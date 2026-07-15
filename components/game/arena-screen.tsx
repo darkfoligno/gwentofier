@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Crown, Skull, Layers, Hexagon, Coins, X, Hand } from "lucide-react"
+import { Crown, Skull, Layers, Hexagon, Coins, X, Hand, Wifi, WifiOff, Loader2 } from "lucide-react"
 import { collection } from "@/lib/game-data"
 import { GameCard } from "./game-card"
+import { useDuelRealtime } from "@/hooks/useDuelRealtime"
 
 /* card footprint used across the board */
 const CARD_W = "w-16 md:w-20 lg:w-22"
@@ -288,7 +289,6 @@ interface PlayerState {
 export function ArenaScreen() {
   const [cemeteryOpen, setCemeteryOpen] = useState(false)
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set())
-  const [currentTurn, setCurrentTurn] = useState(0)
   const [sandParticles, setSandParticles] = useState<Array<{
     id: number
     x: number
@@ -298,6 +298,24 @@ export function ArenaScreen() {
     delay: number
   }>>([])
   const [isMounted, setIsMounted] = useState(false)
+
+  // TODO: Replace with actual match ID and user ID from auth
+  const matchId = "demo-match-id"
+  const currentUserId = "demo-user-id"
+
+  // Use Supabase Realtime hook for authoritative multiplayer state
+  const {
+    matchState,
+    boardCards,
+    connectionStatus,
+    isCurrentPlayer,
+    isPlayer1,
+    opponentId,
+    getCardsByZone,
+    playCard,
+    attackTarget,
+    endTurn,
+  } = useDuelRealtime(matchId, currentUserId)
 
   // Generate sand particles only on client side to fix hydration error
   useEffect(() => {
@@ -312,62 +330,14 @@ export function ArenaScreen() {
     setSandParticles(particles)
     setIsMounted(true)
   }, [])
-  
-  // Local Player State
-  const [localPlayer, setLocalPlayer] = useState<PlayerState>({
-    name: "Cavaleiro de Velen",
-    rank: "#8 Guardião Real",
-    mana: 6,
-    maxMana: 10,
-    hand: collection.slice(0, 6),
-    lifeCards: [
-      { label: "Defesa 1 [Frente]", att: 4500, vida: 8000 },
-      { label: "Defesa 2", att: 3800, vida: 9500 },
-      { label: "Defesa 3 [Base]", att: 3000, vida: 12000 },
-    ],
-    reinforcements: [
-      { cardIndex: 1, isFaceDown: true, isFlipped: flippedCards.has(3) },
-      { cardIndex: null, isFaceDown: true, isFlipped: false },
-      { cardIndex: null, isFaceDown: true, isFlipped: false },
-      { cardIndex: null, isFaceDown: true, isFlipped: false },
-    ],
-    attackers: [
-      { cardIndex: 0 },
-      { cardIndex: null },
-      { cardIndex: 4 },
-      { cardIndex: null },
-    ],
-    deckCount: 34,
-    maxDeck: 40,
-  })
 
-  // Opponent State
-  const [opponent, setOpponent] = useState<PlayerState>({
-    name: "Bruxo de Yggdrasil",
-    rank: "#12 Mestre de Ofieri",
-    mana: 7,
-    maxMana: 10,
-    hand: collection.slice(6, 13), // Hidden from view
-    lifeCards: [
-      { label: "Defesa 1", att: 5000, vida: 6000 },
-      { label: "Defesa 2", att: 4200, vida: 7500 },
-      { label: "Defesa 3", att: 3000, vida: 9000 },
-    ],
-    reinforcements: [
-      { cardIndex: 0, isFaceDown: true, isFlipped: flippedCards.has(0) },
-      { cardIndex: 1, isFaceDown: true, isFlipped: flippedCards.has(1) },
-      { cardIndex: 2, isFaceDown: true, isFlipped: flippedCards.has(2) },
-      { cardIndex: null, isFaceDown: true, isFlipped: false },
-    ],
-    attackers: [
-      { cardIndex: 3 },
-      { cardIndex: 9 },
-      { cardIndex: null },
-      { cardIndex: null },
-    ],
-    deckCount: 33,
-    maxDeck: 40,
-  })
+  // Fallback to mock data if Supabase is not configured
+  const useMockData = !matchState || !boardCards.length
+
+  const currentTurn = matchState?.current_turn ?? 0
+  const localPlayerMana = matchState ? (isPlayer1 ? matchState.player1_mana : matchState.player2_mana) : 6
+  const localPlayerMaxMana = matchState ? (isPlayer1 ? matchState.player1_max_mana : matchState.player2_max_mana) : 10
+  const opponentMana = matchState ? (isPlayer1 ? matchState.player2_mana : matchState.player1_mana) : 7
 
   const toggleFlip = (index: number) => {
     setFlippedCards(prev => {
@@ -379,6 +349,42 @@ export function ArenaScreen() {
       }
       return newSet
     })
+  }
+
+  // Get cards from authoritative database or fallback to mock
+  const getLocalPlayerHand = () => {
+    if (useMockData) return collection.slice(0, 6)
+    return getCardsByZone('hand', currentUserId).map(c => c.card_data)
+  }
+
+  const getLocalPlayerLifeCards = () => {
+    if (useMockData) {
+      return [
+        { label: "Defesa 1 [Frente]", att: 4500, vida: 8000 },
+        { label: "Defesa 2", att: 3800, vida: 9500 },
+        { label: "Defesa 3 [Base]", att: 3000, vida: 12000 },
+      ]
+    }
+    return getCardsByZone('life', currentUserId).map(c => ({
+      label: c.card_data.nome,
+      att: c.card_data.ataque,
+      vida: c.card_data.vida,
+    }))
+  }
+
+  const getOpponentLifeCards = () => {
+    if (useMockData) {
+      return [
+        { label: "Defesa 1", att: 5000, vida: 6000 },
+        { label: "Defesa 2", att: 4200, vida: 7500 },
+        { label: "Defesa 3", att: 3000, vida: 9000 },
+      ]
+    }
+    return getCardsByZone('life', opponentId).map(c => ({
+      label: c.card_data.nome,
+      att: c.card_data.ataque,
+      vida: c.card_data.vida,
+    }))
   }
 
   return (
@@ -430,6 +436,28 @@ export function ArenaScreen() {
           ease: "easeInOut",
         }}
       />
+      {/* Realtime Connection Badge */}
+      <div className="absolute top-2 right-4 z-50 flex items-center gap-2 rounded-full border border-gold/30 bg-stone-950/90 px-3 py-1.5 shadow-[0_0_12px_rgba(0,0,0,0.8)]">
+        {connectionStatus === 'connected' && (
+          <>
+            <Wifi size={14} className="text-green-500" />
+            <span className="text-[10px] font-serif text-green-500/90">Conectado à Areia</span>
+          </>
+        )}
+        {connectionStatus === 'syncing' && (
+          <>
+            <Loader2 size={14} className="text-yellow-500 animate-spin" />
+            <span className="text-[10px] font-serif text-yellow-500/90">Sincronizando...</span>
+          </>
+        )}
+        {connectionStatus === 'disconnected' && (
+          <>
+            <WifiOff size={14} className="text-red-500" />
+            <span className="text-[10px] font-serif text-red-500/90">Desconectado</span>
+          </>
+        )}
+      </div>
+
       {/* Main 3-Column Grid Layout */}
       <div className="grid grid-cols-[minmax(160px,200px)_1fr_minmax(160px,200px)] w-full flex-1 max-w-[1800px] mx-auto px-3 py-1 gap-3 items-center overflow-hidden">
         
@@ -437,10 +465,10 @@ export function ArenaScreen() {
         <div className="flex flex-col justify-between h-full py-2 gap-2">
           {/* Top-Left: Opponent Profile */}
           <ProfileBanner
-            name={opponent.name}
-            rank={opponent.rank}
-            mana={opponent.maxMana}
-            hand={opponent.hand.length}
+            name="Bruxo de Yggdrasil"
+            rank="#12 Mestre de Ofieri"
+            mana={10}
+            hand={useMockData ? 7 : getCardsByZone('hand', opponentId).length}
             isPlayer={false}
           />
 
@@ -451,10 +479,10 @@ export function ArenaScreen() {
 
           {/* Bottom-Left: Player Profile & Leader */}
           <ProfileBanner
-            name={localPlayer.name}
-            rank={localPlayer.rank}
-            mana={localPlayer.maxMana}
-            hand={localPlayer.hand.length}
+            name="Cavaleiro de Velen"
+            rank="#8 Guardião Real"
+            mana={localPlayerMaxMana}
+            hand={getLocalPlayerHand().length}
             isPlayer={true}
             showLeader={true}
             leaderCooldown={2}
@@ -471,7 +499,7 @@ export function ArenaScreen() {
               <span className="text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">[ DEFESA ]</span>
             </div>
             <Row tight>
-              {opponent.lifeCards.map((life, i) => (
+              {getOpponentLifeCards().map((life: any, i: number) => (
                 <LifeCard key={i} label={life.label} att={life.att} vida={life.vida} interactive={false} />
               ))}
             </Row>
@@ -481,16 +509,25 @@ export function ArenaScreen() {
               <span className="text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">[ REFORÇO ]</span>
             </div>
             <Row tight>
-              {opponent.reinforcements.map((reinforcement, i) => 
-                reinforcement.cardIndex !== null ? (
-                  <FaceDownCard 
-                    key={i} 
-                    isFlipped={flippedCards.has(i)} 
-                    onFlip={() => toggleFlip(i)} 
-                  />
-                ) : (
-                  <CardSlot key={i} label="REFORÇO" accent="#8c6820" />
-                )
+              {useMockData ? (
+                <>
+                  <FaceDownCard isFlipped={flippedCards.has(0)} onFlip={() => toggleFlip(0)} />
+                  <FaceDownCard isFlipped={flippedCards.has(1)} onFlip={() => toggleFlip(1)} />
+                  <FaceDownCard isFlipped={flippedCards.has(2)} onFlip={() => toggleFlip(2)} />
+                  <CardSlot label="REFORÇO" accent="#8c6820" />
+                </>
+              ) : (
+                getCardsByZone('reinforcement', opponentId).map((card: any, i: number) => (
+                  card.is_face_down ? (
+                    <FaceDownCard 
+                      key={i} 
+                      isFlipped={card.is_revealed} 
+                      onFlip={() => toggleFlip(i)} 
+                    />
+                  ) : (
+                    <BoardCard key={i} index={0} playerMana={opponentMana} />
+                  )
+                ))
               )}
             </Row>
 
@@ -499,12 +536,17 @@ export function ArenaScreen() {
               <span className="text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">[ ATAQUE ]</span>
             </div>
             <Row tight>
-              {opponent.attackers.map((attacker, i) => 
-                attacker.cardIndex !== null ? (
-                  <BoardCard key={i} index={attacker.cardIndex} playerMana={opponent.mana} />
-                ) : (
-                  <CardSlot key={i} label="ATAQUE" accent="#dc2626" />
-                )
+              {useMockData ? (
+                <>
+                  <BoardCard index={3} playerMana={opponentMana} />
+                  <BoardCard index={9} playerMana={opponentMana} />
+                  <CardSlot label="ATAQUE" accent="#dc2626" />
+                  <CardSlot label="ATAQUE" accent="#dc2626" />
+                </>
+              ) : (
+                getCardsByZone('attacker', opponentId).map((card: any, i: number) => (
+                  <BoardCard key={i} index={0} playerMana={opponentMana} />
+                ))
               )}
             </Row>
           </div>
@@ -560,12 +602,17 @@ export function ArenaScreen() {
               <span className="text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">[ ATAQUE ]</span>
             </div>
             <Row tight>
-              {localPlayer.attackers.map((attacker, i) => 
-                attacker.cardIndex !== null ? (
-                  <BoardCard key={i} index={attacker.cardIndex} playerMana={localPlayer.mana} />
-                ) : (
-                  <CardSlot key={i} label="ATAQUE" />
-                )
+              {useMockData ? (
+                <>
+                  <BoardCard index={0} playerMana={localPlayerMana} />
+                  <CardSlot label="ATAQUE" />
+                  <BoardCard index={4} playerMana={localPlayerMana} />
+                  <CardSlot label="ATAQUE" />
+                </>
+              ) : (
+                getCardsByZone('attacker', currentUserId).map((card: any, i: number) => (
+                  <BoardCard key={i} index={0} playerMana={localPlayerMana} />
+                ))
               )}
             </Row>
 
@@ -574,16 +621,25 @@ export function ArenaScreen() {
               <span className="text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">[ REFORÇO ]</span>
             </div>
             <Row tight>
-              {localPlayer.reinforcements.map((reinforcement, i) => 
-                reinforcement.cardIndex !== null ? (
-                  <FaceDownCard 
-                    key={i} 
-                    isFlipped={flippedCards.has(i + 3)} 
-                    onFlip={() => toggleFlip(i + 3)} 
-                  />
-                ) : (
-                  <CardSlot key={i} label="REFORÇO" accent="#8c6820" />
-                )
+              {useMockData ? (
+                <>
+                  <FaceDownCard isFlipped={flippedCards.has(3)} onFlip={() => toggleFlip(3)} />
+                  <CardSlot label="REFORÇO" accent="#8c6820" />
+                  <CardSlot label="REFORÇO" accent="#8c6820" />
+                  <CardSlot label="REFORÇO" accent="#8c6820" />
+                </>
+              ) : (
+                getCardsByZone('reinforcement', currentUserId).map((card: any, i: number) => (
+                  card.is_face_down ? (
+                    <FaceDownCard 
+                      key={i} 
+                      isFlipped={card.is_revealed} 
+                      onFlip={() => toggleFlip(i + 3)} 
+                    />
+                  ) : (
+                    <BoardCard key={i} index={0} playerMana={localPlayerMana} />
+                  )
+                ))
               )}
             </Row>
 
@@ -592,7 +648,7 @@ export function ArenaScreen() {
               <span className="text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">[ DEFESA ]</span>
             </div>
             <Row tight>
-              {localPlayer.lifeCards.map((life, i) => (
+              {getLocalPlayerLifeCards().map((life: any, i: number) => (
                 <LifeCard 
                   key={i} 
                   label={life.label} 
@@ -600,7 +656,7 @@ export function ArenaScreen() {
                   vida={life.vida} 
                   interactive={true}
                   onClick={() => {
-                    if (localPlayer.mana >= 2) {
+                    if (localPlayerMana >= 2) {
                       console.log(`Defesa ativada: ${life.label}`)
                     }
                   }}
@@ -613,25 +669,25 @@ export function ArenaScreen() {
         {/* ============ RIGHT COLUMN ============ */}
         <div className="flex flex-col justify-between h-full py-2 gap-2">
           {/* Top-Right: Opponent Deck */}
-          <Deck current={opponent.deckCount} max={opponent.maxDeck} isOpponent={true} />
+          <Deck current={33} max={40} isOpponent={true} />
 
           {/* Spacer */}
           <div className="flex-1" />
 
           {/* Bottom-Right: Player Deck */}
-          <Deck current={localPlayer.deckCount} max={localPlayer.maxDeck} isOpponent={false} />
+          <Deck current={34} max={40} isOpponent={false} />
         </div>
       </div>
 
       {/* ============ BOTTOM OVERLAY: PLAYER HAND ============ */}
       <div className="pointer-events-none fixed bottom-1 left-1/2 -translate-x-1/2 z-50 flex justify-center">
         <div className="pointer-events-auto flex items-end gap-1">
-          {localPlayer.hand.map((card, i) => {
-            const mid = (localPlayer.hand.length - 1) / 2
+          {getLocalPlayerHand().map((card: any, i: number) => {
+            const mid = (getLocalPlayerHand().length - 1) / 2
             const offset = i - mid
             return (
               <motion.div
-                key={card.id}
+                key={card.id || i}
                 className="w-16 origin-bottom"
                 style={{
                   rotate: offset * 4,
@@ -646,7 +702,7 @@ export function ArenaScreen() {
                 }}
                 transition={{ type: "spring", stiffness: 300, damping: 22 }}
               >
-                <GameCard card={card} interactive={true} playerMana={localPlayer.mana} />
+                <GameCard card={card} interactive={true} playerMana={localPlayerMana} />
               </motion.div>
             )
           })}
