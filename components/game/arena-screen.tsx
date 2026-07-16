@@ -298,6 +298,9 @@ export function ArenaScreen() {
     delay: number
   }>>([])
   const [isMounted, setIsMounted] = useState(false)
+  const [banPhaseOpen, setBanPhaseOpen] = useState(false)
+  const [banCandidates, setBanCandidates] = useState<any[]>([])
+  const [hasPlayedCardThisTurn, setHasPlayedCardThisTurn] = useState(false)
 
   // TODO: Replace with actual match ID and user ID from auth
   const matchId = "00000000-0000-0000-0000-000000000000"
@@ -315,6 +318,9 @@ export function ArenaScreen() {
     playCard,
     attackTarget,
     endTurn,
+    passWithoutAction,
+    getBanCandidates,
+    submitBan,
   } = useDuelRealtime(matchId, currentUserId)
 
   // Generate sand particles only on client side to fix hydration error
@@ -330,6 +336,25 @@ export function ArenaScreen() {
     setSandParticles(particles)
     setIsMounted(true)
   }, [])
+
+  // Handle ban phase logic
+  useEffect(() => {
+    if (matchState?.status === 'ban_phase' && isCurrentPlayer && !banPhaseOpen) {
+      const fetchBanCandidates = async () => {
+        try {
+          const candidates = await getBanCandidates()
+          setBanCandidates(candidates || [])
+          setBanPhaseOpen(true)
+        } catch (error) {
+          console.error('Erro ao buscar candidatos de banimento:', error)
+        }
+      }
+      fetchBanCandidates()
+    } else if (matchState?.status !== 'ban_phase') {
+      setBanPhaseOpen(false)
+      setBanCandidates([])
+    }
+  }, [matchState?.status, isCurrentPlayer, banPhaseOpen, getBanCandidates])
 
   // Fallback to mock data if Supabase is not configured
   const useMockData = !matchState || !boardCards.length
@@ -585,13 +610,26 @@ export function ArenaScreen() {
                 </p>
               </div>
 
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95, rotate: -2 }}
-                className="gold-trim rounded-md px-4 py-1 font-serif text-xs font-black uppercase tracking-wide text-wood-darkest shadow-[0_4px_12px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.5)] border-2 border-gold-dark/50"
-              >
-                PASSAR TURNO
-              </motion.button>
+              <div className="flex gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95, rotate: -2 }}
+                  onClick={() => endTurn(matchState?.match_version || 0)}
+                  className="gold-trim rounded-md px-3 py-1 font-serif text-[10px] font-black uppercase tracking-wide text-wood-darkest shadow-[0_4px_12px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.5)] border-2 border-gold-dark/50"
+                >
+                  ENCERRAR TURNO
+                </motion.button>
+                {!hasPlayedCardThisTurn && (
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95, rotate: -2 }}
+                    onClick={() => passWithoutAction(matchState?.match_version || 0)}
+                    className="rounded-md px-3 py-1 font-serif text-[10px] font-black uppercase tracking-wide text-rune-amber shadow-[0_4px_12px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.5)] border-2 border-rune-amber/50"
+                  >
+                    PASSAR SEM AGIR
+                  </motion.button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -710,6 +748,69 @@ export function ArenaScreen() {
       </div>
 
       <AnimatePresence>{cemeteryOpen && <CemeteryModal onClose={() => setCemeteryOpen(false)} />}</AnimatePresence>
+      
+      {/* Ban Phase Modal */}
+      <AnimatePresence>
+        {banPhaseOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="relative max-w-2xl w-full mx-4 rounded-lg border-2 border-gold/50 bg-wood-darkest/95 p-6 shadow-[0_0_40px_rgba(212,175,55,0.3)]"
+            >
+              <h2 className="mb-4 font-serif text-xl font-bold uppercase tracking-wider text-gold text-shadow-gold text-center">
+                Fase de Banimento
+              </h2>
+              <p className="mb-6 text-center font-serif text-sm text-rune-amber">
+                Selecione uma carta lendária/dourada do oponente para banir
+              </p>
+              
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                {banCandidates.map((card: any) => (
+                  <motion.button
+                    key={card.id}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={async () => {
+                      try {
+                        await submitBan(card.id)
+                        setBanPhaseOpen(false)
+                        setBanCandidates([])
+                      } catch (error) {
+                        console.error('Erro ao banir carta:', error)
+                      }
+                    }}
+                    className="relative aspect-[2.5/3.5] rounded-md border-2 border-gold/30 bg-stone-900/50 p-2 hover:border-gold hover:shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all"
+                  >
+                    <div className="h-full flex flex-col items-center justify-center">
+                      <p className="text-[10px] font-serif text-center text-gold leading-tight">
+                        {card.nome}
+                      </p>
+                      <p className="text-[8px] font-serif text-center text-rune-amber mt-1">
+                        {card.raridade}
+                      </p>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+
+              {matchState?.status === 'ban_phase' && !isCurrentPlayer && (
+                <div className="text-center">
+                  <p className="font-serif text-sm text-rune-amber animate-pulse">
+                    Aguardando oponente banir...
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

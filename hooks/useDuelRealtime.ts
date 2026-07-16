@@ -38,7 +38,7 @@ interface MatchState {
   player1_max_mana: number
   player2_max_mana: number
   match_version: number
-  status: 'setup' | 'active' | 'completed'
+  status: 'setup' | 'ban_phase' | 'active' | 'completed'
 }
 
 type ConnectionStatus = 'connected' | 'syncing' | 'disconnected'
@@ -152,6 +152,53 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     }
   }, [matchId])
 
+  // RPC: Pass without action (draw card)
+  const passWithoutAction = useCallback(async (expectedVersion: number) => {
+    try {
+      const { data, error } = await supabase.rpc('pass_without_action', {
+        p_match_id: matchId,
+        p_expected_version: expectedVersion
+      })
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Erro ao passar sem agir:', error)
+      throw error
+    }
+  }, [matchId])
+
+  // RPC: Get ban candidates
+  const getBanCandidates = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_match_ban_candidates', {
+        p_match_id: matchId
+      })
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Erro ao buscar candidatos de banimento:', error)
+      throw error
+    }
+  }, [matchId])
+
+  // RPC: Submit ban
+  const submitBan = useCallback(async (cardId: string) => {
+    try {
+      const { data, error } = await supabase.rpc('submit_match_ban', {
+        p_match_id: matchId,
+        p_card_id: cardId
+      })
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Erro ao submeter banimento:', error)
+      throw error
+    }
+  }, [matchId])
+
   // Setup realtime subscriptions
   useEffect(() => {
     setConnectionStatus('syncing')
@@ -224,6 +271,9 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     playCard,
     attackTarget,
     endTurn,
+    passWithoutAction,
+    getBanCandidates,
+    submitBan,
     refresh: () => {
       fetchMatchState()
       fetchBoardCards()
