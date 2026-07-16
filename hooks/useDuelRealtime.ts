@@ -43,6 +43,14 @@ interface MatchState {
 
 type ConnectionStatus = 'connected' | 'syncing' | 'disconnected'
 
+// UUID validation regex
+const isValidUUID = (uuid: string) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  return uuidRegex.test(uuid)
+}
+
+const NIL_UUID = '00000000-0000-0000-0000-000000000000'
+
 export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [matchState, setMatchState] = useState<MatchState | null>(null)
   const [boardCards, setBoardCards] = useState<MatchCard[]>([])
@@ -51,6 +59,12 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   // Fetch visible match cards from authoritative view
   const fetchBoardCards = useCallback(async () => {
+    // Guard clause: skip fetch if matchId is nil UUID or invalid
+    if (matchId === NIL_UUID || !isValidUUID(matchId)) {
+      console.log('Skipping board cards fetch - invalid or nil UUID:', matchId)
+      return
+    }
+
     try {
       const { data, error } = await supabase
         .from('visible_match_cards')
@@ -66,6 +80,12 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   // Fetch match public state
   const fetchMatchState = useCallback(async () => {
+    // Guard clause: skip fetch if matchId is nil UUID or invalid
+    if (matchId === NIL_UUID || !isValidUUID(matchId)) {
+      console.log('Skipping match state fetch - invalid or nil UUID:', matchId)
+      return
+    }
+
     try {
       const { data, error } = await supabase
         .from('match_public_states')

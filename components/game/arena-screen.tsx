@@ -300,8 +300,8 @@ export function ArenaScreen() {
   const [isMounted, setIsMounted] = useState(false)
 
   // TODO: Replace with actual match ID and user ID from auth
-  const matchId = "demo-match-id"
-  const currentUserId = "demo-user-id"
+  const matchId = "00000000-0000-0000-0000-000000000000"
+  const currentUserId = "00000000-0000-0000-0000-000000000000"
 
   // Use Supabase Realtime hook for authoritative multiplayer state
   const {

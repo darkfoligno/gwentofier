@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { AuthScreen } from "@/components/game/auth-screen"
 import { HubScreen } from "@/components/game/hub-screen"
 import { ArenaScreen } from "@/components/game/arena-screen"
 import type { Screen } from "@/lib/types"
+import { supabase } from "@/lib/supabase"
 
 const debugItems: { key: Screen; label: string }[] = [
   { key: "auth", label: "Login" },
@@ -14,7 +15,27 @@ const debugItems: { key: Screen; label: string }[] = [
 ]
 
 export default function Page() {
-  const [activeScreen, setActiveScreen] = useState<Screen>("arena")
+  const [activeScreen, setActiveScreen] = useState<Screen>("auth")
+
+  useEffect(() => {
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setActiveScreen("hub")
+      }
+    })
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setActiveScreen("hub")
+      } else {
+        setActiveScreen("auth")
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   return (
     <main className="relative min-h-screen">
