@@ -1,4 +1,4 @@
-export type Screen = "auth" | "hub" | "store" | "spectator" | "arena"
+export type Screen = "auth" | "hub" | "store" | "spectator" | "arena" | "friends" | "patch-notes" | "collection" | "decks"
 
 export type MatchStatus = "waiting" | "ban_phase" | "setup" | "initiative" | "in_progress" | "finished" | "cancelled" | "expired"
 export type MatchCardZone = "deck" | "hand" | "life" | "reinforcement" | "attacker" | "leader" | "graveyard" | "banished" | "temporary"
@@ -48,6 +48,9 @@ export interface VisibleMatchCardRow {
   card_name: string | null
   image_url: string | null
   rarity: string | null
+  element?: string | null
+  effect_mana_cost?: number | null
+  effect_text?: string | null
   current_power: number | null
   maximum_power: number | null
   current_life: number | null

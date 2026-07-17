@@ -28,7 +28,7 @@ export function StoreScreen() {
     const ids = results.map(card => card.card_id)
     const { data } = await supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").in("id", ids)
     const byId = new Map((data ?? []).map((card: any) => [card.id, card]))
-    return results.map(result => { const card: any = byId.get(result.card_id); return { id: result.card_id, nome: result.name, image_url: result.image_url, elemento: (["Bestiário", "M&F", "Witcher", "Elfica", "Cívil", "Vampiro"].includes(card?.element) ? card.element : "Bestiário") as GameCardType["elemento"], raridade: result.rarity, tipo: card?.card_type ?? "normal", mana: card?.effect_mana_cost ?? 0, ataque: card?.base_power ?? 0, vida: card?.base_max_life ?? 1, efeito: card?.effect_text ?? "", effect_definition: card?.card_effects ?? [], is_original_rpg: card?.is_original_rpg ?? false } })
+    return results.map(result => { const card: any = byId.get(result.card_id); return { id: result.card_id, nome: result.name, image_url: result.image_url, elemento: (["Bestiário", "M&F", "Witcher", "Elfica", "Cívil", "Vampiro"].includes(card?.element) ? card.element : "Bestiário") as GameCardType["elemento"], raridade: result.rarity, tipo: card?.element ?? "Bestiário", mana: card?.effect_mana_cost ?? 0, ataque: card?.base_power ?? 0, vida: card?.base_max_life ?? 1, efeito: card?.effect_text ?? "", effect_definition: card?.card_effects ?? [], is_original_rpg: card?.is_original_rpg ?? false } })
   }
 
   const openResult = async (result: any) => { setCards(await hydrate(result?.cards ?? [])); await refresh() }

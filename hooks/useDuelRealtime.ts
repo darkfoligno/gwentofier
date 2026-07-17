@@ -71,9 +71,9 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
         ataque: row.current_power ?? 0,
         vida: row.current_life ?? 0,
         elemento: "Bestiário",
-        tipo: "unidade",
+        tipo: row.element ?? "",
         raridade: (["common", "rare", "epic", "legendary", "collab"].includes(row.rarity ?? "") ? row.rarity : "common") as "common" | "rare" | "epic" | "legendary" | "collab",
-        efeito: "",
+        efeito: row.effect_text ?? "",
       },
     })))
   }, [matchId, validMatch])
