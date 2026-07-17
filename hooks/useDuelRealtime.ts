@@ -22,6 +22,11 @@ function isStaleVersion(error: PostgrestError | Error | null) {
   return Boolean(error && (error.message.includes("STALE_MATCH_VERSION") || ("details" in error && error.details?.includes("STALE_MATCH_VERSION"))))
 }
 
+async function reportDuelError(matchId: string, operation: string, error: PostgrestError | Error) {
+  const issue = error as PostgrestError
+  await supabase.rpc("report_client_error", { p_area: "arena", p_operation: operation, p_error_code: issue.code ?? null, p_error_message: error.message, p_error_details: issue.details ?? null, p_match_id: UUID.test(matchId) ? matchId : null, p_client_context: { online: typeof navigator !== "undefined" ? navigator.onLine : null } })
+}
+
 export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [matchState, setMatchState] = useState<MatchState | null>(null)
   const [boardCards, setBoardCards] = useState<VisibleMatchCard[]>([])
@@ -100,6 +105,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       if (mounted.current) setConnectionStatus("connected")
     } catch (error) {
       console.error("Falha ao sincronizar a partida autoritativa", error)
+      void reportDuelError(matchId, "realtime_refresh", error as PostgrestError | Error)
       if (mounted.current) setConnectionStatus("disconnected")
     }
   }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, validMatch])
@@ -108,10 +114,11 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     const { data, error } = await supabase.rpc(name, args)
     if (error) {
       if (isStaleVersion(error)) await refresh()
+      void reportDuelError(matchId, name, error)
       throw error
     }
     return data as T
-  }, [refresh])
+  }, [matchId, refresh])
 
   const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
     p_match_id: matchId,

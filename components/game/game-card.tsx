@@ -15,6 +15,13 @@ const rarity: Record<Rarity, string> = {
   legendary: "border-amber-500 shadow-amber-500/50",
   collab: "border-pink-500 shadow-pink-500/40",
 }
+const raritySurface: Record<Rarity, string> = {
+  common: "bg-gradient-to-b from-emerald-50 via-white to-emerald-100",
+  rare: "bg-gradient-to-b from-blue-50 via-white to-blue-100",
+  epic: "bg-gradient-to-b from-purple-50 via-white to-purple-100",
+  legendary: "bg-gradient-to-b from-amber-50 via-white to-amber-100",
+  collab: "bg-gradient-to-b from-pink-50 via-white to-pink-100",
+}
 
 export function GameCard({ card, interactive = false, className, isFaceDown = false, enableZoom = true }: { card?: GameCardType; interactive?: boolean; className?: string; isFaceDown?: boolean; playerMana?: number; enableZoom?: boolean }) {
   const [artOpen, setArtOpen] = useState(false)
@@ -34,7 +41,7 @@ export function GameCard({ card, interactive = false, className, isFaceDown = fa
   const effectSize = card.efeito.length > 180 ? "text-[5px] leading-[1.05]" : card.efeito.length > 100 ? "text-[6px] leading-tight" : "text-[clamp(6px,.7vw,9px)] leading-snug"
   return <><motion.article whileHover={interactive ? { y: -10, scale: 1.06, zIndex: 60 } : undefined} transition={{ type: "spring", stiffness: 320, damping: 24 }} className={cn("group relative aspect-[2/3] w-full rounded-[11px] border-2 p-[2px] shadow-xl", rarity[card.raridade], className)}>
     <div className="relative h-full overflow-hidden rounded-lg bg-gradient-to-b from-amber-700 via-yellow-950 to-amber-800 p-1.5 shadow-inner">
-      <div className="relative flex h-full flex-col overflow-hidden rounded-md bg-[#FDFBF7] text-slate-900 shadow-[inset_0_0_18px_rgba(120,80,25,.16)]">
+      <div className={cn("relative flex h-full flex-col overflow-hidden rounded-md text-slate-900 shadow-[inset_0_0_18px_rgba(120,80,25,.16)]", raritySurface[card.raridade])}>
         <div className="relative z-20 ml-auto mr-2 mt-2 flex h-[12%] w-[76%] min-w-0 items-center justify-center overflow-hidden rounded border border-amber-600 bg-white px-1 shadow-sm"><h3 title={card.nome} className={`${nameSize} w-full break-words text-center font-serif font-black leading-[1.02]`}>{card.nome}</h3></div>
         <div className="absolute left-1 top-1 z-30"><div className="flex h-9 w-9 rotate-45 items-center justify-center border-2 border-amber-400 bg-blue-950 shadow-[0_0_10px_rgba(59,130,246,.6)]"><span className="-rotate-45 text-xs font-black text-blue-100"><Hand size={9} className="mx-auto" />{card.mana}</span></div><span className="mt-1 block rounded-sm bg-black px-1 text-center font-serif text-[6px] text-white">MANA</span></div>
         <div onClick={(event) => { event.stopPropagation(); if (enableZoom) setArtOpen(true) }} className={`relative mx-2 mt-1 h-[45%] overflow-hidden border-2 border-double border-amber-700 bg-stone-800 ${enableZoom ? "cursor-zoom-in" : ""}`}>
@@ -51,5 +58,5 @@ export function GameCard({ card, interactive = false, className, isFaceDown = fa
         </div>
       </div>
     </div>
-  </motion.article>{typeof document !== "undefined" && createPortal(<AnimatePresence>{artOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={(event) => { event.stopPropagation(); setArtOpen(false) }} className="fixed inset-0 z-[500] flex cursor-zoom-out items-center justify-center bg-black/90 p-6 backdrop-blur-md"><motion.div initial={{ scale: .75 }} animate={{ scale: 1 }} className="aspect-[2/3] h-[min(88vh,780px)] max-w-[90vw]" onClick={event => event.stopPropagation()}><GameCard card={card} enableZoom={false} /></motion.div></motion.div>}</AnimatePresence>, document.body)}</>
+  </motion.article>{typeof document !== "undefined" && createPortal(<AnimatePresence>{artOpen && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={(event) => { event.stopPropagation(); setArtOpen(false) }} className="fixed inset-0 z-[500] flex cursor-zoom-out items-center justify-center bg-black/90 p-6 backdrop-blur-md"><motion.div initial={{ scale: .75 }} animate={{ scale: 1 }} className="aspect-[2/3] w-[240px] origin-center scale-[1.35] sm:scale-[1.65] lg:scale-[1.9]" onClick={event => event.stopPropagation()}><GameCard card={card} enableZoom={false} /></motion.div></motion.div>}</AnimatePresence>, document.body)}</>
 }
