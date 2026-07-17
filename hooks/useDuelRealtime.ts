@@ -1,282 +1,170 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { PostgrestError } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase"
+import type {
+  BanCandidate,
+  MatchAction,
+  MatchPublicStateRow,
+  MatchRow,
+  MatchState,
+  PendingAttack,
+  VisibleMatchCard,
+  VisibleMatchCardRow,
+} from "@/lib/types"
 
-interface MatchCard {
-  id: string
-  match_id: string
-  card_id: string
-  owner_id: string
-  zone: 'hand' | 'life' | 'reinforcement' | 'attacker' | 'graveyard'
-  slot_index: number
-  is_face_down: boolean
-  is_revealed: boolean
-  card_data: {
-    id: string
-    nome: string
-    mana: number
-    ataque: number
-    vida: number
-    elemento: string
-    tipo: string
-    raridade: string
-    efeito: string
-  }
+type ConnectionStatus = "connected" | "syncing" | "disconnected"
+const NIL_UUID = "00000000-0000-0000-0000-000000000000"
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function isStaleVersion(error: PostgrestError | Error | null) {
+  return Boolean(error && (error.message.includes("STALE_MATCH_VERSION") || ("details" in error && error.details?.includes("STALE_MATCH_VERSION"))))
 }
-
-interface MatchState {
-  id: string
-  current_turn: number
-  current_player_id: string
-  player1_id: string
-  player2_id: string
-  player1_life: number
-  player2_life: number
-  player1_mana: number
-  player2_mana: number
-  player1_max_mana: number
-  player2_max_mana: number
-  match_version: number
-  status: 'setup' | 'ban_phase' | 'active' | 'completed'
-}
-
-type ConnectionStatus = 'connected' | 'syncing' | 'disconnected'
-
-// UUID validation regex
-const isValidUUID = (uuid: string) => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  return uuidRegex.test(uuid)
-}
-
-const NIL_UUID = '00000000-0000-0000-0000-000000000000'
 
 export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [matchState, setMatchState] = useState<MatchState | null>(null)
-  const [boardCards, setBoardCards] = useState<MatchCard[]>([])
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
-  const channelRef = useRef<any>(null)
+  const [boardCards, setBoardCards] = useState<VisibleMatchCard[]>([])
+  const [matchActions, setMatchActions] = useState<MatchAction[]>([])
+  const [pendingAttack, setPendingAttack] = useState<PendingAttack | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
+  const mounted = useRef(true)
+  const validMatch = UUID.test(matchId) && matchId !== NIL_UUID
 
-  // Fetch visible match cards from authoritative view
-  const fetchBoardCards = useCallback(async () => {
-    // Guard clause: skip fetch if matchId is nil UUID or invalid
-    if (matchId === NIL_UUID || !isValidUUID(matchId)) {
-      console.log('Skipping board cards fetch - invalid or nil UUID:', matchId)
-      return
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('visible_match_cards')
-        .select('*')
-        .eq('match_id', matchId)
-
-      if (error) throw error
-      setBoardCards(data || [])
-    } catch (error) {
-      console.error('Erro ao buscar cartas do tabuleiro:', error)
-    }
-  }, [matchId])
-
-  // Fetch match public state
   const fetchMatchState = useCallback(async () => {
-    // Guard clause: skip fetch if matchId is nil UUID or invalid
-    if (matchId === NIL_UUID || !isValidUUID(matchId)) {
-      console.log('Skipping match state fetch - invalid or nil UUID:', matchId)
-      return
-    }
+    if (!validMatch) return
+    const [matchResult, publicResult] = await Promise.all([
+      supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason").eq("id", matchId).single(),
+      supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
+    ])
+    if (matchResult.error) throw matchResult.error
+    if (publicResult.error) throw publicResult.error
+    const match = matchResult.data as MatchRow
+    const state = publicResult.data as MatchPublicStateRow
+    if (mounted.current) setMatchState({
+      ...match, ...state,
+      current_player_id: match.active_player_id,
+      player1_id: state.player1_user_id ?? "",
+      player2_id: state.player2_user_id ?? "",
+      player1_mana: state.player1_mana_available,
+      player2_mana: state.player2_mana_available,
+      player1_max_mana: state.player1_hand_count,
+      player2_max_mana: state.player2_hand_count,
+      match_version: match.state_version,
+    })
+  }, [matchId, validMatch])
 
+  const fetchBoardCards = useCallback(async () => {
+    if (!validMatch) return
+    const { data, error } = await supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("slot_index")
+    if (error) throw error
+    const rows = (data ?? []) as VisibleMatchCardRow[]
+    if (mounted.current) setBoardCards(rows.map(row => ({
+      ...row,
+      card_id: row.id,
+      owner_id: row.controller_user_id,
+      slot_index: row.zone_position ?? 0,
+      card_data: row.card_name == null ? null : {
+        id: row.id,
+        nome: row.card_name,
+        mana: 0,
+        ataque: row.current_power ?? 0,
+        vida: row.current_life ?? 0,
+        elemento: "arcano",
+        tipo: "unidade",
+        raridade: (["common", "rare", "epic", "legendary", "collab"].includes(row.rarity ?? "") ? row.rarity : "common") as "common" | "rare" | "epic" | "legendary" | "collab",
+        efeito: "",
+      },
+    })))
+  }, [matchId, validMatch])
+
+  const fetchActions = useCallback(async () => {
+    if (!validMatch) return
+    const { data, error } = await supabase.from("visible_match_actions").select("*").eq("match_id", matchId).order("sequence_number", { ascending: false }).limit(50)
+    if (error) throw error
+    if (mounted.current) setMatchActions((data ?? []) as MatchAction[])
+  }, [matchId, validMatch])
+
+  const fetchPendingAttack = useCallback(async () => {
+    if (!validMatch || !currentUserId) return
+    const { data, error } = await supabase.from("pending_attacks").select("*").eq("match_id", matchId).eq("defender_user_id", currentUserId).eq("status", "awaiting_reaction").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    if (error) throw error
+    if (mounted.current) setPendingAttack(data as PendingAttack | null)
+  }, [currentUserId, matchId, validMatch])
+
+  const refresh = useCallback(async () => {
+    if (!validMatch) return
+    setConnectionStatus("syncing")
     try {
-      const { data, error } = await supabase
-        .from('match_public_states')
-        .select('*')
-        .eq('match_id', matchId)
-        .single()
-
-      if (error) throw error
-      setMatchState(data)
+      await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack()])
+      if (mounted.current) setConnectionStatus("connected")
     } catch (error) {
-      console.error('Erro ao buscar estado da partida:', error)
+      console.error("Falha ao sincronizar a partida autoritativa", error)
+      if (mounted.current) setConnectionStatus("disconnected")
     }
-  }, [matchId])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, validMatch])
 
-  // RPC: Play card to board
-  const playCard = useCallback(async (cardId: string, zone: string, slotIndex: number, isFaceDown: boolean = false) => {
-    try {
-      const { data, error } = await supabase.rpc('play_match_card', {
-        p_match_id: matchId,
-        p_card_id: cardId,
-        p_zone: zone,
-        p_slot_index: slotIndex,
-        p_is_face_down: isFaceDown
-      })
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Erro ao jogar carta:', error)
+  const rpc = useCallback(async <T,>(name: string, args: Record<string, unknown>) => {
+    const { data, error } = await supabase.rpc(name, args)
+    if (error) {
+      if (isStaleVersion(error)) await refresh()
       throw error
     }
-  }, [matchId])
+    return data as T
+  }, [refresh])
 
-  // RPC: Declare attack
-  const attackTarget = useCallback(async (attackerCardId: string, targetCardId: string) => {
-    try {
-      const { data, error } = await supabase.rpc('declare_attack', {
-        p_match_id: matchId,
-        p_attacker_card_id: attackerCardId,
-        p_target_card_id: targetCardId
-      })
+  const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
+    p_match_id: matchId,
+    p_expected_version: matchState?.match_version ?? 0,
+    ...extra,
+  }), [matchId, matchState?.match_version])
 
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Erro ao declarar ataque:', error)
-      throw error
-    }
-  }, [matchId])
-
-  // RPC: Pass turn
-  const endTurn = useCallback(async (expectedVersion: number) => {
-    try {
-      const { data, error } = await supabase.rpc('pass_turn', {
-        p_match_id: matchId,
-        p_expected_version: expectedVersion
-      })
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Erro ao passar turno:', error)
-      throw error
-    }
-  }, [matchId])
-
-  // RPC: Pass without action (draw card)
-  const passWithoutAction = useCallback(async (expectedVersion: number) => {
-    try {
-      const { data, error } = await supabase.rpc('pass_without_action', {
-        p_match_id: matchId,
-        p_expected_version: expectedVersion
-      })
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Erro ao passar sem agir:', error)
-      throw error
-    }
-  }, [matchId])
-
-  // RPC: Get ban candidates
-  const getBanCandidates = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_match_ban_candidates', {
-        p_match_id: matchId
-      })
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Erro ao buscar candidatos de banimento:', error)
-      throw error
-    }
-  }, [matchId])
-
-  // RPC: Submit ban
-  const submitBan = useCallback(async (cardId: string) => {
-    try {
-      const { data, error } = await supabase.rpc('submit_match_ban', {
-        p_match_id: matchId,
-        p_card_id: cardId
-      })
-
-      if (error) throw error
-      return data
-    } catch (error) {
-      console.error('Erro ao submeter banimento:', error)
-      throw error
-    }
-  }, [matchId])
-
-  // Setup realtime subscriptions
   useEffect(() => {
-    setConnectionStatus('syncing')
-
-    // Initial fetch
-    Promise.all([fetchMatchState(), fetchBoardCards()])
-      .then(() => setConnectionStatus('connected'))
-      .catch(() => setConnectionStatus('disconnected'))
-
-    // Create realtime channel
-    const channel = supabase.channel(`match_room_${matchId}`)
-    channelRef.current = channel
-
-    // Subscribe to match state changes
-    channel
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'match_public_states',
-        filter: `match_id=eq.${matchId}`
-      }, (payload) => {
-        console.log('Estado da partida alterado:', payload)
-        fetchMatchState()
+    mounted.current = true
+    if (!validMatch) return
+    void refresh()
+    const channel = supabase.channel(`match:${matchId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, payload => {
+        const next = payload.new as MatchRow
+        setMatchState(previous => previous ? { ...previous, ...next, current_player_id: next.active_player_id, match_version: next.state_version } : previous)
+        void Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions()])
       })
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'match_actions',
-        filter: `match_id=eq.${matchId}`
-      }, (payload) => {
-        console.log('Ação de partida registrada:', payload)
-        fetchBoardCards()
-        fetchMatchState()
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_public_states", filter: `match_id=eq.${matchId}` }, payload => {
+        const next = payload.new as MatchPublicStateRow
+        setMatchState(previous => previous ? { ...previous, ...next, player1_mana: next.player1_mana_available, player2_mana: next.player2_mana_available } : previous)
+        void Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions()])
       })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setConnectionStatus('connected')
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setConnectionStatus('disconnected')
-        }
+      .on("postgres_changes", { event: "*", schema: "public", table: "pending_attacks", filter: `match_id=eq.${matchId}` }, payload => {
+        const next = payload.new as PendingAttack
+        setPendingAttack(next.status === "awaiting_reaction" && next.defender_user_id === currentUserId ? next : null)
+        void Promise.all([fetchPendingAttack(), fetchMatchState(), fetchBoardCards(), fetchActions()])
       })
-
+      .subscribe(status => setConnectionStatus(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "CLOSED" ? "disconnected" : "syncing"))
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-      }
+      mounted.current = false
+      void supabase.removeChannel(channel)
     }
-  }, [matchId, fetchMatchState, fetchBoardCards])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, matchId, refresh, validMatch])
 
-  // Filter cards by zone for UI rendering
-  const getCardsByZone = useCallback((zone: string, ownerId?: string) => {
-    return boardCards.filter(card => 
-      card.zone === zone && (!ownerId || card.owner_id === ownerId)
-    )
-  }, [boardCards])
-
-  // Get current player's perspective
-  const isCurrentPlayer = matchState?.current_player_id === currentUserId
   const isPlayer1 = matchState?.player1_id === currentUserId
   const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
+  const isCurrentPlayer = matchState?.current_player_id === currentUserId
+  const getCardsByZone = useCallback((zone: VisibleMatchCard["zone"], ownerId?: string) => boardCards.filter(card => card.zone === zone && (!ownerId || card.owner_id === ownerId)), [boardCards])
+  const hasActedThisTurn = useMemo(() => matchActions.some(action => action.actor_user_id === currentUserId && action.state_version_after === matchState?.match_version), [currentUserId, matchActions, matchState?.match_version])
+  const reactionUsed = pendingAttack?.status === "reaction_used"
 
   return {
-    matchState,
-    boardCards,
-    connectionStatus,
-    isCurrentPlayer,
-    isPlayer1,
-    opponentId,
-    getCardsByZone,
-    playCard,
-    attackTarget,
-    endTurn,
-    passWithoutAction,
-    getBanCandidates,
-    submitBan,
-    refresh: () => {
-      fetchMatchState()
-      fetchBoardCards()
-    }
+    matchState, boardCards, matchActions, pendingAttack, connectionStatus,
+    isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
+    getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
+    submitBan: (cardId: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "legendary_golden" })),
+    playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
+    replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
+    declareAttack: (attackerCardIds: string[], isDirect: boolean) => rpc("declare_attack", versioned({ p_attacker_card_ids: attackerCardIds, p_is_direct: isDirect })),
+    endTurn: () => rpc("end_turn", versioned()),
+    passWithoutAction: () => rpc("pass_without_action", versioned()),
+    surrenderMatch: () => rpc("surrender_match", versioned()),
+    activateMatchEffect: (cardId: string, effectOrder = 1, targetCardId?: string) => rpc("activate_match_effect", versioned({ p_source_card_id: cardId, p_effect_order: effectOrder, p_target_card_id: targetCardId ?? null })),
+    declineAttackReaction: () => rpc("decline_attack_reaction", { p_pending_attack_id: pendingAttack?.id, p_expected_version: matchState?.match_version ?? 0 }),
   }
 }

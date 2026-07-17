@@ -1,32 +1,38 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Crown, Skull, Layers, Hexagon, Coins, X, Hand, Wifi, WifiOff, Loader2 } from "lucide-react"
-import { collection } from "@/lib/game-data"
+import { Crown, Skull, Layers, Hexagon, Coins, X, Hand, Wifi, WifiOff, Loader2, AlertTriangle, Flag, Swords } from "lucide-react"
+import { collection, type GameCard as GameCardType } from "@/lib/game-data"
 import { GameCard } from "./game-card"
 import { useDuelRealtime } from "@/hooks/useDuelRealtime"
+import { ReactionModal } from "./reaction-modal"
+import { supabase } from "@/lib/supabase"
+import type { BanCandidate, VisibleMatchCard } from "@/lib/types"
 
 /* card footprint used across the board */
 const CARD_W = "w-16 md:w-20 lg:w-22"
 const LIFE_W = "w-18 md:w-22 lg:w-24"
 
 /* ---------- Empty carved slot ---------- */
-function CardSlot({ label, accent = "#d4af37" }: { label: string; accent?: string }) {
+function CardSlot({ label, accent = "#d4af37", onClick, active = false }: { label: string; accent?: string; onClick?: () => void; active?: boolean }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!onClick}
       className={`relative ${CARD_W} flex aspect-[2.5/3.5] items-center justify-center rounded-md border-2 border-dashed`}
       style={{
         borderColor: `${accent}55`,
         background: "rgba(0,0,0,0.45)",
-        boxShadow: "inset 0 4px 12px rgba(0,0,0,0.9)",
+        boxShadow: active ? `0 0 18px ${accent}` : "inset 0 4px 12px rgba(0,0,0,0.9)",
       }}
     >
       <Hexagon size={24} style={{ color: `${accent}33` }} strokeWidth={1} />
       <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[8px] font-serif text-amber-600/40 tracking-widest uppercase">
         {label}
       </span>
-    </div>
+    </button>
   )
 }
 
@@ -92,6 +98,13 @@ function BoardCard({ index, playerMana }: { index: number; playerMana: number })
   )
 }
 
+function MatchBoardCard({ card, playerMana, selected = false, onClick }: { card: VisibleMatchCard; playerMana: number; selected?: boolean; onClick?: () => void }) {
+  if (!card.card_data) return <FaceDownCard />
+  return <button type="button" onClick={onClick} className={`${CARD_W} rounded-lg ${selected ? "ring-2 ring-red-400 shadow-[0_0_20px_rgba(248,113,113,.8)]" : ""}`}>
+    <GameCard card={card.card_data as unknown as GameCardType} interactive={Boolean(onClick)} playerMana={playerMana} />
+  </button>
+}
+
 function ManaHandCounter({ current, max }: { current: number; max: number }) {
   return (
     <div className="flex items-center gap-2 rounded-full border-2 border-gold/50 bg-stone-900/90 px-3 py-1.5 shadow-[0_0_16px_rgba(194,155,56,0.3),inset_0_2px_6px_rgba(0,0,0,0.9)]">
@@ -120,8 +133,7 @@ function ZoneLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-function CemeteryModal({ onClose }: { onClose: () => void }) {
-  const dead = collection.slice(0, 8)
+function CemeteryModal({ onClose, cards }: { onClose: () => void; cards: VisibleMatchCard[] }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -148,8 +160,8 @@ function CemeteryModal({ onClose }: { onClose: () => void }) {
           <Skull size={20} /> Cemitério — Cartas Destruídas
         </h3>
         <div className="scrollbar-thin grid max-h-[60vh] grid-cols-4 gap-3 overflow-y-auto sm:grid-cols-6">
-          {dead.map((c) => (
-            <GameCard key={c.id} card={c} />
+          {cards.filter(c => c.card_data).map((c) => (
+            <GameCard key={c.id} card={c.card_data as unknown as GameCardType} />
           ))}
         </div>
       </motion.div>
@@ -299,12 +311,16 @@ export function ArenaScreen() {
   }>>([])
   const [isMounted, setIsMounted] = useState(false)
   const [banPhaseOpen, setBanPhaseOpen] = useState(false)
-  const [banCandidates, setBanCandidates] = useState<any[]>([])
-  const [hasPlayedCardThisTurn, setHasPlayedCardThisTurn] = useState(false)
+  const [banCandidates, setBanCandidates] = useState<BanCandidate[]>([])
+  const [matchId, setMatchId] = useState("")
+  const [currentUserId, setCurrentUserId] = useState("")
+  const [selectedHandCard, setSelectedHandCard] = useState<string | null>(null)
+  const [selectedAttackers, setSelectedAttackers] = useState<Set<string>>(new Set())
 
-  // TODO: Replace with actual match ID and user ID from auth
-  const matchId = "00000000-0000-0000-0000-000000000000"
-  const currentUserId = "00000000-0000-0000-0000-000000000000"
+  useEffect(() => {
+    setMatchId(new URLSearchParams(window.location.search).get("matchId") ?? "")
+    void supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? ""))
+  }, [])
 
   // Use Supabase Realtime hook for authoritative multiplayer state
   const {
@@ -316,11 +332,18 @@ export function ArenaScreen() {
     opponentId,
     getCardsByZone,
     playCard,
-    attackTarget,
+    declareAttack,
     endTurn,
     passWithoutAction,
     getBanCandidates,
     submitBan,
+    replaceEarlyLifeCard,
+    surrenderMatch,
+    activateMatchEffect,
+    declineAttackReaction,
+    pendingAttack,
+    hasActedThisTurn,
+    reactionUsed,
   } = useDuelRealtime(matchId, currentUserId)
 
   // Generate sand particles only on client side to fix hydration error
@@ -339,11 +362,11 @@ export function ArenaScreen() {
 
   // Handle ban phase logic
   useEffect(() => {
-    if (matchState?.status === 'ban_phase' && isCurrentPlayer && !banPhaseOpen) {
+    if (matchState?.status === 'ban_phase' && !banPhaseOpen) {
       const fetchBanCandidates = async () => {
         try {
           const candidates = await getBanCandidates()
-          setBanCandidates(candidates || [])
+          setBanCandidates((candidates || []).filter(card => card.is_golden === true && card.rarity === "legendary"))
           setBanPhaseOpen(true)
         } catch (error) {
           console.error('Erro ao buscar candidatos de banimento:', error)
@@ -354,10 +377,10 @@ export function ArenaScreen() {
       setBanPhaseOpen(false)
       setBanCandidates([])
     }
-  }, [matchState?.status, isCurrentPlayer, banPhaseOpen, getBanCandidates])
+  }, [matchState?.status, banPhaseOpen, getBanCandidates])
 
   // Fallback to mock data if Supabase is not configured
-  const useMockData = !matchState || !boardCards.length
+  const useMockData = !matchId
 
   const currentTurn = matchState?.current_turn ?? 0
   const localPlayerMana = matchState ? (isPlayer1 ? matchState.player1_mana : matchState.player2_mana) : 6
@@ -379,7 +402,7 @@ export function ArenaScreen() {
   // Get cards from authoritative database or fallback to mock
   const getLocalPlayerHand = () => {
     if (useMockData) return collection.slice(0, 6)
-    return getCardsByZone('hand', currentUserId).map(c => c.card_data)
+    return getCardsByZone('hand', currentUserId).filter(c => c.card_data).map(c => c.card_data as unknown as GameCardType)
   }
 
   const getLocalPlayerLifeCards = () => {
@@ -391,9 +414,10 @@ export function ArenaScreen() {
       ]
     }
     return getCardsByZone('life', currentUserId).map(c => ({
-      label: c.card_data.nome,
-      att: c.card_data.ataque,
-      vida: c.card_data.vida,
+       label: c.card_data?.nome ?? "Carta de vida",
+       att: c.card_data?.ataque ?? 0,
+       vida: c.current_life ?? c.card_data?.vida ?? 0,
+       slotIndex: c.slot_index,
     }))
   }
 
@@ -406,15 +430,20 @@ export function ArenaScreen() {
       ]
     }
     return getCardsByZone('life', opponentId).map(c => ({
-      label: c.card_data.nome,
-      att: c.card_data.ataque,
-      vida: c.card_data.vida,
+      label: c.card_data?.nome ?? "Carta de vida",
+      att: c.card_data?.ataque ?? 0,
+      vida: c.current_life ?? c.card_data?.vida ?? 0,
     }))
   }
 
+  const localHandRows = useMockData ? [] : getCardsByZone("hand", currentUserId)
+  const localAttackers = useMockData ? [] : getCardsByZone("attacker", currentUserId)
+  const attackPower = useMemo(() => localAttackers.filter(card => selectedAttackers.has(card.card_id)).reduce((sum, card) => sum + (card.card_data?.ataque ?? 0), 0), [localAttackers, selectedAttackers])
+  const reactionCards = boardCards.filter(card => card.controller_user_id === currentUserId && ["life", "reinforcement", "attacker", "leader"].includes(card.zone) && (card.current_life ?? 0) > 0)
+
   return (
     <div
-      className="relative w-full h-screen overflow-hidden flex flex-col justify-between bg-stone-950 sandstone-texture select-none"
+      className={`relative w-full h-screen overflow-hidden flex flex-col justify-between bg-stone-950 sandstone-texture select-none ${currentTurn >= 8 ? "ring-4 ring-inset ring-red-700 animate-pulse" : ""}`}
       style={{
         boxShadow: "inset 0 0 80px rgba(0,0,0,0.9)",
       }}
@@ -483,6 +512,8 @@ export function ArenaScreen() {
         )}
       </div>
 
+      {currentTurn >= 8 && <div className="absolute left-1/2 top-2 z-50 flex -translate-x-1/2 items-center gap-2 rounded border border-red-500 bg-red-950/90 px-3 py-1 text-xs font-bold uppercase text-red-200"><AlertTriangle size={14} /> Deterioração ativa</div>}
+
       {/* Main 3-Column Grid Layout */}
       <div className="grid grid-cols-[minmax(160px,200px)_1fr_minmax(160px,200px)] w-full flex-1 max-w-[1800px] mx-auto px-3 py-1 gap-3 items-center overflow-hidden">
         
@@ -499,7 +530,7 @@ export function ArenaScreen() {
 
           {/* Center-Left: Graveyard */}
           <div className="flex-1 flex items-center justify-center">
-            <Graveyard count={12} onClick={() => setCemeteryOpen(true)} />
+            <Graveyard count={getCardsByZone("graveyard").length} onClick={() => setCemeteryOpen(true)} />
           </div>
 
           {/* Bottom-Left: Player Profile & Leader */}
@@ -543,14 +574,13 @@ export function ArenaScreen() {
                 </>
               ) : (
                 getCardsByZone('reinforcement', opponentId).map((card: any, i: number) => (
-                  card.is_face_down ? (
-                    <FaceDownCard 
+                  !card.is_face_up ? (
+                    <FaceDownCard
                       key={i} 
-                      isFlipped={card.is_revealed} 
-                      onFlip={() => toggleFlip(i)} 
+                      isFlipped={card.is_face_up}
                     />
                   ) : (
-                    <BoardCard key={i} index={0} playerMana={opponentMana} />
+                    <MatchBoardCard key={i} card={card} playerMana={opponentMana} />
                   )
                 ))
               )}
@@ -570,7 +600,7 @@ export function ArenaScreen() {
                 </>
               ) : (
                 getCardsByZone('attacker', opponentId).map((card: any, i: number) => (
-                  <BoardCard key={i} index={0} playerMana={opponentMana} />
+                  <MatchBoardCard key={i} card={card} playerMana={opponentMana} />
                 ))
               )}
             </Row>
@@ -614,21 +644,24 @@ export function ArenaScreen() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95, rotate: -2 }}
-                  onClick={() => endTurn(matchState?.match_version || 0)}
+                  disabled={!isCurrentPlayer}
+                  onClick={() => void endTurn()}
                   className="gold-trim rounded-md px-3 py-1 font-serif text-[10px] font-black uppercase tracking-wide text-wood-darkest shadow-[0_4px_12px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.5)] border-2 border-gold-dark/50"
                 >
                   ENCERRAR TURNO
                 </motion.button>
-                {!hasPlayedCardThisTurn && (
+                {!hasActedThisTurn && (
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95, rotate: -2 }}
-                    onClick={() => passWithoutAction(matchState?.match_version || 0)}
+                    disabled={!isCurrentPlayer}
+                    onClick={() => void passWithoutAction()}
                     className="rounded-md px-3 py-1 font-serif text-[10px] font-black uppercase tracking-wide text-rune-amber shadow-[0_4px_12px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.5)] border-2 border-rune-amber/50"
                   >
                     PASSAR SEM AGIR
                   </motion.button>
                 )}
+                <button disabled={!selectedAttackers.size || !isCurrentPlayer} onClick={() => void declareAttack([...selectedAttackers], false).then(() => setSelectedAttackers(new Set()))} className="rounded-md border border-red-500 bg-red-950/70 px-3 py-1 text-[10px] font-black text-red-200 disabled:opacity-40"><Swords size={12} className="inline" /> ATACAR ({attackPower})</button>
               </div>
             </div>
           </div>
@@ -649,9 +682,12 @@ export function ArenaScreen() {
                 </>
               ) : (
                 getCardsByZone('attacker', currentUserId).map((card: any, i: number) => (
-                  <BoardCard key={i} index={0} playerMana={localPlayerMana} />
+                  <MatchBoardCard key={i} card={card} playerMana={localPlayerMana} selected={selectedAttackers.has(card.card_id)} onClick={() => setSelectedAttackers(previous => { const next = new Set(previous); next.has(card.card_id) ? next.delete(card.card_id) : next.add(card.card_id); return next })} />
                 ))
               )}
+              {!useMockData && [1, 2, 3, 4].filter(slot => !getCardsByZone("attacker", currentUserId).some(card => card.slot_index === slot)).map(slot => (
+                <CardSlot key={`attacker-${slot}`} label="ATAQUE" accent="#dc2626" active={Boolean(selectedHandCard)} onClick={selectedHandCard && isCurrentPlayer ? () => void playCard(selectedHandCard, "attacker", slot).then(() => setSelectedHandCard(null)) : undefined} />
+              ))}
             </Row>
 
             {/* Row 2: Reinforcements */}
@@ -668,17 +704,19 @@ export function ArenaScreen() {
                 </>
               ) : (
                 getCardsByZone('reinforcement', currentUserId).map((card: any, i: number) => (
-                  card.is_face_down ? (
+                  !card.is_face_up ? (
                     <FaceDownCard 
                       key={i} 
-                      isFlipped={card.is_revealed} 
-                      onFlip={() => toggleFlip(i + 3)} 
+                      isFlipped={false}
                     />
                   ) : (
-                    <BoardCard key={i} index={0} playerMana={localPlayerMana} />
+                    <MatchBoardCard key={i} card={card} playerMana={localPlayerMana} />
                   )
                 ))
               )}
+              {!useMockData && [1, 2, 3, 4].filter(slot => !getCardsByZone("reinforcement", currentUserId).some(card => card.slot_index === slot)).map(slot => (
+                <CardSlot key={`reinforcement-${slot}`} label="REFORÇO" accent="#8c6820" active={Boolean(selectedHandCard)} onClick={selectedHandCard && isCurrentPlayer ? () => void playCard(selectedHandCard, "reinforcement", slot).then(() => setSelectedHandCard(null)) : undefined} />
+              ))}
             </Row>
 
             {/* Row 3: Life Cards */}
@@ -692,13 +730,11 @@ export function ArenaScreen() {
                   label={life.label} 
                   att={life.att} 
                   vida={life.vida} 
-                  interactive={true}
-                  onClick={() => {
-                    if (localPlayerMana >= 2) {
-                      console.log(`Defesa ativada: ${life.label}`)
-                    }
-                  }}
+                  interactive={false}
                 />
+              ))}
+              {!useMockData && currentTurn > 0 && currentTurn < 4 && [1, 2, 3].filter(slot => !getCardsByZone("life", currentUserId).some(card => card.slot_index === slot)).map(slot => (
+                <CardSlot key={slot} label="REPOR VIDA" accent="#dc2626" active={Boolean(selectedHandCard)} onClick={selectedHandCard ? () => void replaceEarlyLifeCard(selectedHandCard, slot).then(() => setSelectedHandCard(null)) : undefined} />
               ))}
             </Row>
           </div>
@@ -726,7 +762,8 @@ export function ArenaScreen() {
             return (
               <motion.div
                 key={card.id || i}
-                className="w-16 origin-bottom"
+                onClick={() => !useMockData && setSelectedHandCard(card.id)}
+                className={`w-16 origin-bottom ${selectedHandCard === card.id ? "ring-2 ring-gold rounded-lg" : ""}`}
                 style={{
                   rotate: offset * 4,
                   y: Math.abs(offset) * 4,
@@ -747,7 +784,13 @@ export function ArenaScreen() {
         </div>
       </div>
 
-      <AnimatePresence>{cemeteryOpen && <CemeteryModal onClose={() => setCemeteryOpen(false)} />}</AnimatePresence>
+      <AnimatePresence>{cemeteryOpen && <CemeteryModal cards={getCardsByZone("graveyard")} onClose={() => setCemeteryOpen(false)} />}</AnimatePresence>
+
+      <button onClick={() => void surrenderMatch()} disabled={!matchState || matchState.status === "finished"} className="fixed bottom-3 right-3 z-[70] flex items-center gap-1 rounded border border-red-700 bg-black/80 px-3 py-2 text-[10px] font-bold uppercase text-red-300 disabled:opacity-40"><Flag size={13} /> Declarar derrota</button>
+
+      <AnimatePresence>{pendingAttack && pendingAttack.defender_user_id === currentUserId && <ReactionModal attack={pendingAttack} reactionCards={reactionCards} mana={localPlayerMana} reactionUsed={reactionUsed} onActivate={activateMatchEffect} onDecline={declineAttackReaction} />}</AnimatePresence>
+
+      <AnimatePresence>{matchState?.status === "finished" && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[190] flex items-center justify-center bg-black/85"><div className="rounded-xl border-2 border-gold bg-stone-950 p-8 text-center shadow-[0_0_50px_rgba(212,175,55,.4)]"><Crown className="mx-auto mb-3 text-gold" size={42} /><h2 className="font-serif text-2xl font-black uppercase text-gold">{matchState.winner_id === currentUserId ? "Vitória" : "Derrota"}</h2><p className="mt-2 text-sm text-stone-300">A partida foi encerrada pelo servidor.</p><button onClick={() => { window.history.replaceState({}, "", "/"); window.location.reload() }} className="mt-5 rounded bg-gold px-5 py-2 font-bold text-stone-950">Voltar ao Hub</button></div></motion.div>}</AnimatePresence>
       
       {/* Ban Phase Modal */}
       <AnimatePresence>
@@ -774,12 +817,12 @@ export function ArenaScreen() {
               <div className="grid grid-cols-4 gap-4 mb-6">
                 {banCandidates.map((card: any) => (
                   <motion.button
-                    key={card.id}
+                    key={card.card_id}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={async () => {
                       try {
-                        await submitBan(card.id)
+                        await submitBan(card.card_id)
                         setBanPhaseOpen(false)
                         setBanCandidates([])
                       } catch (error) {
@@ -790,10 +833,10 @@ export function ArenaScreen() {
                   >
                     <div className="h-full flex flex-col items-center justify-center">
                       <p className="text-[10px] font-serif text-center text-gold leading-tight">
-                        {card.nome}
+                        {card.name}
                       </p>
                       <p className="text-[8px] font-serif text-center text-rune-amber mt-1">
-                        {card.raridade}
+                        {card.rarity}
                       </p>
                     </div>
                   </motion.button>
