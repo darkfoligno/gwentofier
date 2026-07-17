@@ -299,6 +299,25 @@ function NewsFeed() {
 }
 
 function GameModes({ onEnter }: { onEnter: (s: Screen) => void }) {
+  const [training, setTraining] = useState(false)
+  const [trainingError, setTrainingError] = useState<string | null>(null)
+  const startTraining = async () => {
+    setTraining(true); setTrainingError(null)
+    try {
+      const { data: decks, error: deckError } = await supabase.from("decks").select("id").eq("is_valid", true).order("updated_at", { ascending: false }).limit(1)
+      if (deckError) throw deckError
+      let deckId = decks?.[0]?.id
+      if (!deckId) {
+        const { data, error } = await supabase.rpc("claim_starter_deck", { p_deck_name: "Deck Inicial de Treino" })
+        if (error) throw error
+        deckId = data?.deck_id
+      }
+      if (!deckId) throw new Error("Nenhum deck válido disponível para treino.")
+      const { data: matchId, error } = await supabase.rpc("create_match", { p_deck_id: deckId, p_match_type: "friendly", p_is_private: true })
+      if (error) throw error
+      const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", matchId); window.history.pushState({}, "", url); onEnter("arena")
+    } catch (error) { setTrainingError(error instanceof Error ? error.message : "Não foi possível iniciar o treino.") } finally { setTraining(false) }
+  }
   const modes = [
     {
       label: "Arena PVP",
@@ -307,13 +326,14 @@ function GameModes({ onEnter }: { onEnter: (s: Screen) => void }) {
       color: "#ff3333",
       action: () => onEnter("arena"),
     },
-    { label: "Sala de Testes", sub: "Amistoso", icon: Snowflake, color: "#38bdf8", action: () => onEnter("arena") },
-    { label: "Loja de Cartas & Gacha", sub: "Pacote Universal d500", icon: Gem, color: "#c084fc", action: () => {} },
+    { label: "MODO TREINO (TESTE VISUAL)", sub: training ? "Forjando arena..." : "Cria uma partida real privada", icon: Snowflake, color: "#38bdf8", action: () => void startTraining() },
+    { label: "Loja de Cartas & Gacha", sub: "Ritual de Ofier", icon: Gem, color: "#c084fc", action: () => onEnter("store") },
     { label: "Modo Campanha", sub: "20 Decks", icon: Leaf, color: "#66dd88", action: () => {} },
   ]
   return (
     <Panel title="Salões de Duelo">
       <div className="scrollbar-thin flex h-full flex-col gap-3 overflow-y-auto p-3">
+        {trainingError && <div className="rounded border border-red-500/50 bg-red-950/60 p-2 text-xs text-red-200">{trainingError}</div>}
         {modes.map((m) => {
           const Icon = m.icon
           return (

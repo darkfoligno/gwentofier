@@ -5,12 +5,14 @@ import { AnimatePresence, motion } from "framer-motion"
 import { AuthScreen } from "@/components/game/auth-screen"
 import { HubScreen } from "@/components/game/hub-screen"
 import { ArenaScreen } from "@/components/game/arena-screen"
+import { StoreScreen } from "@/components/game/store-screen"
 import type { Screen } from "@/lib/types"
 import { supabase } from "@/lib/supabase"
 
 const debugItems: { key: Screen; label: string }[] = [
   { key: "auth", label: "Login" },
   { key: "hub", label: "Hub" },
+  { key: "store", label: "Loja" },
   { key: "arena", label: "Arena" },
 ]
 
@@ -20,15 +22,13 @@ export default function Page() {
   useEffect(() => {
     // Check initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setActiveScreen("hub")
-      }
+      if (session) setActiveScreen((new URLSearchParams(window.location.search).get("screen") as Screen) || "hub")
     })
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        setActiveScreen("hub")
+        setActiveScreen(previous => previous === "auth" ? ((new URLSearchParams(window.location.search).get("screen") as Screen) || "hub") : previous)
       } else {
         setActiveScreen("auth")
       }
@@ -44,7 +44,7 @@ export default function Page() {
         {debugItems.map((item) => (
           <button
             key={item.key}
-            onClick={() => setActiveScreen(item.key)}
+            onClick={() => { const url = new URL(window.location.href); url.searchParams.set("screen", item.key); if (item.key !== "arena") url.searchParams.delete("matchId"); window.history.pushState({}, "", url); setActiveScreen(item.key) }}
             className={`rounded px-2.5 py-1 font-serif text-[11px] font-bold uppercase tracking-wide transition-all ${
               activeScreen === item.key
                 ? "bg-gold text-wood-darkest"
@@ -66,6 +66,7 @@ export default function Page() {
         >
           {activeScreen === "auth" && <AuthScreen onEnter={setActiveScreen} />}
           {activeScreen === "hub" && <HubScreen onEnter={setActiveScreen} />}
+          {activeScreen === "store" && <StoreScreen />}
           {activeScreen === "arena" && <ArenaScreen />}
         </motion.div>
       </AnimatePresence>
