@@ -70,7 +70,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
         mana: 0,
         ataque: row.current_power ?? 0,
         vida: row.current_life ?? 0,
-        elemento: "arcano",
+        elemento: "Bestiário",
         tipo: "unidade",
         raridade: (["common", "rare", "epic", "legendary", "collab"].includes(row.rarity ?? "") ? row.rarity : "common") as "common" | "rare" | "epic" | "legendary" | "collab",
         efeito: "",

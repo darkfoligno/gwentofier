@@ -70,7 +70,7 @@ export interface VisibleMatchCard extends VisibleMatchCardRow {
     mana: number
     ataque: number
     vida: number
-    elemento: "fogo" | "gelo" | "arcano" | "natureza" | "sombra"
+    elemento: "Bestiário" | "M&F" | "Witcher" | "Elfica" | "Cívil" | "Vampiro"
     tipo: string
     raridade: "common" | "rare" | "epic" | "legendary" | "collab"
     efeito: string

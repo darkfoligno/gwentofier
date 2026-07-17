@@ -10,13 +10,6 @@ import { GachaModal } from "./gacha-modal"
 interface PackType { id: string; code: string; name: string; description: string | null; price_coins: number; cards_per_pack: number; is_daily: boolean }
 interface PackResult { card_id: string; name: string; image_url: string; rarity: Rarity; is_golden: boolean }
 
-const presentation: Record<number, { title: string; text: string; style: string }> = {
-  20: { title: "Pacote Básico", text: "4 Cartas de estudo do bruxo. Predominância Comum.", style: "border-slate-400 shadow-slate-500/20" },
-  50: { title: "Pacote Duelista", text: "4 Cartas de combate. Probabilidade Padrão (5% Lendário, 15% Épico, 30% Raro, 50% Comum).", style: "border-blue-500 shadow-blue-500/30" },
-  100: { title: "Pacote Clone", text: "4 Cartas espelhadas para fortalecer baralhos estabelecidos.", style: "border-purple-600 shadow-purple-600/40" },
-  200: { title: "Pacote Master", text: "4 Cartas da alta nobreza. Apenas raridades Épicas ou Lendárias.", style: "border-amber-400 shadow-amber-400/50" },
-}
-
 export function StoreScreen() {
   const [packs, setPacks] = useState<PackType[]>([])
   const [coins, setCoins] = useState(0)
@@ -25,7 +18,7 @@ export function StoreScreen() {
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    const [wallet, packRows] = await Promise.all([supabase.from("my_wallet").select("coins").maybeSingle(), supabase.from("pack_types").select("id,code,name,description,price_coins,cards_per_pack,is_daily").eq("is_active", true).order("price_coins")])
+    const [wallet, packRows] = await Promise.all([supabase.from("my_wallet").select("coins").maybeSingle(), supabase.from("pack_types").select("id,code,name,description,price_coins,cards_per_pack,is_daily").eq("is_active", true).gt("price_coins", 0).order("price_coins")])
     if (wallet.data) setCoins(wallet.data.coins)
     if (packRows.data) setPacks(packRows.data as PackType[])
   }, [])
@@ -35,7 +28,7 @@ export function StoreScreen() {
     const ids = results.map(card => card.card_id)
     const { data } = await supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").in("id", ids)
     const byId = new Map((data ?? []).map((card: any) => [card.id, card]))
-    return results.map(result => { const card: any = byId.get(result.card_id); return { id: result.card_id, nome: result.name, image_url: result.image_url, elemento: (["fogo", "gelo", "arcano", "natureza", "sombra"].includes(card?.element) ? card.element : "arcano") as GameCardType["elemento"], raridade: result.rarity, tipo: card?.card_type ?? "normal", mana: card?.effect_mana_cost ?? 0, ataque: card?.base_power ?? 0, vida: card?.base_max_life ?? 1, efeito: card?.effect_text ?? "", effect_definition: card?.card_effects ?? [], is_original_rpg: card?.is_original_rpg ?? false } })
+    return results.map(result => { const card: any = byId.get(result.card_id); return { id: result.card_id, nome: result.name, image_url: result.image_url, elemento: (["Bestiário", "M&F", "Witcher", "Elfica", "Cívil", "Vampiro"].includes(card?.element) ? card.element : "Bestiário") as GameCardType["elemento"], raridade: result.rarity, tipo: card?.card_type ?? "normal", mana: card?.effect_mana_cost ?? 0, ataque: card?.base_power ?? 0, vida: card?.base_max_life ?? 1, efeito: card?.effect_text ?? "", effect_definition: card?.card_effects ?? [], is_original_rpg: card?.is_original_rpg ?? false } })
   }
 
   const openResult = async (result: any) => { setCards(await hydrate(result?.cards ?? [])); await refresh() }
@@ -46,6 +39,6 @@ export function StoreScreen() {
     <header className="mb-6 flex items-center justify-between rounded-xl border border-amber-600/40 bg-stone-950/75 p-5"><div><h1 className="font-serif text-3xl font-black text-amber-200">Mercado de Ofier</h1><p className="text-sm text-stone-400">Relíquias, grimórios e cartas escolhidas pelo destino.</p></div><div className="flex items-center gap-3 rounded-full border border-amber-400/60 bg-black/70 px-5 py-2 shadow-[0_0_20px_rgba(245,158,11,.3)]"><Coins className="text-amber-300" /><strong className="text-xl text-amber-100">{coins.toLocaleString("pt-BR")}</strong></div></header>
     {error && <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 rounded-lg border border-red-500 bg-red-950/80 p-3 text-center font-bold text-red-200">{error}</motion.div>}
     <button onClick={() => void daily()} disabled={Boolean(busy)} className="mb-7 flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50"><span className="flex items-center gap-4"><Gift className="text-amber-300" size={35} /><span><b className="block font-serif text-xl text-amber-100">Resgate Diário</b><span className="text-sm text-stone-400">Reivindique sua recompensa gratuita nas Areias.</span></span></span><span className="rounded bg-amber-700 px-5 py-2 text-xs font-black">{busy === "daily" ? "INVOCANDO..." : "RESGATAR"}</span></button>
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.filter(pack => !pack.is_daily).map((pack, index) => { const visual = presentation[pack.price_coins] ?? { title: pack.name, text: pack.description ?? "Pacote de cartas de Ofier.", style: "border-amber-700" }; return <motion.article key={pack.id} whileHover={{ y: -8 }} className={`relative overflow-hidden rounded-xl border-2 bg-stone-950/90 p-5 shadow-2xl ${visual.style}`}><div className="mb-5 flex h-44 items-center justify-center rounded-lg border border-amber-700/30 bg-[radial-gradient(circle,#78350f,#0c0a09_65%)]">{index === 3 ? <Sparkles className="animate-pulse text-amber-300" size={70} /> : <PackageOpen className="text-amber-300/80" size={70} />}</div><h2 className="font-serif text-xl font-black text-amber-100">{visual.title}</h2><p className="mt-2 min-h-20 text-sm leading-relaxed text-stone-400">{visual.text}</p><div className="mt-5 flex items-center justify-between"><span className="flex items-center gap-1 text-lg font-black text-amber-300"><Coins size={18} />{pack.price_coins}</span><button disabled={Boolean(busy)} onClick={() => void purchase(pack)} className="rounded border border-amber-400 bg-amber-700 px-4 py-2 text-[10px] font-black text-amber-50 disabled:opacity-40">{busy === pack.id ? "ABRINDO..." : "COMPRAR E ABRIR"}</button></div></motion.article> })}</div>
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack, index) => <motion.article key={pack.id} whileHover={{ y: -8 }} className="relative overflow-hidden rounded-xl border-2 border-amber-700 bg-stone-950/90 p-5 shadow-2xl"><div className="mb-5 flex h-44 items-center justify-center rounded-lg border border-amber-700/30 bg-[radial-gradient(circle,#78350f,#0c0a09_65%)]">{index === packs.length - 1 ? <Sparkles className="animate-pulse text-amber-300" size={70} /> : <PackageOpen className="text-amber-300/80" size={70} />}</div><h2 className="font-serif text-xl font-black text-amber-100">{pack.name}</h2><p className="mt-2 min-h-20 text-sm leading-relaxed text-stone-400">{pack.description ?? ""}</p><div className="mt-5 flex items-center justify-between"><span className="flex items-center gap-1 text-lg font-black text-amber-300"><Coins size={18} />{pack.price_coins}</span><button disabled={Boolean(busy)} onClick={() => void purchase(pack)} className="rounded border border-amber-400 bg-amber-700 px-4 py-2 text-[10px] font-black text-amber-50 disabled:opacity-40">{busy === pack.id ? "ABRINDO..." : "COMPRAR E ABRIR"}</button></div></motion.article>)}</div>
   </div><AnimatePresence>{cards && <GachaModal cards={cards} onCollect={() => { setCards(null); void refresh() }} />}</AnimatePresence></main>
 }

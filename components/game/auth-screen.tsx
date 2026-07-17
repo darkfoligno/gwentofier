@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Mail, Lock, Eye, EyeOff, Crown, ChevronRight } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, Crown } from "lucide-react"
 import { Embers } from "./embers"
 import type { Screen } from "@/lib/types"
+import { supabase } from "@/lib/supabase"
 
 type Mode = "login" | "register"
 
@@ -13,11 +14,15 @@ function LeatherInput({
   label,
   type = "text",
   toggleable = false,
+  value,
+  onChange,
 }: {
   icon: typeof Mail
   label: string
   type?: string
   toggleable?: boolean
+  value: string
+  onChange: (value: string) => void
 }) {
   const [show, setShow] = useState(false)
   const inputType = toggleable ? (show ? "text" : "password") : type
@@ -29,6 +34,8 @@ function LeatherInput({
         <input
           type={inputType}
           placeholder={label}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
           className="w-full bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
         />
         {toggleable && (
@@ -48,6 +55,21 @@ function LeatherInput({
 
 export function AuthScreen({ onEnter }: { onEnter: (s: Screen) => void }) {
   const [mode, setMode] = useState<Mode>("login")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmation, setConfirmation] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const submit = async () => {
+    setError(null)
+    if (mode === "register" && password !== confirmation) { setError("As senhas não coincidem."); return }
+    setBusy(true)
+    const result = mode === "login" ? await supabase.auth.signInWithPassword({ email, password }) : await supabase.auth.signUp({ email, password })
+    setBusy(false)
+    if (result.error) { setError(result.error.message); return }
+    if (result.data.session) onEnter("hub")
+    else if (mode === "register") setError("Confira seu e-mail para confirmar a conta.")
+  }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
@@ -118,40 +140,22 @@ export function AuthScreen({ onEnter }: { onEnter: (s: Screen) => void }) {
                 transition={{ duration: 0.25 }}
                 className="flex flex-col gap-4"
               >
-                <LeatherInput icon={Mail} label="E-mail ou Usuário" />
-                <LeatherInput icon={Lock} label="Senha" toggleable />
-                {mode === "register" && <LeatherInput icon={Lock} label="Confirmar Senha" toggleable />}
+                <LeatherInput icon={Mail} label="E-mail" value={email} onChange={setEmail} />
+                <LeatherInput icon={Lock} label="Senha" toggleable value={password} onChange={setPassword} />
+                {mode === "register" && <LeatherInput icon={Lock} label="Confirmar Senha" toggleable value={confirmation} onChange={setConfirmation} />}
+                {error && <p className="rounded border border-red-500/40 bg-red-950/50 p-2 text-center text-xs text-red-200">{error}</p>}
 
                 {/* embossed golden submit */}
                 <button
-                  onClick={() => onEnter("hub")}
+                  onClick={() => void submit()}
+                  disabled={busy || !email || !password}
                   className="gold-trim group mt-2 w-full rounded-md py-3 font-serif text-base font-black uppercase tracking-wider text-wood-darkest shadow-[0_6px_16px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.6),inset_0_-3px_6px_rgba(0,0,0,0.3)] transition-all hover:shadow-[0_0_24px_rgba(212,175,55,0.7),inset_0_1px_2px_rgba(255,255,255,0.6)] active:translate-y-0.5"
                 >
-                  {mode === "login" ? "Adentrar na Taverna" : "Forjar Destino"}
+                  {busy ? "Autenticando..." : mode === "login" ? "Adentrar na Taverna" : "Forjar Destino"}
                 </button>
               </motion.div>
             </AnimatePresence>
 
-            {/* quick skip toggles */}
-            <div className="mt-7 border-t border-gold-dark/30 pt-4">
-              <p className="mb-2 text-center text-[10px] uppercase tracking-widest text-muted-foreground">
-                Acesso rápido (teste)
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => onEnter("hub")}
-                  className="flex flex-1 items-center justify-center gap-1 rounded border border-gold-dark/40 bg-black/30 py-2 text-xs font-semibold text-brass transition-colors hover:border-gold hover:text-gold"
-                >
-                  Ir ao Hub <ChevronRight size={13} />
-                </button>
-                <button
-                  onClick={() => onEnter("arena")}
-                  className="flex flex-1 items-center justify-center gap-1 rounded border border-gold-dark/40 bg-black/30 py-2 text-xs font-semibold text-brass transition-colors hover:border-gold hover:text-gold"
-                >
-                  Ir à Arena <ChevronRight size={13} />
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </motion.div>

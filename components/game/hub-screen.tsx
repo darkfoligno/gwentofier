@@ -1,389 +1,76 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import {
-  Search,
-  Coins,
-  Package,
-  Crown,
-  Home,
-  Layers,
-  BookOpen,
-  Swords,
-  Gem,
-  Check,
-  Sparkles,
-  Flame,
-  Snowflake,
-  Leaf,
-  Moon,
-  ChevronRight,
-} from "lucide-react"
-import {
-  filtrosRaridade,
-  filtrosElemento,
-  questsDiarias,
-  feedNoticias,
-  raridadeCor,
-  type Rarity,
-  type GameCard as GameCardType,
-} from "@/lib/game-data"
-import type { Screen } from "@/lib/types"
+import { Coins, Gem, Search, Shield, Swords, Trophy } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
+import type { Screen } from "@/lib/types"
 import { GameCard } from "./game-card"
 
-const elementIcons = { fogo: Flame, gelo: Snowflake, arcano: Sparkles, natureza: Leaf, sombra: Moon }
+interface Profile { username: string; avatar_url: string | null }
+interface Stats { wins: number; losses: number; draws: number; ranked_rating: number; current_win_streak: number }
 
-const navItems = [
-  { label: "Início", icon: Home },
-  { label: "Meus Decks", icon: Layers },
-  { label: "Modo História", icon: BookOpen },
-  { label: "Campanha PVE", icon: Swords },
-  { label: "Inventário", icon: Package },
-]
-
-function Panel({
-  title,
-  children,
-  className,
-}: {
-  title: string
-  children: React.ReactNode
-  className?: string
-}) {
-  return (
-    <section
-      className={`flex min-h-0 flex-col rounded-xl p-[2px] shadow-[0_10px_30px_rgba(0,0,0,0.7)] ${className ?? ""}`}
-      style={{ background: "linear-gradient(160deg, #6b5010, #2c1e14 45%, #6b5010)" }}
-    >
-      <div className="wood-grain flex min-h-0 flex-1 flex-col rounded-[10px]">
-        <h2 className="border-b border-gold-dark/40 px-4 py-3 font-serif text-sm font-bold uppercase tracking-wider text-gold text-shadow-gold">
-          {title}
-        </h2>
-        <div className="min-h-0 flex-1">{children}</div>
-      </div>
-    </section>
-  )
-}
-
-function TopBar() {
-  return (
-    <header
-      className="flex flex-col gap-4 rounded-xl p-[2px] shadow-[0_10px_30px_rgba(0,0,0,0.7)] xl:flex-row xl:items-center xl:justify-between"
-      style={{ background: "linear-gradient(160deg, #6b5010, #242424 45%, #6b5010)" }}
-    >
-      <div className="iron-plate flex flex-col gap-4 rounded-[10px] px-4 py-3 xl:flex-row xl:items-center xl:justify-between">
-        {/* profile */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-gold bg-gradient-to-b from-leather to-wood-darkest shadow-[0_0_14px_rgba(212,175,55,0.5)]">
-              <Crown size={24} className="text-gold" />
-            </div>
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border border-gold bg-wood-darkest px-1.5 text-[10px] font-bold text-gold">
-              42
-            </span>
-          </div>
-          <div className="min-w-[150px]">
-            <p className="font-serif text-base font-bold text-gold">Mestre Foli</p>
-            <p className="text-[11px] uppercase tracking-wide text-brass">Grão-Mestre de Ofieri</p>
-            <div className="mt-1 h-2 w-40 overflow-hidden rounded-full border border-gold-dark/50 bg-black/50">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: "68%",
-                  background: "linear-gradient(90deg, #8c6820, #d4af37)",
-                  boxShadow: "0 0 8px rgba(212,175,55,0.7)",
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* center nav */}
-        <nav className="flex flex-wrap items-center justify-center gap-1.5">
-          {navItems.map((item, i) => {
-            const Icon = item.icon
-            const active = i === 0
-            return (
-              <button
-                key={item.label}
-                className={`flex items-center gap-1.5 rounded border px-3 py-2 font-serif text-xs font-semibold transition-all ${
-                  active
-                    ? "border-gold bg-gradient-to-b from-gold/25 to-transparent text-gold"
-                    : "border-gold-dark/30 bg-black/30 text-brass hover:border-gold/60 hover:text-gold"
-                }`}
-              >
-                <Icon size={14} />
-                {item.label}
-              </button>
-            )
-          })}
-        </nav>
-
-        {/* economy */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-md border border-gold-dark/50 bg-black/40 px-3 py-2">
-            <motion.span
-              animate={{ rotateY: 360 }}
-              transition={{ duration: 3, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-              style={{ transformStyle: "preserve-3d" }}
-            >
-              <Coins size={20} className="text-gold" />
-            </motion.span>
-            <span className="font-bold text-foreground">2.450</span>
-            <span className="text-[10px] uppercase text-brass">Moedas</span>
-          </div>
-          <motion.div
-            animate={{ boxShadow: ["0 0 6px rgba(255,170,0,0.4)", "0 0 18px rgba(255,170,0,0.9)", "0 0 6px rgba(255,170,0,0.4)"] }}
-            transition={{ duration: 1.8, repeat: Number.POSITIVE_INFINITY }}
-            className="flex items-center gap-2 rounded-md border border-rune-amber/60 bg-rune-amber/10 px-3 py-2"
-          >
-            <Package size={18} className="text-rune-amber" />
-            <span className="text-xs font-semibold text-rune-amber">1 Pacote Diário</span>
-          </motion.div>
-        </div>
-      </div>
-    </header>
-  )
-}
-
-function Compendium() {
-  const [rar, setRar] = useState<Rarity | null>(null)
+export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [coins, setCoins] = useState(0)
   const [cards, setCards] = useState<GameCardType[]>([])
+  const [rarity, setRarity] = useState<Rarity | null>(null)
+  const [cardType, setCardType] = useState<OfficialCardType | null>(null)
+  const [query, setQuery] = useState("")
+  const [training, setTraining] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
-    void supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").eq("is_active", true).order("name").then(({ data, error }) => {
-      if (error) { console.error("Falha ao carregar catálogo", error); return }
-      setCards((data ?? []).map((card: any) => ({
-        id: card.id, nome: card.name, tipo: card.card_type, image_url: card.image_url,
-        elemento: (["fogo", "gelo", "arcano", "natureza", "sombra"].includes(card.element) ? card.element : "arcano") as GameCardType["elemento"],
-        raridade: card.rarity as Rarity, mana: card.effect_mana_cost, ataque: card.base_power, vida: card.base_max_life,
-        efeito: card.effect_text ?? "", effect_definition: card.card_effects ?? [], is_original_rpg: card.is_original_rpg,
-      })))
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return
+      const [profileResult, statsResult, walletResult, cardsResult] = await Promise.all([
+        supabase.from("profiles").select("username,avatar_url").eq("id", data.user.id).single(),
+        supabase.from("my_stats").select("wins,losses,draws,ranked_rating,current_win_streak").maybeSingle(),
+        supabase.from("my_wallet").select("coins").maybeSingle(),
+        supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").eq("is_active", true).order("name"),
+      ])
+      if (profileResult.data) setProfile(profileResult.data)
+      if (statsResult.data) setStats(statsResult.data)
+      if (walletResult.data) setCoins(walletResult.data.coins)
+      setCards((cardsResult.data ?? []).map((card: any) => ({ id: card.id, nome: card.name, image_url: card.image_url, elemento: card.element as OfficialCardType, raridade: card.rarity as Rarity, tipo: card.card_type, mana: card.effect_mana_cost, ataque: card.base_power, vida: card.base_max_life, efeito: card.effect_text ?? "", effect_definition: card.card_effects ?? [], is_original_rpg: card.is_original_rpg })))
     })
   }, [])
-  const list = rar ? cards.filter((card) => card.raridade === rar) : cards
-  return (
-    <Panel title="Coleção & Enciclopédia" className="min-h-0">
-      <div className="flex h-full flex-col p-3">
-        <div className="relative mb-3">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-brass" />
-          <input
-            placeholder="Pesquisar carta por nome, efeito ou tipagem..."
-            className="w-full rounded-md border border-gold-dark/40 bg-[#1a0f07] py-2 pl-9 pr-3 text-xs text-foreground shadow-[inset_0_2px_6px_rgba(0,0,0,0.7)] placeholder:text-muted-foreground/60 focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold/40"
-          />
-        </div>
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {filtrosRaridade.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setRar(rar === f.key ? null : f.key)}
-              className="rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-all"
-              style={{
-                borderColor: rar === f.key ? raridadeCor[f.key] : "rgba(140,104,32,0.4)",
-                color: rar === f.key ? raridadeCor[f.key] : "#a89575",
-                background: rar === f.key ? `${raridadeCor[f.key]}22` : "rgba(0,0,0,0.3)",
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {filtrosElemento.map((f) => {
-            const Icon = elementIcons[f.key]
-            return (
-              <span
-                key={f.key}
-                className="flex items-center gap-1 rounded border border-gold-dark/30 bg-black/30 px-2 py-0.5 text-[10px] text-brass"
-              >
-                <Icon size={11} /> {f.label}
-              </span>
-            )
-          })}
-        </div>
-        <div className="scrollbar-thin -mr-1 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pr-1 xl:grid-cols-3">
-          {list.map(card => <GameCard key={card.id} card={card} interactive />)}
-          {!list.length && <div className="col-span-full flex h-40 items-center justify-center rounded-lg border border-dashed border-amber-600/30 text-xs text-brass">Nenhuma carta disponível no catálogo.</div>}
-        </div>
-      </div>
-    </Panel>
-  )
-}
 
-function NewsFeed() {
-  return (
-    <Panel title="Crônicas & Atualizações">
-      <div className="scrollbar-thin flex h-full flex-col gap-4 overflow-y-auto p-3">
-        {/* featured banner */}
-        <div
-          className="relative overflow-hidden rounded-lg border border-gold/40 p-5 shadow-[0_8px_20px_rgba(0,0,0,0.6)]"
-          style={{
-            background:
-              "radial-gradient(circle at 80% 20%, rgba(192,132,252,0.35), transparent 50%), linear-gradient(150deg, #3a2817, #140d07)",
-          }}
-        >
-          <span className="inline-block rounded bg-rune-amber/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rune-amber">
-            Destaque
-          </span>
-          <h3 className="mt-2 font-serif text-lg font-black leading-tight text-gold text-shadow-gold text-balance">
-            Nova Expansão: Mitos de Yggdrasil & Collab D500
-          </h3>
-          <p className="mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-            48 novas cartas chegam à taverna, incluindo a linha colaborativa Universal d500 com raridade exclusiva.
-          </p>
-          <button className="mt-3 flex items-center gap-1 rounded border border-gold/50 bg-black/30 px-3 py-1.5 text-xs font-semibold text-gold transition-colors hover:bg-gold/15">
-            Explorar Expansão <ChevronRight size={13} />
-          </button>
-        </div>
-
-        {/* claim daily pack widget */}
-        <motion.button
-          whileHover={{ scale: 1.015 }}
-          whileTap={{ scale: 0.985 }}
-          className="relative flex items-center justify-between overflow-hidden rounded-lg border border-rune-amber/60 px-4 py-3"
-          style={{ background: "linear-gradient(90deg, rgba(255,170,0,0.2), rgba(140,104,32,0.15))" }}
-        >
-          <div className="flex items-center gap-3">
-            <motion.span
-              animate={{ y: [0, -3, 0] }}
-              transition={{ duration: 1.4, repeat: Number.POSITIVE_INFINITY }}
-            >
-              <Package size={26} className="text-rune-amber" />
-            </motion.span>
-            <div className="text-left">
-              <p className="font-serif text-sm font-bold text-gold">Resgatar Pacote Diário</p>
-              <p className="text-[11px] text-brass">4 Cartas Aleatórias</p>
-            </div>
-          </div>
-          <span className="rounded-full bg-rune-amber px-3 py-1 text-xs font-black uppercase text-wood-darkest">
-            Resgatar
-          </span>
-        </motion.button>
-
-        {/* daily quests */}
-        <div className="rounded-lg border border-gold-dark/40 bg-black/30 p-3">
-          <p className="mb-2 font-serif text-xs font-bold uppercase tracking-wide text-brass">Missões Diárias</p>
-          <div className="space-y-2">
-            {questsDiarias.map((q) => (
-              <div key={q.titulo} className="flex items-center gap-2">
-                <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                    q.feito ? "border-rune-amber bg-rune-amber/20" : "border-gold-dark/50 bg-black/40"
-                  }`}
-                >
-                  {q.feito && <Check size={12} className="text-rune-amber" />}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className={`truncate text-xs ${q.feito ? "text-muted-foreground line-through" : "text-foreground"}`}>
-                    {q.titulo}
-                  </p>
-                  <p className="text-[10px] text-brass">Recompensa: {q.recompensa}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* patch notes / lore */}
-        {feedNoticias.slice(1).map((n) => (
-          <div key={n.titulo} className="rounded-lg border border-gold-dark/30 bg-black/20 p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-brass">{n.tag}</span>
-            <h4 className="font-serif text-sm font-bold text-gold">{n.titulo}</h4>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">{n.texto}</p>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  )
-}
-
-function GameModes({ onEnter }: { onEnter: (s: Screen) => void }) {
-  const [training, setTraining] = useState(false)
-  const [trainingError, setTrainingError] = useState<string | null>(null)
+  const filtered = useMemo(() => cards.filter(card => (!rarity || card.raridade === rarity) && (!cardType || card.elemento === cardType) && (!query || card.nome.toLowerCase().includes(query.toLowerCase()))), [cardType, cards, query, rarity])
   const startTraining = async () => {
-    setTraining(true); setTrainingError(null)
+    setTraining(true); setError(null)
     try {
+      const { data: sessionData } = await supabase.auth.getSession()
+      if (!sessionData.session) throw new Error("Sessão expirada. Entre novamente.")
       const { data: decks, error: deckError } = await supabase.from("decks").select("id").eq("is_valid", true).order("updated_at", { ascending: false }).limit(1)
       if (deckError) throw deckError
       let deckId = decks?.[0]?.id
       if (!deckId) {
-        const { data, error } = await supabase.rpc("claim_starter_deck", { p_deck_name: "Deck Inicial de Treino" })
-        if (error) throw error
+        const { data, error: starterError } = await supabase.rpc("claim_starter_deck", { p_deck_name: "Deck Inicial" })
+        if (starterError) throw starterError
         deckId = data?.deck_id
       }
-      if (!deckId) throw new Error("Nenhum deck válido disponível para treino.")
-      const { data: matchId, error } = await supabase.rpc("create_match", { p_deck_id: deckId, p_match_type: "friendly", p_is_private: true })
-      if (error) throw error
+      if (!deckId) throw new Error("Não foi possível obter um deck válido.")
+      const { data: matchId, error: matchError } = await supabase.rpc("create_match", { p_deck_id: deckId, p_match_type: "friendly", p_is_private: true })
+      if (matchError) throw matchError
       const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", matchId); window.history.pushState({}, "", url); onEnter("arena")
-    } catch (error) { setTrainingError(error instanceof Error ? error.message : "Não foi possível iniciar o treino.") } finally { setTraining(false) }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Não foi possível iniciar o treino.") } finally { setTraining(false) }
   }
-  const modes = [
-    {
-      label: "Arena PVP",
-      sub: "Tempo Real",
-      icon: Swords,
-      color: "#ff3333",
-      action: () => onEnter("arena"),
-    },
-    { label: "MODO TREINO (TESTE VISUAL)", sub: training ? "Forjando arena..." : "Cria uma partida real privada", icon: Snowflake, color: "#38bdf8", action: () => void startTraining() },
-    { label: "Loja de Cartas & Gacha", sub: "Ritual de Ofier", icon: Gem, color: "#c084fc", action: () => onEnter("store") },
-    { label: "Modo Campanha", sub: "20 Decks", icon: Leaf, color: "#66dd88", action: () => {} },
-  ]
-  return (
-    <Panel title="Salões de Duelo">
-      <div className="scrollbar-thin flex h-full flex-col gap-3 overflow-y-auto p-3">
-        {trainingError && <div className="rounded border border-red-500/50 bg-red-950/60 p-2 text-xs text-red-200">{trainingError}</div>}
-        {modes.map((m) => {
-          const Icon = m.icon
-          return (
-            <motion.button
-              key={m.label}
-              onClick={m.action}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative flex items-center gap-4 overflow-hidden rounded-xl border p-4 text-left shadow-[0_6px_18px_rgba(0,0,0,0.6)]"
-              style={{
-                borderColor: `${m.color}66`,
-                background: `radial-gradient(circle at 15% 50%, ${m.color}33, transparent 60%), linear-gradient(120deg, #241811, #140d07)`,
-              }}
-            >
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border"
-                style={{ borderColor: `${m.color}88`, background: `${m.color}22` }}
-              >
-                <Icon size={26} style={{ color: m.color }} />
-              </div>
-              <div className="flex-1">
-                <p className="font-serif text-base font-black text-gold text-shadow-gold">{m.label}</p>
-                <p className="text-[11px] uppercase tracking-wide text-brass">{m.sub}</p>
-              </div>
-              <ChevronRight size={18} className="text-brass transition-transform group-hover:translate-x-1" />
-            </motion.button>
-          )
-        })}
-      </div>
-    </Panel>
-  )
+
+  return <main className="min-h-screen bg-stone-950 p-5 text-stone-100"><div className="mx-auto max-w-[1600px]">
+    <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-700/40 bg-black/50 p-5">
+      <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
+      <div className="flex items-center gap-3"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><button onClick={() => onEnter("store")} className="rounded border border-purple-500 bg-purple-950 px-4 py-2 text-xs font-black text-purple-200"><Gem className="mr-1 inline" size={15} /> LOJA</button><button disabled={training} onClick={() => void startTraining()} className="rounded border border-blue-400 bg-blue-950 px-4 py-2 text-xs font-black text-blue-100 disabled:opacity-50"><Swords className="mr-1 inline" size={15} /> {training ? "CRIANDO..." : "MODO TREINO"}</button></div>
+    </header>
+    {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200">{error}</div>}
+    {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
+    <section className="rounded-xl border border-amber-800/30 bg-black/35 p-4"><div className="mb-4 flex flex-wrap items-center gap-2"><div className="relative min-w-60 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquisar no grimório" className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm" /></div>{filtrosRaridade.map(filter => <button key={filter.key} onClick={() => setRarity(rarity === filter.key ? null : filter.key)} className={`rounded-full border px-3 py-1 text-xs ${rarity === filter.key ? "border-amber-300 text-amber-200" : "border-stone-700 text-stone-400"}`}>{filter.label}</button>)}</div>
+      <div className="mb-5 flex flex-wrap gap-2">{filtrosElemento.map(filter => <button key={filter.key} onClick={() => setCardType(cardType === filter.key ? null : filter.key)} className={`rounded border px-3 py-1 text-xs ${cardType === filter.key ? "border-blue-400 bg-blue-950 text-blue-200" : "border-stone-700 text-stone-400"}`}>{filter.label}</button>)}</div>
+      {filtered.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">{filtered.map(card => <GameCard key={card.id} card={card} interactive />)}</div> : <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-amber-800/40 font-serif text-amber-200/70">Nenhuma carta encontrada no grimório</div>}
+    </section>
+  </div></main>
 }
 
-export function HubScreen({ onEnter }: { onEnter: (s: Screen) => void }) {
-  return (
-    <div className="relative min-h-screen p-3 md:p-5">
-      <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
-        <TopBar />
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-          <div className="lg:col-span-3 lg:h-[calc(100vh-180px)]">
-            <Compendium />
-          </div>
-          <div className="lg:col-span-5 lg:h-[calc(100vh-180px)]">
-            <NewsFeed />
-          </div>
-          <div className="lg:col-span-4 lg:h-[calc(100vh-180px)]">
-            <GameModes onEnter={onEnter} />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
+function Stat({ icon: Icon, label, value }: { icon: typeof Trophy; label: string; value: number }) { return <motion.div whileHover={{ y: -2 }} className="rounded-lg border border-amber-800/30 bg-black/40 p-3"><Icon className="mb-2 text-amber-400" size={18} /><p className="text-xs text-stone-500">{label}</p><p className="text-xl font-black text-amber-100">{value}</p></motion.div> }

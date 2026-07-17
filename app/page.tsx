@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import type { Session } from "@supabase/supabase-js"
 import { AnimatePresence, motion } from "framer-motion"
 import { AuthScreen } from "@/components/game/auth-screen"
 import { HubScreen } from "@/components/game/hub-screen"
@@ -18,16 +19,23 @@ const debugItems: { key: Screen; label: string }[] = [
 
 export default function Page() {
   const [activeScreen, setActiveScreen] = useState<Screen>("auth")
+  const [session, setSession] = useState<Session | null>(null)
+  const [checkingSession, setCheckingSession] = useState(true)
 
   useEffect(() => {
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setActiveScreen((new URLSearchParams(window.location.search).get("screen") as Screen) || "hub")
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession)
+      setCheckingSession(false)
+      if (currentSession) setActiveScreen((new URLSearchParams(window.location.search).get("screen") as Screen) || "hub")
+      else setActiveScreen("auth")
     })
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setCheckingSession(false)
+      if (nextSession) {
         setActiveScreen(previous => previous === "auth" ? ((new URLSearchParams(window.location.search).get("screen") as Screen) || "hub") : previous)
       } else {
         setActiveScreen("auth")
@@ -36,6 +44,9 @@ export default function Page() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  if (checkingSession) return <main className="flex min-h-screen items-center justify-center bg-stone-950 font-serif text-amber-200">Verificando sessão...</main>
+  if (!session) return <main className="min-h-screen"><AuthScreen onEnter={() => undefined} /></main>
 
   return (
     <main className="relative min-h-screen">
