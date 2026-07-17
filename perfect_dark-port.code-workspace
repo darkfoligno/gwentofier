@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../perfect_dark-port/perfect_dark-port"
+		},
+		{
+			"path": "../perfect_dark-port/perfect-dark-port"
+		}
+	],
+	"settings": {
+		"bg3ModHelper.rootModPath": "d:\\perfect_dark-port\\perfect_dark-port",
+		"bg3ModHelper.packingPriority": 0
+	}
+}
