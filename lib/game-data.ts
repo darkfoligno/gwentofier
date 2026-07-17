@@ -10,6 +10,10 @@ export type GameCard = {
   vida: number
   raridade: Rarity
   efeito: string
+  image_url?: string | null
+  effect_definition?: Array<{ effect_code?: string; [key: string]: unknown }>
+  is_original_rpg?: boolean
+  is_collab?: boolean
 }
 
 export const raridadeLabel: Record<Rarity, string> = {

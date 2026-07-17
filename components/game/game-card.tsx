@@ -1,177 +1,48 @@
 "use client"
 
 import { motion } from "framer-motion"
-import { Flame, Snowflake, Sparkles, Leaf, Moon, Sword, Shield, Droplets, Zap } from "lucide-react"
-import { type GameCard as GameCardType, raridadeCor, raridadeLabel } from "@/lib/game-data"
+import { Hand } from "lucide-react"
+import type { GameCard as GameCardType, Rarity } from "@/lib/game-data"
 import { cn } from "@/lib/utils"
+import { highlightEffectText, parseEffectBadges } from "@/lib/effect-parser"
 
-const elementIcons = {
-  fogo: Flame,
-  gelo: Snowflake,
-  arcano: Sparkles,
-  natureza: Leaf,
-  sombra: Moon,
+const rarity: Record<Rarity, string> = {
+  common: "border-slate-400 shadow-slate-500/20",
+  rare: "border-blue-500 shadow-blue-500/30",
+  epic: "border-purple-600 shadow-purple-600/40",
+  legendary: "border-amber-500 shadow-amber-500/50",
+  collab: "border-pink-500 shadow-pink-500/40",
 }
 
-const elementColor = {
-  fogo: "#ff7a33",
-  gelo: "#66d9ff",
-  arcano: "#c084fc",
-  natureza: "#66dd88",
-  sombra: "#b28ce8",
-}
+export function GameCard({ card, interactive = false, className, isFaceDown = false }: { card?: GameCardType; interactive?: boolean; className?: string; isFaceDown?: boolean; playerMana?: number }) {
+  if (isFaceDown) return <motion.div whileHover={interactive ? { y: -6, scale: 1.04 } : undefined} className={cn("relative aspect-[2/3] w-full overflow-hidden rounded-[10px] border-2 border-amber-700 bg-stone-950 p-1 shadow-2xl", className)}>
+    <div className="relative flex h-full items-center justify-center overflow-hidden rounded-md border border-amber-500/50 bg-[radial-gradient(circle_at_center,#713f12_0,#1c1917_46%,#09090b_100%)]">
+      <div className="absolute inset-2 border border-amber-600/30" /><div className="absolute h-2/3 w-2/3 rotate-45 border-2 border-amber-500/40" />
+      <div className="z-10 flex h-16 w-16 items-center justify-center rounded-full border-2 border-amber-400/60 bg-black/70 shadow-[0_0_25px_rgba(245,158,11,.35)]"><span className="font-serif text-3xl text-amber-300">𓂀</span></div>
+    </div>
+  </motion.div>
 
-export function GameCard({
-  card,
-  interactive = false,
-  className,
-  isFaceDown = false,
-  playerMana = 0,
-}: {
-  card: GameCardType
-  interactive?: boolean
-  className?: string
-  isFaceDown?: boolean
-  playerMana?: number
-}) {
-  const ElementIcon = elementIcons[card.elemento]
-  const rarColor = raridadeCor[card.raridade]
-  const isSpell = card.tipo.startsWith("Feitiço")
-  const canActivate = playerMana >= card.mana
-
-  if (isFaceDown) {
-    return (
-      <motion.div
-        className={cn("group relative", className)}
-        whileHover={interactive ? { scale: 1.05 } : undefined}
-        transition={{ type: "spring", stiffness: 300, damping: 22 }}
-      >
-        <div className="relative flex aspect-[2.5/3.5] w-full flex-col overflow-hidden rounded-lg shadow-xl border-2 border-amber-600/60 egyptian-card-back">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="relative">
-              {/* Egyptian scarab pattern */}
-              <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-gold/40 bg-stone-900/80">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-gold to-amber-700 sun-glow" />
-              </div>
-              {/* Geometric patterns */}
-              <div className="absolute -top-6 -left-6 h-4 w-4 border border-gold/30 rotate-45" />
-              <div className="absolute -top-6 -right-6 h-4 w-4 border border-gold/30 rotate-45" />
-              <div className="absolute -bottom-6 -left-6 h-4 w-4 border border-gold/30 rotate-45" />
-              <div className="absolute -bottom-6 -right-6 h-4 w-4 border border-gold/30 rotate-45" />
-            </div>
-          </div>
-          {/* Hieroglyphic-like symbols */}
-          <div className="absolute top-2 left-2 text-gold/20 text-[8px]">𓂀</div>
-          <div className="absolute top-2 right-2 text-gold/20 text-[8px]">𓃭</div>
-          <div className="absolute bottom-2 left-2 text-gold/20 text-[8px]">𓆣</div>
-          <div className="absolute bottom-2 right-2 text-gold/20 text-[8px]">𓋹</div>
+  if (!card) return null
+  const badges = parseEffectBadges(card.effect_definition)
+  const version = card.is_original_rpg ? "RPG" : card.is_collab || card.raridade === "collab" ? "COLLAB" : "ORIGINAL"
+  return <motion.article whileHover={interactive ? { y: -10, scale: 1.06, zIndex: 60 } : undefined} transition={{ type: "spring", stiffness: 320, damping: 24 }} className={cn("group relative aspect-[2/3] w-full rounded-[11px] border-2 p-[2px] shadow-xl", rarity[card.raridade], className)}>
+    <div className="relative h-full overflow-hidden rounded-lg bg-gradient-to-b from-amber-700 via-yellow-950 to-amber-800 p-1.5 shadow-inner">
+      <div className="relative flex h-full flex-col overflow-hidden rounded-md bg-[#FDFBF7] text-slate-900 shadow-[inset_0_0_18px_rgba(120,80,25,.16)]">
+        <div className="relative z-20 mx-auto mt-2 flex h-[12%] w-[85%] items-center justify-center rounded border border-amber-600 bg-white px-5 shadow-sm"><h3 className="truncate font-serif text-[clamp(8px,1vw,12px)] font-black">{card.nome}</h3></div>
+        <div className="absolute left-1 top-1 z-30"><div className="flex h-9 w-9 rotate-45 items-center justify-center border-2 border-amber-400 bg-blue-950 shadow-[0_0_10px_rgba(59,130,246,.6)]"><span className="-rotate-45 text-xs font-black text-blue-100"><Hand size={9} className="mx-auto" />{card.mana}</span></div><span className="mt-1 block rounded-sm bg-black px-1 text-center font-serif text-[6px] text-white">MANA</span></div>
+        <div className="relative mx-2 mt-1 h-[45%] overflow-hidden border-2 border-double border-amber-700 bg-stone-800">
+          {card.image_url ? <img src={card.image_url} alt={card.nome} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center bg-[radial-gradient(circle,#92400e,#1c1917)] font-serif text-2xl text-amber-300/60">𓂀</div>}
+          <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
         </div>
-      </motion.div>
-    )
-  }
-
-  return (
-    <motion.div
-      className={cn("group relative", className)}
-      whileHover={
-        interactive
-          ? { scale: 1.15, y: -10, zIndex: 50, rotate: 0 }
-          : undefined
-      }
-      transition={{ type: "spring", stiffness: 300, damping: 22 }}
-    >
-      <div
-        className="relative flex aspect-[2.5/3.5] w-full flex-col overflow-hidden rounded-lg shadow-xl border-2 border-amber-600/60 bg-stone-900"
-        style={{
-          background: `linear-gradient(150deg, ${rarColor}33, #1c1917 60%, ${rarColor}22)`,
-          boxShadow:
-            card.raridade === "legendary" || card.raridade === "collab"
-              ? `0 0 20px ${rarColor}66, 0 8px 24px rgba(0,0,0,0.8)`
-              : "0 8px 24px rgba(0,0,0,0.8)",
-        }}
-      >
-        <div className="relative flex h-full flex-col rounded-[6px] bg-stone-900/95">
-          {/* Top Bar: Card Name + Element Icon */}
-          <div className="flex items-center justify-between px-2 pt-2 pb-1">
-            <div className="flex items-center gap-1.5">
-              <p className="font-serif text-xs font-bold leading-tight text-gold truncate max-w-[100px]">
-                {card.nome}
-              </p>
-              <ElementIcon size={14} style={{ color: elementColor[card.elemento] }} />
-            </div>
-            {/* Top-Left: Mana Cost */}
-            <div
-              className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white"
-              style={{
-                background: "radial-gradient(circle at 30% 30%, #3b82f6, #1e3a8a)",
-                boxShadow: "0 0 10px rgba(30, 58, 138, 0.6), inset 0 1px 2px rgba(255,255,255,0.3)",
-                border: "2px solid rgba(194, 155, 56, 0.4)",
-              }}
-            >
-              <Droplets size={10} className="mr-0.5" />
-              {card.mana}
-            </div>
-          </div>
-
-          {/* Center Area: Artwork (50-60% of card) */}
-          <div className="relative mx-2 mt-1 flex-[3] overflow-hidden rounded-sm border border-gold/30">
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `radial-gradient(circle at 50% 30%, ${elementColor[card.elemento]}44, transparent 70%), linear-gradient(160deg, #292524, #0c0a09)`,
-              }}
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <ElementIcon
-                size={64}
-                style={{ color: elementColor[card.elemento], opacity: 0.6 }}
-              />
-            </div>
-            {/* Rarity foil sheen */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/8 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-          </div>
-
-          {/* Visual Divider */}
-          <div className="mx-2 my-1 h-[1px]" style={{ background: `linear-gradient(90deg, transparent, ${rarColor}66, transparent)` }} />
-
-          {/* Bottom Section: Effect Text */}
-          <div className="mx-2 mb-1 flex-1">
-            <p className="text-[9px] leading-snug text-muted-foreground line-clamp-2">
-              {card.efeito}
-            </p>
-          </div>
-
-          {/* Bottom Action Button */}
-          <div className="px-2 pb-2">
-            <motion.button
-              className={`w-full rounded-md px-2 py-1 text-[9px] font-bold uppercase tracking-wide transition-all ${
-                canActivate
-                  ? "bg-gradient-to-r from-amber-500 to-amber-600 text-stone-900 shadow-[0_0_12px_rgba(245,158,11,0.5)]"
-                  : "bg-stone-800 text-stone-500 cursor-not-allowed"
-              }`}
-              whileHover={canActivate ? { scale: 1.05 } : {}}
-              whileTap={canActivate ? { scale: 0.95 } : {}}
-              disabled={!canActivate}
-            >
-              <div className="flex items-center justify-center gap-1">
-                <Zap size={10} />
-                {canActivate ? "ATIVAR" : "SEM MANA"}
-              </div>
-            </motion.button>
-          </div>
+        <div className="relative mx-2 my-1 h-px bg-gradient-to-r from-transparent via-amber-700 to-transparent"><span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-amber-700 bg-yellow-100" /></div>
+        <div className="relative mx-2 min-h-0 flex-1 border border-double border-amber-700/70 bg-white/70 p-1.5 text-[clamp(6px,.7vw,9px)] leading-snug">{highlightEffectText(card.efeito || "")}</div>
+        <div className="absolute right-2 top-[52%] z-20 flex gap-1">{badges.slice(0, 3).map(({ code, label, description, Icon, className: badgeClass }) => <span key={code} title={`${label}: ${description}`} className={cn("rounded-full border p-1 shadow-lg", badgeClass)}><Icon size={10} /></span>)}</div>
+        <div className="relative mt-1 flex h-[15%] items-end justify-between px-1 pb-1">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-amber-400 bg-gradient-to-br from-stone-800 to-black font-mono text-xs font-black text-amber-100 shadow-md">{card.ataque}</div>
+          <div className="mb-1 max-w-[48%] truncate rounded border border-amber-700 bg-gradient-to-b from-amber-200 to-amber-500 px-2 py-0.5 text-[6px] font-black uppercase text-stone-900">{card.tipo} · {version}</div>
+          <div className="flex h-9 w-9 items-center justify-center rounded-t-xl rounded-b-md border-2 border-amber-400 bg-gradient-to-br from-red-600 to-red-950 font-mono text-xs font-black text-white shadow-md">{card.vida}</div>
         </div>
       </div>
-
-      {/* hover tooltip with effect */}
-      {interactive && (
-        <div className="pointer-events-none absolute -top-2 left-1/2 z-50 w-52 -translate-x-1/2 -translate-y-full rounded-lg border border-gold/40 bg-stone-950/95 p-3 opacity-0 shadow-[0_12px_36px_rgba(0,0,0,0.9)] backdrop-blur-md transition-opacity duration-200 group-hover:opacity-100">
-          <p className="font-serif text-sm font-bold text-gold">{card.nome}</p>
-          <p className="mb-1 text-[10px] uppercase tracking-wide" style={{ color: rarColor }}>
-            {raridadeLabel[card.raridade]} · {card.tipo}
-          </p>
-          <p className="text-xs leading-snug text-muted-foreground">{card.efeito}</p>
-        </div>
-      )}
-    </motion.div>
-  )
+    </div>
+  </motion.article>
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import {
   Search,
@@ -21,16 +21,17 @@ import {
   ChevronRight,
 } from "lucide-react"
 import {
-  collection,
   filtrosRaridade,
   filtrosElemento,
   questsDiarias,
   feedNoticias,
   raridadeCor,
-  raridadeLabel,
   type Rarity,
+  type GameCard as GameCardType,
 } from "@/lib/game-data"
 import type { Screen } from "@/lib/types"
+import { supabase } from "@/lib/supabase"
+import { GameCard } from "./game-card"
 
 const elementIcons = { fogo: Flame, gelo: Snowflake, arcano: Sparkles, natureza: Leaf, sombra: Moon }
 
@@ -149,7 +150,19 @@ function TopBar() {
 
 function Compendium() {
   const [rar, setRar] = useState<Rarity | null>(null)
-  const list = rar ? collection.filter((c) => c.raridade === rar) : collection
+  const [cards, setCards] = useState<GameCardType[]>([])
+  useEffect(() => {
+    void supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").eq("is_active", true).order("name").then(({ data, error }) => {
+      if (error) { console.error("Falha ao carregar catálogo", error); return }
+      setCards((data ?? []).map((card: any) => ({
+        id: card.id, nome: card.name, tipo: card.card_type, image_url: card.image_url,
+        elemento: (["fogo", "gelo", "arcano", "natureza", "sombra"].includes(card.element) ? card.element : "arcano") as GameCardType["elemento"],
+        raridade: card.rarity as Rarity, mana: card.effect_mana_cost, ataque: card.base_power, vida: card.base_max_life,
+        efeito: card.effect_text ?? "", effect_definition: card.card_effects ?? [], is_original_rpg: card.is_original_rpg,
+      })))
+    })
+  }, [])
+  const list = rar ? cards.filter((card) => card.raridade === rar) : cards
   return (
     <Panel title="Coleção & Enciclopédia" className="min-h-0">
       <div className="flex h-full flex-col p-3">
@@ -189,34 +202,9 @@ function Compendium() {
             )
           })}
         </div>
-        <div className="scrollbar-thin -mr-1 flex-1 space-y-2 overflow-y-auto pr-1">
-          {list.map((card) => {
-            const Icon = elementIcons[card.elemento]
-            return (
-              <div
-                key={card.id}
-                className="group flex items-center gap-3 rounded-lg border p-2 transition-all hover:translate-x-1"
-                style={{
-                  borderColor: `${raridadeCor[card.raridade]}55`,
-                  background: `linear-gradient(90deg, ${raridadeCor[card.raridade]}18, rgba(0,0,0,0.3))`,
-                }}
-              >
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gold-dark/50 bg-black/40">
-                  <span className="text-xs font-bold text-rune-mana">{card.mana}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-serif text-xs font-bold text-gold">{card.nome}</p>
-                  <p className="flex items-center gap-1 text-[10px]" style={{ color: raridadeCor[card.raridade] }}>
-                    <Icon size={10} /> {raridadeLabel[card.raridade]} · {card.tipo}
-                  </p>
-                </div>
-                <div className="shrink-0 text-right text-[10px] font-semibold text-muted-foreground">
-                  <span className="text-rune-life">{card.ataque}</span> /{" "}
-                  <span style={{ color: "#66dd88" }}>{card.vida}</span>
-                </div>
-              </div>
-            )
-          })}
+        <div className="scrollbar-thin -mr-1 grid flex-1 grid-cols-2 gap-3 overflow-y-auto pr-1 xl:grid-cols-3">
+          {list.map(card => <GameCard key={card.id} card={card} interactive />)}
+          {!list.length && <div className="col-span-full flex h-40 items-center justify-center rounded-lg border border-dashed border-amber-600/30 text-xs text-brass">Nenhuma carta disponível no catálogo.</div>}
         </div>
       </div>
     </Panel>
