@@ -22,6 +22,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [training, setTraining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [trainingStep, setTrainingStep] = useState<string | null>(null)
+  const [matchmaking, setMatchmaking] = useState(false)
 
   useEffect(() => {
     void supabase.auth.getUser().then(async ({ data }) => {
@@ -63,15 +64,32 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       if (matchError) throw matchError
       if (!matchId) throw new Error("O servidor não retornou o match_id da nova partida.")
       const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", matchId); window.history.pushState({}, "", url); onEnter("arena")
-    } catch (cause) { setError(describeError(cause)) } finally { setTraining(false); setTrainingStep(null) }
+    } catch (cause) {
+      const issue = cause as { message?: string }
+      if (issue?.message?.includes("CARD_CATALOG_EMPTY")) {
+        const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("preview", "1"); url.searchParams.delete("matchId"); window.history.pushState({}, "", url); onEnter("arena")
+      } else setError(describeError(cause))
+    } finally { setTraining(false); setTrainingStep(null) }
+  }
+
+  const searchOpponent = async () => {
+    setMatchmaking(true); setError(null)
+    try {
+      const { data: decks, error: deckError } = await supabase.from("decks").select("id").eq("is_valid", true).order("updated_at", { ascending: false }).limit(1)
+      if (deckError) throw deckError
+      if (!decks?.[0]?.id) throw new Error("Você precisa de um deck válido para buscar um oponente.")
+      const { data: queueId, error: queueError } = await supabase.rpc("enqueue_matchmaking", { p_deck_id: decks[0].id, p_match_type: "friendly" })
+      if (queueError) throw queueError
+      setError(`Busca iniciada com sucesso. Fila: ${queueId}`)
+    } catch (cause) { setError(describeError(cause)) } finally { setMatchmaking(false) }
   }
 
   return <main className="min-h-screen bg-stone-950 p-5 text-stone-100"><div className="mx-auto max-w-[1600px]">
     <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-700/40 bg-black/50 p-5">
       <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
-      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => void startTraining()} disabled={training} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="MINHAS CARTAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="DUELOS" onClick={() => onEnter("spectator")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
+      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => void startTraining()} disabled={training} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => void searchOpponent()} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="MINHAS CARTAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="DUELOS" onClick={() => onEnter("spectator")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
     </header>
-    {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Falha ao iniciar o treino</strong>{error}</div>}
+    {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
     {trainingStep && <div className="mb-4 rounded border border-blue-500/40 bg-blue-950/50 p-3 text-sm text-blue-100">{trainingStep}</div>}
     {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
     <section className="rounded-xl border border-amber-800/30 bg-black/35 p-4"><div className="mb-4 flex flex-wrap items-center gap-2"><div className="relative min-w-60 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquisar no grimório" className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm" /></div>{filtrosRaridade.map(filter => <button key={filter.key} onClick={() => setRarity(rarity === filter.key ? null : filter.key)} className={`rounded-full border px-3 py-1 text-xs ${rarity === filter.key ? "border-amber-300 text-amber-200" : "border-stone-700 text-stone-400"}`}>{filter.label}</button>)}</div>

@@ -37,15 +37,21 @@ function GraveyardModal({ cards, onClose }: { cards: VisibleMatchCard[]; onClose
   return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-[160] flex items-center justify-center bg-black/85 p-6 backdrop-blur-md"><div onClick={event => event.stopPropagation()} className="relative max-h-[80vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-amber-500/50 bg-stone-950 p-6"><button onClick={onClose} className="absolute right-4 top-4 text-amber-200"><X /></button><h2 className="mb-5 font-serif text-xl font-black text-amber-200">Cemitério</h2><div className="grid grid-cols-3 gap-4 sm:grid-cols-5 lg:grid-cols-7">{cards.map(card => <CardView key={card.id} row={card} />)}</div></div></motion.div>
 }
 
+function ArenaPreview() {
+  const slots = (label: string, count: number) => <div className="flex justify-center gap-2">{Array.from({ length: count }, (_, index) => <EmptySlot key={index} label={label} />)}</div>
+  return <main className="relative h-screen overflow-hidden bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-center text-stone-100"><div className="absolute inset-0 bg-black/65 backdrop-blur-[2px]" /><div className="relative z-10 flex h-full flex-col p-4 pt-20"><div className="mb-2 rounded border border-blue-400/40 bg-blue-950/70 p-2 text-center text-xs text-blue-100">Prévia visual — catálogo vazio. Nenhuma partida ou ação será enviada ao servidor.</div><section className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col justify-around overflow-y-auto rounded-xl border border-amber-700/30 bg-black/30 p-3"><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Reforços do oponente</p>{slots("Carta", 4)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Vida do oponente</p>{slots("Carta", 3)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Atacantes do oponente</p>{slots("Carta", 4)}</div><div className="flex items-center justify-between border-y border-amber-700/50 bg-stone-950/90 px-5 py-2 text-xs"><span>Rival · 0 mana</span><b>Turno 0</b><span>Você · 0 mana</span></div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Seus atacantes</p>{slots("Carta", 4)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Suas cartas de vida</p>{slots("Carta", 3)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Seus reforços</p>{slots("Carta", 4)}</div></section><div className="mx-auto mt-2 flex h-24 w-full max-w-3xl items-end justify-center gap-2 rounded-t-3xl border border-amber-700/30 bg-black/55 p-2">{Array.from({ length: 5 }, (_, index) => <EmptySlot key={index} label="Carta" />)}</div></div></main>
+}
+
 export function ArenaScreen() {
   const [matchId, setMatchId] = useState("")
+  const [preview, setPreview] = useState(false)
   const [userId, setUserId] = useState("")
   const [selectedHand, setSelectedHand] = useState<string | null>(null)
   const [selectedAttackers, setSelectedAttackers] = useState<Set<string>>(new Set())
   const [graveyardOpen, setGraveyardOpen] = useState(false)
   const [banCandidates, setBanCandidates] = useState<BanCandidate[]>([])
 
-  useEffect(() => { setMatchId(new URLSearchParams(window.location.search).get("matchId") ?? ""); void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? "")) }, [])
+  useEffect(() => { const params = new URLSearchParams(window.location.search); setMatchId(params.get("matchId") ?? ""); setPreview(params.get("preview") === "1"); void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? "")) }, [])
   const duel = useDuelRealtime(matchId, userId)
   const { matchState, boardCards, matchActions, pendingAttack, connectionStatus, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone } = duel
 
@@ -63,6 +69,7 @@ export function ArenaScreen() {
   const toggleAttacker = (card: VisibleMatchCard) => setSelectedAttackers(previous => { const next = new Set(previous); next.has(card.id) ? next.delete(card.id) : next.add(card.id); return next })
   const reactions = boardCards.filter(card => card.controller_user_id === userId && ["life", "reinforcement", "attacker", "leader"].includes(card.zone) && (card.current_life ?? 0) > 0)
 
+  if (preview) return <ArenaPreview />
   if (!matchId) return <div className="flex min-h-screen items-center justify-center bg-stone-950 text-center text-amber-200"><div><Swords className="mx-auto mb-4" size={40} /><h1 className="font-serif text-xl font-black">Nenhuma batalha selecionada</h1><p className="mt-2 text-sm text-stone-400">Abra a Arena a partir de uma partida encontrada no Hub.</p></div></div>
 
   return <main className="relative h-screen overflow-hidden bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-center bg-no-repeat text-stone-100"><div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/85 backdrop-blur-[2px]" />
