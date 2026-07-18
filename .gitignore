@@ -8,6 +8,8 @@ __v0_jsx-dev-runtime.ts
 
 # Environment variables
 .env*.local
+.docker-codex/
+supabase/.temp/
 
 # Common ignores
 node_modules

@@ -77,6 +77,7 @@ export interface VisibleMatchCard extends VisibleMatchCardRow {
     tipo: string
     raridade: "common" | "rare" | "epic" | "legendary" | "collab"
     efeito: string
+    effect_definition?: Array<{ effect_order?: number; trigger_type?: string; effect_code?: string; target_mode?: string; parameters?: Record<string, unknown>; is_reaction?: boolean }>
   } | null
 }
 

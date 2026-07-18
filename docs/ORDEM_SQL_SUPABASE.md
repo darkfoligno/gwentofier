@@ -1,19 +1,37 @@
-# Implantação do catálogo comum e motor de efeitos
+# Instalação manual do motor das 72 cartas comuns
 
-Execute no SQL Editor, um arquivo por vez, nesta ordem. Interrompa se qualquer arquivo retornar erro; não avance para o seguinte.
+Docker não é necessário. Use o **SQL Editor** do projeto Supabase e execute um arquivo por vez. Espere a mensagem de sucesso antes de seguir; se algum arquivo falhar, pare e copie o erro completo.
 
-Arquivos já preparados, mas **ainda não execute** enquanto o executor e a ponte de eventos não estiverem presentes:
+## Antes de começar
 
-1. `202607170006_effect_runtime_foundation.sql`
-2. `202607170007_common_card_effect_definitions.sql`
+1. Faça um backup do banco no painel do Supabase.
+2. Confirme que os dois SQLs oficiais do projeto já foram aplicados.
+3. O catálogo `202607170005_common_cards_catalog.sql` já foi executado. Não é necessário repeti-lo, mas ele é idempotente.
 
-Diagnóstico disponível:
+## Ordem exata
 
-3. `tests/common_cards_preflight.sql` — somente leitura
+1. `supabase/migrations/202607170006_effect_runtime_foundation.sql`
+2. `supabase/migrations/202607170007_common_card_effect_definitions.sql`
+3. `supabase/migrations/202607170008_effect_choices_and_contract.sql`
+4. `supabase/migrations/202607170009_effect_engine_helpers.sql`
+5. `supabase/migrations/202607170010_common_effect_executor.sql`
+6. `supabase/migrations/202607170011_common_effect_event_bridge.sql`
+7. `supabase/migrations/202607170012_common_effect_runtime_guards.sql`
+8. `supabase/migrations/202607170013_effect_visibility_security_realtime.sql`
+9. `supabase/migrations/202607170014_common_attack_rules.sql`
+10. `supabase/migrations/202607170015_effect_engine_installation_audit.sql`
 
-O catálogo `202607170005_common_cards_catalog.sql` já foi aplicado. Ele é idempotente e pode ser reaplicado se necessário.
+O arquivo 015 é a trava final: ele aborta se não encontrar as 72 cartas, os 72 códigos, as funções e os gatilhos obrigatórios.
 
-Resultado obrigatório do preflight:
+## Verificação no painel
+
+Execute, nesta ordem:
+
+1. `supabase/tests/common_cards_preflight.sql`
+2. `supabase/tests/common_cards_catalog_only_check.sql`
+3. `supabase/tests/common_effect_engine_check.sql`
+
+Todos os itens de `audit_common_effect_engine()` precisam retornar `ok = true`. O preflight precisa retornar:
 
 - `catalog_cards = 72`
 - `missing_cards = 0`
@@ -22,4 +40,23 @@ Resultado obrigatório do preflight:
 - `missing_images = 0`
 - `invalid_elements = 0`
 
-Depois dos SQLs, faça o build do front-end e somente então commit/push.
+## Teste funcional manual
+
+1. Crie uma partida de treino nova; partidas antigas não recebem retroativamente os snapshots das cartas.
+2. Jogue uma carta com gatilho `on_play` e confira `match_effect_execution_log`.
+3. Ative uma carta `manual`; confirme o desconto de mana e uma linha em `match_effect_uses`.
+4. Declare um ataque com uma carta que possua regra de ataque.
+5. Abra outra sessão/conta e confirme a janela de reação e a escolha pendente.
+6. Consulte `supabase/tests/common_effect_engine_check.sql`; eventos com `result.failed = true` mostram o SQLSTATE e a mensagem exata.
+
+## Git depois do Supabase
+
+Somente depois de todos os checks retornarem verdes:
+
+```powershell
+git add .
+git commit -m "feat: motor autoritativo para as 72 cartas comuns"
+git push -u origin main
+```
+
+Não use `--force`: ele não é necessário para esta entrega e pode apagar histórico remoto.
