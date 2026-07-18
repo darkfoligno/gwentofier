@@ -13,6 +13,7 @@ export interface MatchRow {
   current_turn: number
   state_version: number
   finish_reason: string | null
+  turn_deadline: string | null
 }
 
 /** Exact public.match_public_states row. */
