@@ -72,6 +72,7 @@ export interface VisibleMatchCard extends VisibleMatchCardRow {
   card_data: {
     id: string
     nome: string
+    image_url?: string | null
     mana: number
     ataque: number
     vida: number
@@ -81,6 +82,7 @@ export interface VisibleMatchCard extends VisibleMatchCardRow {
     efeito: string
     effect_definition?: Array<{ effect_order?: number; trigger_type?: string; effect_code?: string; target_mode?: string; parameters?: Record<string, unknown>; is_reaction?: boolean }>
   } | null
+  active_modifiers?: Array<{ id: string; modifier_type: string; power_delta: number; max_life_delta: number; current_life_delta: number; multiplier: number | null; is_permanent: boolean; metadata: Record<string, unknown> }>
 }
 
 export interface MatchState extends MatchRow, MatchPublicStateRow {

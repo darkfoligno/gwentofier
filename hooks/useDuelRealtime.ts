@@ -18,6 +18,16 @@ type ConnectionStatus = "connected" | "syncing" | "disconnected"
 const NIL_UUID = "00000000-0000-0000-0000-000000000000"
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
+function requiredUuid(value: unknown, field: string) {
+  if (typeof value !== "string" || !UUID.test(value) || value === NIL_UUID) throw new Error(`PAYLOAD_UUID_INVALID: ${field}`)
+  return value
+}
+function requiredVersion(value: unknown) {
+  const parsed = typeof value === "number" ? value : Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("PAYLOAD_VERSION_INVALID: p_expected_version")
+  return parsed
+}
+
 function isStaleVersion(error: PostgrestError | Error | null) {
   return Boolean(error && (error.message.includes("STALE_MATCH_VERSION") || ("details" in error && error.details?.includes("STALE_MATCH_VERSION"))))
 }
@@ -66,19 +76,24 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   const fetchBoardCards = useCallback(async () => {
     if (!validMatch) return
-    const [{ data, error }, effectsResult] = await Promise.all([
+    const [{ data, error }, effectsResult, modifiersResult] = await Promise.all([
       supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("zone_position", { nullsFirst: false }),
       supabase.from("visible_match_card_effects").select("match_card_id,element,effect_mana_cost,effect_text,effect_definition").eq("match_id", matchId),
+      supabase.from("visible_match_card_modifiers").select("id,match_card_id,modifier_type,power_delta,max_life_delta,current_life_delta,multiplier,is_permanent,metadata").eq("match_id",matchId),
     ])
     if (error) throw error
     if (effectsResult.error) throw effectsResult.error
+    if (modifiersResult.error && !["42P01","PGRST205"].includes(modifiersResult.error.code ?? "")) throw modifiersResult.error
     const effects = new Map((effectsResult.data ?? []).map((item: any) => [item.match_card_id, item]))
+    const modifiers = new Map<string, any[]>()
+    for (const item of modifiersResult.data ?? []) modifiers.set(item.match_card_id, [...(modifiers.get(item.match_card_id) ?? []), item])
     const rows = (data ?? []) as VisibleMatchCardRow[]
     if (mounted.current) setBoardCards(rows.map(row => ({
       ...row,
       card_id: row.id,
       owner_id: row.controller_user_id,
       slot_index: row.zone_position ?? 0,
+      active_modifiers: modifiers.get(row.id) ?? [],
       card_data: row.card_name == null ? null : {
         id: row.id,
         nome: row.card_name,
@@ -97,9 +112,12 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   const fetchActions = useCallback(async () => {
     if (!validMatch) return
-    const { data, error } = await supabase.from("visible_match_actions").select("*").eq("match_id", matchId).order("sequence_number", { ascending: false }).limit(50)
-    if (error) throw error
-    if (mounted.current) setMatchActions((data ?? []) as MatchAction[])
+    const feed = await supabase.from("match_action_feed").select("action_id,match_id,sequence_number,actor_user_id,action_type,payload_public,state_version_before,state_version_after,created_at").eq("match_id", matchId).order("sequence_number", { ascending: true }).limit(100)
+    if (!feed.error) { if (mounted.current) setMatchActions((feed.data ?? []).map(row => ({ ...row, id: row.action_id })) as MatchAction[]); return }
+    if (!["42P01","PGRST205"].includes(feed.error.code ?? "")) throw feed.error
+    const fallback = await supabase.from("visible_match_actions").select("*").eq("match_id",matchId).order("sequence_number",{ascending:true}).limit(100)
+    if(fallback.error)throw fallback.error
+    if(mounted.current)setMatchActions((fallback.data??[]) as MatchAction[])
   }, [matchId, validMatch])
 
   const fetchPendingAttack = useCallback(async () => {
@@ -124,7 +142,12 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice, matchId, validMatch])
 
   const rpc = useCallback(async <T,>(name: string, args: Record<string, unknown>) => {
-    const { data, error } = await supabase.rpc(name, args)
+    const clean = Object.fromEntries(Object.entries(args).filter(([,value]) => value !== undefined && value !== ""))
+    if ("p_match_id" in clean) clean.p_match_id = requiredUuid(clean.p_match_id, "p_match_id")
+    if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
+    for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id"])
+      if (key in clean && clean[key] !== null) clean[key] = requiredUuid(clean[key], key)
+    const { data, error } = await supabase.rpc(name, clean)
     if (error) {
       if (isStaleVersion(error)) await refresh()
       void reportDuelError(matchId, name, error)
@@ -134,8 +157,8 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   }, [matchId, refresh])
 
   const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
-    p_match_id: matchId,
-    p_expected_version: matchState?.match_version ?? 0,
+    p_match_id: requiredUuid(matchId,"p_match_id"),
+    p_expected_version: requiredVersion(matchState?.match_version ?? 0),
     ...extra,
   }), [matchId, matchState?.match_version])
 
@@ -161,9 +184,17 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_effect_choices", filter: `match_id=eq.${matchId}` }, () => { void fetchPendingEffectChoice(); void fetchBoardCards() })
       .subscribe(status => setConnectionStatus(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "CLOSED" ? "disconnected" : "syncing"))
+    const actionChannel=supabase.channel(`match-actions:${matchId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_action_feed", filter: `match_id=eq.${matchId}` }, payload => {
+        const row = payload.new as Omit<MatchAction,"id"> & { action_id: number }
+        setMatchActions(previous => previous.some(item => item.id === row.action_id) ? previous : [...previous,{ ...row,id:row.action_id }].slice(-100))
+        void Promise.all([fetchMatchState(),fetchBoardCards()])
+      })
+      .subscribe()
     return () => {
       mounted.current = false
       void supabase.removeChannel(channel)
+      void supabase.removeChannel(actionChannel)
     }
   }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice, matchId, refresh, validMatch])
 
