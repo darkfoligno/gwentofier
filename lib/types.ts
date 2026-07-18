@@ -14,6 +14,7 @@ export interface MatchRow {
   state_version: number
   finish_reason: string | null
   turn_deadline: string | null
+  initiative_result: { mode?: string; player1?: number; player2?: number; winner_user_id?: string } | null
 }
 
 /** Exact public.match_public_states row. */

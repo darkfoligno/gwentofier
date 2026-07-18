@@ -41,7 +41,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const fetchMatchState = useCallback(async () => {
     if (!validMatch) return
     const [matchResult, publicResult, trainingResult] = await Promise.all([
-      supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline").eq("id", matchId).single(),
+      supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result").eq("id", matchId).single(),
       supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
       supabase.from("training_matches").select("match_id").eq("match_id", matchId).maybeSingle(),
     ])
@@ -82,6 +82,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       card_data: row.card_name == null ? null : {
         id: row.id,
         nome: row.card_name,
+        image_url: row.image_url ?? undefined,
         mana: effects.get(row.id)?.effect_mana_cost ?? 0,
         ataque: row.current_power ?? 0,
         vida: row.current_life ?? 0,
@@ -186,9 +187,14 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     passWithoutAction: () => rpc("pass_without_action", versioned()),
     surrenderMatch: () => rpc("surrender_match", versioned()),
     activateMatchEffect: (cardId: string, effectOrder = 1, targetCardId?: string) => rpc("activate_card_effect_v2", versioned({ p_source_card_id: cardId, p_effect_order: effectOrder, p_target_card_id: targetCardId ?? null })),
-    declineAttackReaction: () => rpc("decline_attack_reaction", { p_pending_attack_id: pendingAttack?.id, p_expected_version: matchState?.match_version ?? 0 }),
+    declineAttackReaction: async () => {
+      const declined = await rpc<{ state_version: number }>("decline_attack_reaction", { p_pending_attack_id: pendingAttack?.id, p_expected_version: matchState?.match_version ?? 0 })
+      return rpc("finalize_pending_attack_turn", { p_pending_attack_id: pendingAttack?.id, p_expected_version: declined.state_version })
+    },
     submitEffectChoice: (choiceId: string, selectedIds: string[]) => rpc("submit_effect_choice", { p_choice_id: choiceId, p_selected_ids: selectedIds, p_expected_version: matchState?.match_version ?? 0 }),
     runTrainingBotTurn: () => rpc("run_training_bot_turn", versioned()),
     expireTurn: () => rpc("expire_match_turn", versioned()),
+    autoResolveTrainingAttack: (expectedVersion: number) => rpc("auto_resolve_training_attack", { p_match_id: matchId, p_expected_version: expectedVersion }),
+    finalizePendingAttack: (attackId: string, expectedVersion: number) => rpc("finalize_pending_attack_turn", { p_pending_attack_id: attackId, p_expected_version: expectedVersion }),
   }
 }

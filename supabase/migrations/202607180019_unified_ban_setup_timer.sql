@@ -29,8 +29,8 @@ create or replace view public.visible_match_card_effects with(security_barrier=t
 select mc.id match_card_id,mc.match_id,
  case when mc.owner_user_id=auth.uid() or mc.is_face_up or mc.zone in('life','attacker','leader','graveyard','banished') then mdc.element end element,
  case when mc.owner_user_id=auth.uid() or mc.is_face_up or mc.zone in('life','attacker','leader','graveyard','banished') then mdc.effect_mana_cost end effect_mana_cost,
- case when mc.owner_user_id=auth.uid() or mc.is_face_up or mc.zone in('life','attacker','leader','graveyard','banished') then c.effect_text end effect_text,
- case when mc.owner_user_id=auth.uid() or mc.is_face_up or mc.zone in('life','attacker','leader','graveyard','banished') then mdc.effect_definition end effect_definition
+ case when mc.owner_user_id=auth.uid() or mc.is_face_up or mc.zone in('life','attacker','leader','graveyard','banished') then mdc.effect_definition end effect_definition,
+ case when mc.owner_user_id=auth.uid() or mc.is_face_up or mc.zone in('life','attacker','leader','graveyard','banished') then c.effect_text end effect_text
 from public.match_cards mc join public.match_deck_cards mdc on mdc.id=mc.match_deck_card_id
 join public.cards c on c.id=mc.source_card_id
 where game_private.is_match_participant(mc.match_id,auth.uid());
