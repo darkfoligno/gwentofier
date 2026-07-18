@@ -2710,7 +2710,9 @@ begin
     where is_active = true;
 
     if p_is_private then
-        v_invite_code := upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 8));
+        -- gen_random_bytes pertence ao pgcrypto e pode não estar visível quando
+        -- a função usa search_path vazio. UUID é nativo, seguro e suficiente.
+        v_invite_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
     end if;
 
     insert into public.matches(

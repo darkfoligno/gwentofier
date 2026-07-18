@@ -20,6 +20,9 @@ Docker não é necessário. Use o **SQL Editor** do projeto Supabase e execute u
 8. `supabase/migrations/202607170013_effect_visibility_security_realtime.sql`
 9. `supabase/migrations/202607170014_common_attack_rules.sql`
 10. `supabase/migrations/202607170015_effect_engine_installation_audit.sql`
+11. `supabase/migrations/202607180016_fix_create_match_invite_code.sql`
+12. `supabase/migrations/202607180017_training_match_and_rls_fix.sql`
+13. `supabase/migrations/202607180018_training_bot_turn.sql`
 
 O arquivo 015 é a trava final: ele aborta se não encontrar as 72 cartas, os 72 códigos, as funções e os gatilhos obrigatórios.
 

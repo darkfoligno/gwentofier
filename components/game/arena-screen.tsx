@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { AlertTriangle, Crown, Flag, Hourglass, Layers, Loader2, Skull, Swords, Wifi, WifiOff, X } from "lucide-react"
 import { GameCard } from "./game-card"
@@ -59,10 +59,21 @@ export function ArenaScreen() {
   const [matchBans, setMatchBans] = useState<MatchBanView[]>([])
   const [effectSelection, setEffectSelection] = useState<{ sourceId: string; order: number; zone?: MatchCardZone } | null>(null)
   const [effectMessage, setEffectMessage] = useState<string | null>(null)
+  const botRunning = useRef(false)
 
   useEffect(() => { const params = new URLSearchParams(window.location.search); setMatchId(params.get("matchId") ?? ""); setPreview(params.get("preview") === "1"); void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? "")) }, [])
   const duel = useDuelRealtime(matchId, userId)
-  const { matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone } = duel
+  const { matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus, isTraining, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone } = duel
+
+  useEffect(() => {
+    if (!isTraining || !matchState || matchState.status !== "in_progress" || isCurrentPlayer || botRunning.current) return
+    botRunning.current = true
+    setEffectMessage("O Autômato de Ofier está calculando a jogada…")
+    const timer = window.setTimeout(() => {
+      void duel.runTrainingBotTurn().then(() => duel.refresh()).catch(error => setEffectMessage(error?.message ?? "Falha no turno do Autômato.")).finally(() => { botRunning.current = false })
+    }, 900)
+    return () => window.clearTimeout(timer)
+  }, [isCurrentPlayer, isTraining, matchState?.match_version, matchState?.status])
 
   useEffect(() => { if (matchState?.status !== "ban_phase") { setBanCandidates([]); return } void duel.getBanCandidates().then(cards => setBanCandidates(cards.filter(card => card.rarity === "legendary" && card.is_golden))).catch(console.error) }, [matchId, matchState?.status])
   useEffect(() => {

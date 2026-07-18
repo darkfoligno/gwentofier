@@ -34,17 +34,21 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [pendingAttack, setPendingAttack] = useState<PendingAttack | null>(null)
   const [pendingEffectChoice, setPendingEffectChoice] = useState<{ id: string; effect_code: string; choice_type: string; min_choices: number; max_choices: number; candidate_ids: string[]; public_prompt: string; expected_state_version: number } | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
+  const [isTraining, setIsTraining] = useState(false)
   const mounted = useRef(true)
   const validMatch = UUID.test(matchId) && matchId !== NIL_UUID
 
   const fetchMatchState = useCallback(async () => {
     if (!validMatch) return
-    const [matchResult, publicResult] = await Promise.all([
+    const [matchResult, publicResult, trainingResult] = await Promise.all([
       supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason").eq("id", matchId).single(),
       supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
+      supabase.from("training_matches").select("match_id").eq("match_id", matchId).maybeSingle(),
     ])
     if (matchResult.error) throw matchResult.error
     if (publicResult.error) throw publicResult.error
+    if (trainingResult.error) throw trainingResult.error
+    if (mounted.current) setIsTraining(Boolean(trainingResult.data))
     const match = matchResult.data as MatchRow
     const state = publicResult.data as MatchPublicStateRow
     if (mounted.current) setMatchState({
@@ -63,7 +67,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const fetchBoardCards = useCallback(async () => {
     if (!validMatch) return
     const [{ data, error }, effectsResult] = await Promise.all([
-      supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("slot_index"),
+      supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("zone_position", { nullsFirst: false }),
       supabase.from("visible_match_card_effects").select("match_card_id,element,effect_mana_cost,effect_definition").eq("match_id", matchId),
     ])
     if (error) throw error
@@ -170,7 +174,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const reactionUsed = pendingAttack?.status === "reaction_used"
 
   return {
-    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus,
+    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus, isTraining,
     isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
     getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
     submitBan: (cardId: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "legendary_golden" })),
@@ -183,5 +187,6 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     activateMatchEffect: (cardId: string, effectOrder = 1, targetCardId?: string) => rpc("activate_card_effect_v2", versioned({ p_source_card_id: cardId, p_effect_order: effectOrder, p_target_card_id: targetCardId ?? null })),
     declineAttackReaction: () => rpc("decline_attack_reaction", { p_pending_attack_id: pendingAttack?.id, p_expected_version: matchState?.match_version ?? 0 }),
     submitEffectChoice: (choiceId: string, selectedIds: string[]) => rpc("submit_effect_choice", { p_choice_id: choiceId, p_selected_ids: selectedIds, p_expected_version: matchState?.match_version ?? 0 }),
+    runTrainingBotTurn: () => rpc("run_training_bot_turn", versioned()),
   }
 }

@@ -48,20 +48,10 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
       if (sessionError) throw sessionError
       if (!sessionData.session) throw new Error("Sessão expirada. Entre novamente.")
-      setTrainingStep("Procurando um deck válido…")
-      const { data: decks, error: deckError } = await supabase.from("decks").select("id").eq("is_valid", true).order("updated_at", { ascending: false }).limit(1)
-      if (deckError) throw deckError
-      let deckId = decks?.[0]?.id
-      if (!deckId) {
-        setTrainingStep("Preparando seu deck inicial…")
-        const { data, error: starterError } = await supabase.rpc("claim_starter_deck", { p_deck_name: "Deck Inicial" })
-        if (starterError) throw starterError
-        deckId = data?.deck_id
-      }
-      if (!deckId) throw new Error("Não foi possível obter um deck válido.")
-      setTrainingStep("Criando a partida de treino…")
-      const { data: matchId, error: matchError } = await supabase.rpc("create_match", { p_deck_id: deckId, p_match_type: "friendly", p_is_private: true })
+      setTrainingStep("Montando dois decks de teste com 40 cartas…")
+      const { data: trainingResult, error: matchError } = await supabase.rpc("create_training_match", { p_deck_size: 40 })
       if (matchError) throw matchError
+      const matchId = typeof trainingResult === "string" ? trainingResult : trainingResult?.match_id
       if (!matchId) throw new Error("O servidor não retornou o match_id da nova partida.")
       const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", matchId); window.history.pushState({}, "", url); onEnter("arena")
     } catch (cause) {
