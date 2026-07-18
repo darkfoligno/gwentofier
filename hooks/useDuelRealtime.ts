@@ -156,6 +156,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
     for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id"])
       if (key in clean && clean[key] !== null) clean[key] = requiredUuid(clean[key], key)
+    console.error(`[Duel RPC] ${name}`, { payload: clean, matchVersion: matchState?.match_version, at: new Date().toISOString() })
     const { data, error } = await supabase.rpc(name, clean)
     if (error) {
       if (isStaleVersion(error)) await refresh()
@@ -236,5 +237,6 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     expireTurn: () => rpc("expire_match_turn", versioned()),
     autoResolveTrainingAttack: (expectedVersion: number) => rpc("auto_resolve_training_attack", { p_match_id: matchId, p_expected_version: expectedVersion }),
     finalizePendingAttack: (attackId: string, expectedVersion: number) => rpc("finalize_pending_attack_turn", { p_pending_attack_id: attackId, p_expected_version: expectedVersion }),
+    rescueTrainingBotTurn: () => rpc("rescue_training_bot_turn", versioned()),
   }
 }
