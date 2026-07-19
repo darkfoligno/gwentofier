@@ -3,7 +3,7 @@ export type Screen = "auth" | "hub" | "store" | "spectator" | "arena" | "friends
 export type MatchStatus = "waiting" | "ban_phase" | "setup" | "initiative" | "in_progress" | "finished" | "cancelled" | "expired"
 export type MatchCardZone = "deck" | "hand" | "life" | "reinforcement" | "attacker" | "leader" | "graveyard" | "banished" | "temporary"
 export type PendingAttackStatus = "awaiting_reaction" | "reaction_used" | "reaction_declined" | "resolving" | "resolved" | "cancelled" | "expired"
-export type MatchEngineState = "lifecycle" | "ban_phase" | "setup" | "turn_action" | "reaction_window" | "resolving" | "finished"
+export type MatchEngineState = "lifecycle" | "ban_phase" | "setup" | "turn_action" | "pending_trigger" | "reaction_window" | "resolving" | "finished"
 
 /** Exact public.matches columns consumed by the client. */
 export interface MatchRow {
@@ -138,6 +138,21 @@ export interface PendingAttack {
   resolved_state_version: number | null
   result: Record<string, unknown>
   created_at: string
+}
+
+export interface PendingCardTrigger {
+  id: string
+  match_id: string
+  owner_user_id: string
+  source_match_card_id: string
+  effect_order: number
+  effect_code: string
+  trigger_type: string
+  target_mode: string
+  mana_cost: number
+  description: string
+  expected_state_version: number
+  expires_at: string
 }
 
 export interface BanCandidate {

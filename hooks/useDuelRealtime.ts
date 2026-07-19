@@ -10,6 +10,7 @@ import type {
   MatchRow,
   MatchState,
   PendingAttack,
+  PendingCardTrigger,
   VisibleMatchCard,
   VisibleMatchCardRow,
 } from "@/lib/types"
@@ -49,6 +50,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [boardCards, setBoardCards] = useState<VisibleMatchCard[]>([])
   const [matchActions, setMatchActions] = useState<MatchAction[]>([])
   const [pendingAttack, setPendingAttack] = useState<PendingAttack | null>(null)
+  const [pendingCardTrigger,setPendingCardTrigger]=useState<PendingCardTrigger|null>(null)
   const [pendingEffectChoice, setPendingEffectChoice] = useState<{ id: string; effect_code: string; choice_type: string; min_choices: number; max_choices: number; candidate_ids: string[]; public_prompt: string; expected_state_version: number } | null>(null)
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
   const [isTraining, setIsTraining] = useState(false)
@@ -148,20 +150,21 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     if (mounted.current) setPendingAttack(data as PendingAttack | null)
   }, [currentUserId, matchId, validMatch])
   const fetchPendingEffectChoice = useCallback(async () => { if (!validMatch) return; const { data, error } = await supabase.rpc("get_my_pending_effect_choice", { p_match_id: matchId }); if (error) throw error; const row = Array.isArray(data) ? data[0] : data; if (mounted.current) setPendingEffectChoice(row ?? null) }, [matchId, validMatch])
+  const fetchPendingCardTrigger=useCallback(async()=>{if(!validMatch)return;const {data,error}=await supabase.rpc("get_my_pending_card_trigger",{p_match_id:matchId});if(error){if(["42883","PGRST202"].includes(error.code??""))return;throw error}const row=Array.isArray(data)?data[0]:data;if(mounted.current)setPendingCardTrigger((row??null) as PendingCardTrigger|null)},[matchId,validMatch])
   const fetchEffectUses=useCallback(async()=>{if(!validMatch||!matchState)return;const {data,error}=await supabase.from("match_effect_uses").select("match_card_id").eq("match_id",matchId).eq("turn_number",matchState.current_turn);if(error)throw error;if(mounted.current)setUsedEffectCardIds(new Set((data??[]).map(row=>row.match_card_id)))},[matchId,matchState?.current_turn,validMatch])
 
   const refresh = useCallback(async () => {
     if (!validMatch) return
     setConnectionStatus("syncing")
     try {
-      await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack(), fetchPendingEffectChoice(),fetchEffectUses()])
+      await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack(), fetchPendingEffectChoice(),fetchPendingCardTrigger(),fetchEffectUses()])
       if (mounted.current) setConnectionStatus("connected")
     } catch (error) {
       console.error("Falha ao sincronizar a partida autoritativa", error)
       void reportDuelError(matchId, "realtime_refresh", error as PostgrestError | Error)
       if (mounted.current) setConnectionStatus("disconnected")
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchEffectUses, matchId, validMatch])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses, matchId, validMatch])
 
   const rpc = useCallback(async <T,>(name: string, args: Record<string, unknown>) => {
     if (actionPending.current) throw new Error("ACTION_IN_PROGRESS: aguarde a confirmação do servidor.")
@@ -171,7 +174,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     const clean = Object.fromEntries(Object.entries(args).filter(([,value]) => value !== undefined && value !== ""))
     if ("p_match_id" in clean) clean.p_match_id = requiredUuid(clean.p_match_id, "p_match_id")
     if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
-    for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id"])
+    for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id","p_trigger_id"])
       if (key in clean && clean[key] !== null) clean[key] = requiredUuid(clean[key], key)
     console.error(`[Duel RPC] ${name}`, { payload: clean, matchVersion: matchState?.match_version, at: new Date().toISOString() })
     const { data, error } = await supabase.rpc(name, clean)
@@ -214,6 +217,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
         void Promise.all([fetchPendingAttack(), fetchMatchState(), fetchBoardCards(), fetchActions()])
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_effect_choices", filter: `match_id=eq.${matchId}` }, () => { void fetchPendingEffectChoice(); void fetchBoardCards() })
+      .on("postgres_changes", { event: "*", schema: "public", table: "pending_card_triggers", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchPendingCardTrigger(),fetchMatchState(),fetchBoardCards(),fetchActions()]) })
       .on("postgres_changes", { event: "*", schema: "public", table: "match_cards", filter: `match_id=eq.${matchId}` }, () => {
         // A linha bruta apenas invalida o cache. A leitura seguinte permanece na
         // view sanitizada e atualiza revelação, HP, zona e cemitério atomicamente.
@@ -232,7 +236,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       void supabase.removeChannel(channel)
       void supabase.removeChannel(actionChannel)
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice, matchId, refresh, validMatch])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger, matchId, refresh, validMatch])
 
   const isPlayer1 = matchState?.player1_id === currentUserId
   const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
@@ -242,7 +246,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const reactionUsed = pendingAttack?.status === "reaction_used"
 
   return {
-    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
+    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
     isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
     getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
     submitBan: (cardId: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "highest_rarity" })),
@@ -259,6 +263,8 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       return rpc("finalize_pending_attack_turn", { p_pending_attack_id: pendingAttack?.id, p_expected_version: declined.state_version })
     },
     submitEffectChoice: (choiceId: string, selectedIds: string[]) => rpc("submit_effect_choice", { p_choice_id: choiceId, p_selected_ids: selectedIds, p_expected_version: matchState?.match_version ?? 0 }),
+    resolvePendingCardTrigger:(triggerId:string,activate:boolean,targetCardId?:string)=>rpc("resolve_pending_card_trigger",{p_trigger_id:triggerId,p_activate:activate,p_target_card_id:targetCardId??null,p_expected_version:matchState?.match_version??0}),
+    resolveTrainingBotTrigger:()=>rpc("resolve_training_bot_trigger",versioned()),
     runTrainingBotTurn: () => rpc("run_training_bot_turn", versioned()),
     expireTurn: () => rpc("expire_match_turn", versioned()),
     autoResolveTrainingAttack: (expectedVersion: number) => rpc("auto_resolve_training_attack", { p_match_id: matchId, p_expected_version: expectedVersion }),
