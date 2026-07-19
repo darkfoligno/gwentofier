@@ -147,4 +147,10 @@ export interface BanCandidate {
   rarity: string
   is_golden: boolean
   copy_count: number
+  card_type?: string
+  element?: string
+  base_power?: number
+  base_max_life?: number
+  effect_mana_cost?: number
+  effect_text?: string
 }
