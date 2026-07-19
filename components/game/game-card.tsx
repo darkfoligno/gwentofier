@@ -7,6 +7,7 @@ import { Hand, Heart, Sword } from "lucide-react"
 import type { GameCard as GameCardType, Rarity } from "@/lib/game-data"
 import { cn } from "@/lib/utils"
 import { highlightEffectText, parseEffectBadges } from "@/lib/effect-parser"
+import { secureImageUrl } from "@/lib/secure-url"
 
 const rarity: Record<Rarity, string> = {
   common: "border-emerald-500 shadow-emerald-500/25",
@@ -47,6 +48,7 @@ export function GameCard({ card, interactive = false, className, isFaceDown = fa
   </motion.div>
 
   if (!card) return null
+  const cardImageUrl = secureImageUrl(card.image_url)
   const badges = parseEffectBadges(card.effect_definition)
   const allowedTypes = ["Bestiário", "M&F", "Witcher", "Elfica", "Cívil", "Civil", "Vampiro"]
   const rawType = allowedTypes.includes(card.tipo) ? card.tipo : card.elemento
@@ -59,7 +61,7 @@ export function GameCard({ card, interactive = false, className, isFaceDown = fa
         <div className={cn("relative z-20 ml-auto mr-2 mt-2 flex h-[12%] w-[76%] min-w-0 items-center justify-center overflow-hidden rounded border bg-white px-1 shadow-sm", rarityLine[card.raridade])}><h3 title={card.nome} className={`${nameSize} w-full break-words text-center font-serif font-black leading-[1.02]`}>{card.nome}</h3></div>
         <div className="absolute left-1 top-1 z-30"><div className="flex h-9 w-9 rotate-45 items-center justify-center border-2 border-amber-400 bg-blue-950 shadow-[0_0_10px_rgba(59,130,246,.6)]"><span className="-rotate-45 text-xs font-black text-blue-100"><Hand size={9} className="mx-auto" />{card.mana}</span></div><span className="mt-1 block rounded-sm bg-black px-1 text-center font-serif text-[6px] text-white">MANA</span></div>
         <div onClick={(event) => { event.stopPropagation(); if (enableZoom) setArtOpen(true) }} className={cn("relative mx-2 mt-1 flex h-[45%] items-center justify-center overflow-hidden border-2 border-double bg-black/90", rarityLine[card.raridade], enableZoom && "cursor-zoom-in")}>
-          {card.image_url ? <img src={card.image_url} alt={card.nome} className="block h-full w-full object-contain object-center" /> : <div className="flex h-full items-center justify-center bg-[radial-gradient(circle,#92400e,#1c1917)] font-serif text-2xl text-amber-300/60">𓂀</div>}
+          <img src={cardImageUrl} alt={card.nome} className="block h-full w-full object-contain object-center" />
           <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
         </div>
         <div className={cn("relative mx-2 my-1 h-px border-t", rarityLine[card.raridade])}><span className={cn("absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rotate-45 border bg-yellow-100", rarityLine[card.raridade])} /></div>

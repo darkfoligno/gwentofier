@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
 import type { Screen } from "@/lib/types"
 import { GameCard } from "./game-card"
+import { secureImageUrl } from "@/lib/secure-url"
 
 interface Profile { username: string; avatar_url: string | null }
 interface Stats { wins: number; losses: number; draws: number; ranked_rating: number; current_win_streak: number }
@@ -76,7 +77,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
 
   return <main className="min-h-screen bg-stone-950 p-5 text-stone-100"><div className="mx-auto max-w-[1600px]">
     <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-700/40 bg-black/50 p-5">
-      <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
+      <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={secureImageUrl(profile.avatar_url)} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
       <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => void startTraining()} disabled={training} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => void searchOpponent()} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="MINHAS CARTAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="DUELOS" onClick={() => onEnter("spectator")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
     </header>
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
