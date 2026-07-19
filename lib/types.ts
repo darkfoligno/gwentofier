@@ -3,6 +3,7 @@ export type Screen = "auth" | "hub" | "store" | "spectator" | "arena" | "friends
 export type MatchStatus = "waiting" | "ban_phase" | "setup" | "initiative" | "in_progress" | "finished" | "cancelled" | "expired"
 export type MatchCardZone = "deck" | "hand" | "life" | "reinforcement" | "attacker" | "leader" | "graveyard" | "banished" | "temporary"
 export type PendingAttackStatus = "awaiting_reaction" | "reaction_used" | "reaction_declined" | "resolving" | "resolved" | "cancelled" | "expired"
+export type MatchEngineState = "lifecycle" | "ban_phase" | "setup" | "turn_action" | "reaction_window" | "resolving" | "finished"
 
 /** Exact public.matches columns consumed by the client. */
 export interface MatchRow {
@@ -15,6 +16,7 @@ export interface MatchRow {
   finish_reason: string | null
   turn_deadline: string | null
   initiative_result: { mode?: string; player1?: number; player2?: number; winner_user_id?: string } | null
+  engine_state: MatchEngineState
 }
 
 /** Exact public.match_public_states row. */

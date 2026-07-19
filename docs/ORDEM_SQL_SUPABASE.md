@@ -28,6 +28,7 @@ Docker não é necessário. Use o **SQL Editor** do projeto Supabase e execute u
 16. `supabase/migrations/202607180021_safe_action_feed_and_modifiers.sql`
 17. `supabase/migrations/202607180022_initial_draw_guard_fix.sql`
 18. `supabase/migrations/202607180023_bot_rescue_and_nonfatal_draw_lock.sql`
+19. `supabase/migrations/202607180024_strict_v2_blocking_engine.sql`
 
 O arquivo 015 é a trava final: ele aborta se não encontrar as 72 cartas, os 72 códigos, as funções e os gatilhos obrigatórios.
 
@@ -56,6 +57,10 @@ Todos os itens de `audit_common_effect_engine()` precisam retornar `ok = true`. 
 4. Declare um ataque com uma carta que possua regra de ataque.
 5. Abra outra sessão/conta e confirme a janela de reação e a escolha pendente.
 6. Consulte `supabase/tests/common_effect_engine_check.sql`; eventos com `result.failed = true` mostram o SQLSTATE e a mensagem exata.
+
+## Verificação adicional da especificação V2.0
+
+Depois da migração 024, execute `supabase/tests/strict_v2_engine_check.sql`. Todos os itens devem retornar `ok = true`. Crie uma partida de treino nova: partidas antigas preservam seus snapshots e não são uma validação confiável do setup atualizado.
 
 ## Git depois do Supabase
 

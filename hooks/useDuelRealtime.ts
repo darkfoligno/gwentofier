@@ -53,13 +53,15 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
   const [isTraining, setIsTraining] = useState(false)
   const [usedEffectCardIds,setUsedEffectCardIds]=useState<Set<string>>(new Set())
+  const [isActionPending,setIsActionPending]=useState(false)
+  const actionPending = useRef(false)
   const mounted = useRef(true)
   const validMatch = UUID.test(matchId) && matchId !== NIL_UUID
 
   const fetchMatchState = useCallback(async () => {
     if (!validMatch) return
     const [matchResult, publicResult, trainingResult] = await Promise.all([
-      supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result").eq("id", matchId).single(),
+      supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result,engine_state").eq("id", matchId).single(),
       supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
       supabase.from("training_matches").select("match_id").eq("match_id", matchId).maybeSingle(),
     ])
@@ -130,7 +132,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   const fetchPendingAttack = useCallback(async () => {
     if (!validMatch || !currentUserId) return
-    const { data, error } = await supabase.from("pending_attacks").select("*").eq("match_id", matchId).eq("defender_user_id", currentUserId).eq("status", "awaiting_reaction").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    const { data, error } = await supabase.from("pending_attacks").select("*").eq("match_id", matchId).in("status", ["awaiting_reaction","reaction_used","reaction_declined","resolving"]).order("created_at", { ascending: false }).limit(1).maybeSingle()
     if (error) throw error
     if (mounted.current) setPendingAttack(data as PendingAttack | null)
   }, [currentUserId, matchId, validMatch])
@@ -151,6 +153,10 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchEffectUses, matchId, validMatch])
 
   const rpc = useCallback(async <T,>(name: string, args: Record<string, unknown>) => {
+    if (actionPending.current) throw new Error("ACTION_IN_PROGRESS: aguarde a confirmação do servidor.")
+    actionPending.current = true
+    if (mounted.current) setIsActionPending(true)
+    try {
     const clean = Object.fromEntries(Object.entries(args).filter(([,value]) => value !== undefined && value !== ""))
     if ("p_match_id" in clean) clean.p_match_id = requiredUuid(clean.p_match_id, "p_match_id")
     if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
@@ -164,6 +170,10 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       throw readableRpcError(error)
     }
     return data as T
+    } finally {
+      actionPending.current = false
+      if (mounted.current) setIsActionPending(false)
+    }
   }, [matchId, refresh])
 
   const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
@@ -189,7 +199,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_attacks", filter: `match_id=eq.${matchId}` }, payload => {
         const next = payload.new as PendingAttack
-        setPendingAttack(next.status === "awaiting_reaction" && next.defender_user_id === currentUserId ? next : null)
+        setPendingAttack(["awaiting_reaction","reaction_used","reaction_declined","resolving"].includes(next.status) ? next : null)
         void Promise.all([fetchPendingAttack(), fetchMatchState(), fetchBoardCards(), fetchActions()])
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_effect_choices", filter: `match_id=eq.${matchId}` }, () => { void fetchPendingEffectChoice(); void fetchBoardCards() })
@@ -216,11 +226,11 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const reactionUsed = pendingAttack?.status === "reaction_used"
 
   return {
-    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus, isTraining,usedEffectCardIds,
+    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
     isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
     getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
     submitBan: (cardId: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "highest_rarity" })),
-    submitSetup: (lifeCardIds: string[]) => isTraining ? rpc("submit_training_setup", versioned({ p_life_card_ids: lifeCardIds })) : rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: [], p_leader_card_id: null })),
+    submitSetup: (lifeCardIds: string[], reinforcementCardIds: string[] = []) => isTraining ? rpc("submit_training_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds })) : rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds, p_leader_card_id: null })),
     playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
     replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
     declareAttack: (attackerCardIds: string[], isDirect: boolean) => rpc("declare_attack", versioned({ p_attacker_card_ids: attackerCardIds, p_is_direct: isDirect })),
