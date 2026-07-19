@@ -55,6 +55,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [usedEffectCardIds,setUsedEffectCardIds]=useState<Set<string>>(new Set())
   const [isActionPending,setIsActionPending]=useState(false)
   const actionPending = useRef(false)
+  const boardRequest = useRef(0)
   const mounted = useRef(true)
   const validMatch = UUID.test(matchId) && matchId !== NIL_UUID
 
@@ -92,6 +93,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   const fetchBoardCards = useCallback(async () => {
     if (!validMatch) return
+    const requestId = ++boardRequest.current
     const [{ data, error }, effectsResult, modifiersResult,detailsResult] = await Promise.all([
       supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("zone_position", { nullsFirst: false }),
       supabase.from("visible_match_card_effects").select("match_card_id,element,effect_mana_cost,effect_text,effect_definition").eq("match_id", matchId),
@@ -107,7 +109,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     const details=new Map((detailsResult.data??[]).map((item:any)=>[item.match_card_id,item]))
     for (const item of modifiersResult.data ?? []) modifiers.set(item.match_card_id, [...(modifiers.get(item.match_card_id) ?? []), item])
     const rows = (data ?? []) as VisibleMatchCardRow[]
-    if (mounted.current) setBoardCards(rows.map(row => ({
+    if (mounted.current && requestId === boardRequest.current) setBoardCards(rows.map(row => ({
       ...row,...(details.get(row.id)??{}),
       card_id: row.id,
       owner_id: row.controller_user_id,
@@ -212,6 +214,11 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
         void Promise.all([fetchPendingAttack(), fetchMatchState(), fetchBoardCards(), fetchActions()])
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_effect_choices", filter: `match_id=eq.${matchId}` }, () => { void fetchPendingEffectChoice(); void fetchBoardCards() })
+      .on("postgres_changes", { event: "*", schema: "public", table: "match_cards", filter: `match_id=eq.${matchId}` }, () => {
+        // A linha bruta apenas invalida o cache. A leitura seguinte permanece na
+        // view sanitizada e atualiza revelação, HP, zona e cemitério atomicamente.
+        void fetchBoardCards()
+      })
       .subscribe(status => setConnectionStatus(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "CLOSED" ? "disconnected" : "syncing"))
     const actionChannel=supabase.channel(`match-actions:${matchId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_action_feed", filter: `match_id=eq.${matchId}` }, payload => {
