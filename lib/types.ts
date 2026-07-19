@@ -87,7 +87,7 @@ export interface VisibleMatchCard extends VisibleMatchCardRow {
     tipo: string
     raridade: "common" | "rare" | "epic" | "legendary" | "collab"
     efeito: string
-    effect_definition?: Array<{ effect_order?: number; trigger_type?: string; effect_code?: string; target_mode?: string; parameters?: Record<string, unknown>; is_reaction?: boolean }>
+    effect_definition?: Array<{ effect_order?: number; trigger_type?: string; effect_code?: string; target_mode?: string; description?: string; parameters?: Record<string, unknown>; is_reaction?: boolean }>
   } | null
   active_modifiers?: Array<{ id: string; modifier_type: string; power_delta: number; max_life_delta: number; current_life_delta: number; multiplier: number | null; is_permanent: boolean; metadata: Record<string, unknown> }>
 }
@@ -153,4 +153,5 @@ export interface BanCandidate {
   base_max_life?: number
   effect_mana_cost?: number
   effect_text?: string
+  raridade?: string
 }
