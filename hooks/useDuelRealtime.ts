@@ -60,17 +60,20 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
 
   const fetchMatchState = useCallback(async () => {
     if (!validMatch) return
-    const [matchResult, publicResult, trainingResult] = await Promise.all([
+    const [matchResult, publicResult, trainingResult,usageResult] = await Promise.all([
       supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result,engine_state").eq("id", matchId).single(),
       supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
       supabase.from("training_matches").select("match_id").eq("match_id", matchId).maybeSingle(),
+      supabase.rpc("get_my_turn_usage",{p_match_id:matchId}),
     ])
     if (matchResult.error) throw matchResult.error
     if (publicResult.error) throw publicResult.error
     if (trainingResult.error) throw trainingResult.error
+    if (usageResult.error && !["42883","PGRST202"].includes(usageResult.error.code??"")) throw usageResult.error
     if (mounted.current) setIsTraining(Boolean(trainingResult.data))
     const match = matchResult.data as MatchRow
     const state = publicResult.data as MatchPublicStateRow
+    const usage=Array.isArray(usageResult.data)?usageResult.data[0]:usageResult.data
     if (mounted.current) setMatchState({
       ...match, ...state,
       current_player_id: match.active_player_id,
@@ -81,25 +84,31 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       player1_max_mana: state.player1_hand_count,
       player2_max_mana: state.player2_hand_count,
       match_version: match.state_version,
+      my_actions_this_turn:usage?.actions_this_turn??0,
+      my_paid_effect_used:usage?.paid_effect_used??false,
+      my_free_effect_used:usage?.free_effect_used??false,
     })
   }, [matchId, validMatch])
 
   const fetchBoardCards = useCallback(async () => {
     if (!validMatch) return
-    const [{ data, error }, effectsResult, modifiersResult] = await Promise.all([
+    const [{ data, error }, effectsResult, modifiersResult,detailsResult] = await Promise.all([
       supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("zone_position", { nullsFirst: false }),
       supabase.from("visible_match_card_effects").select("match_card_id,element,effect_mana_cost,effect_text,effect_definition").eq("match_id", matchId),
       supabase.from("visible_match_card_modifiers").select("id,match_card_id,modifier_type,power_delta,max_life_delta,current_life_delta,multiplier,is_permanent,metadata").eq("match_id",matchId),
+      supabase.from("visible_match_card_details").select("match_card_id,base_power,base_max_life,effect_mana_cost,element,card_type,is_original_rpg,is_collab").eq("match_id",matchId),
     ])
     if (error) throw error
     if (effectsResult.error) throw effectsResult.error
     if (modifiersResult.error && !["42P01","PGRST205"].includes(modifiersResult.error.code ?? "")) throw modifiersResult.error
+    if (detailsResult.error && !["42P01","PGRST205"].includes(detailsResult.error.code ?? "")) throw detailsResult.error
     const effects = new Map((effectsResult.data ?? []).map((item: any) => [item.match_card_id, item]))
     const modifiers = new Map<string, any[]>()
+    const details=new Map((detailsResult.data??[]).map((item:any)=>[item.match_card_id,item]))
     for (const item of modifiersResult.data ?? []) modifiers.set(item.match_card_id, [...(modifiers.get(item.match_card_id) ?? []), item])
     const rows = (data ?? []) as VisibleMatchCardRow[]
     if (mounted.current) setBoardCards(rows.map(row => ({
-      ...row,
+      ...row,...(details.get(row.id)??{}),
       card_id: row.id,
       owner_id: row.controller_user_id,
       slot_index: row.zone_position ?? 0,
@@ -108,11 +117,11 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
         id: row.id,
         nome: row.card_name,
         image_url: row.image_url ?? undefined,
-        mana: effects.get(row.id)?.effect_mana_cost ?? 0,
+        mana: details.get(row.id)?.effect_mana_cost ?? effects.get(row.id)?.effect_mana_cost ?? 0,
         ataque: row.current_power ?? 0,
         vida: row.current_life ?? 0,
-        elemento: (effects.get(row.id)?.element ?? "Cívil") as "Bestiário" | "M&F" | "Witcher" | "Elfica" | "Cívil" | "Vampiro",
-        tipo: effects.get(row.id)?.element ?? "Cívil",
+        elemento: (details.get(row.id)?.element ?? effects.get(row.id)?.element ?? "Cívil") as "Bestiário" | "M&F" | "Witcher" | "Elfica" | "Cívil" | "Vampiro",
+        tipo: details.get(row.id)?.card_type ?? "normal",
         raridade: (["common", "rare", "epic", "legendary", "collab"].includes(row.rarity ?? "") ? row.rarity : "common") as "common" | "rare" | "epic" | "legendary" | "collab",
         efeito: effects.get(row.id)?.effect_text ?? row.effect_text ?? "",
         effect_definition: effects.get(row.id)?.effect_definition ?? [],

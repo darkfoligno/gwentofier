@@ -64,6 +64,11 @@ export interface VisibleMatchCardRow {
   is_face_up: boolean
   is_destroyed: boolean
   has_attacked_this_turn: boolean
+  base_power?: number | null
+  base_max_life?: number | null
+  card_type?: string | null
+  is_original_rpg?: boolean | null
+  is_collab?: boolean | null
 }
 
 /** Presentation adapter derived only from VisibleMatchCardRow. */
@@ -97,6 +102,9 @@ export interface MatchState extends MatchRow, MatchPublicStateRow {
   player2_max_mana: number
   match_version: number
   turn_action_count?: number
+  my_actions_this_turn?: number
+  my_paid_effect_used?: boolean
+  my_free_effect_used?: boolean
 }
 
 /** Exact public.visible_match_actions row. */
