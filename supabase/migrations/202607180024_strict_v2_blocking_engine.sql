@@ -139,7 +139,7 @@ end $$;
 
 -- Setup de treino completo: 3 vidas, até 4 reforços ocultos e iniciativa D20.
 drop function if exists public.submit_training_setup(uuid,uuid[],bigint);
-create function public.submit_training_setup(p_match_id uuid,p_life_card_ids uuid[],p_reinforcement_card_ids uuid[] default array[]::uuid[],p_expected_version bigint default 0)
+create or replace function public.submit_training_setup(p_match_id uuid,p_life_card_ids uuid[],p_reinforcement_card_ids uuid[] default array[]::uuid[],p_expected_version bigint default 0)
 returns jsonb language plpgsql security definer set search_path='' as $$
 declare human uuid:=game_private.require_authenticated(); bot uuid; m public.matches; bot_life uuid[]; bot_reinforcement uuid[]; all_ids uuid[]; version bigint; active uuid; human_roll integer; bot_roll integer;
 begin
