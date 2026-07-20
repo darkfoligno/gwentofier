@@ -258,7 +258,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     endTurn: (expectedVersion?:number) => rpc("end_turn",expectedVersion===undefined?versioned():{p_match_id:matchId,p_expected_version:expectedVersion}),
     passWithoutAction: () => rpc("pass_without_action", versioned()),
     surrenderMatch: () => rpc("surrender_match", versioned()),
-    activateMatchEffect: (cardId: string, effectOrder = 1, targetCardId?: string,expectedVersion?:number) => rpc("activate_card_effect_v2",expectedVersion===undefined?versioned({p_source_card_id:cardId,p_effect_order:effectOrder,p_target_card_id:targetCardId??null}):{p_match_id:matchId,p_source_card_id:cardId,p_effect_order:effectOrder,p_target_card_id:targetCardId??null,p_expected_version:expectedVersion}),
+    activateMatchEffect: (cardId: string, effectOrder = 1, targetCardId?: string,expectedVersion?:number) => rpc<{success?:boolean;eligible?:boolean;reason?:string;state_version?:number}>("activate_card_effect_v2",expectedVersion===undefined?versioned({p_source_card_id:cardId,p_effect_order:effectOrder,p_target_card_id:targetCardId??null}):{p_match_id:matchId,p_source_card_id:cardId,p_effect_order:effectOrder,p_target_card_id:targetCardId??null,p_expected_version:expectedVersion}).then(result=>{if(result.success===false)throw new Error(result.reason??"EFFECT_NOT_ELIGIBLE");return result}),
     declineAttackReaction: async () => {
       const declined = await rpc<{ state_version: number }>("decline_attack_reaction", { p_pending_attack_id: pendingAttack?.id, p_expected_version: matchState?.match_version ?? 0 })
       return rpc("finalize_pending_attack_turn", { p_pending_attack_id: pendingAttack?.id, p_expected_version: declined.state_version })
