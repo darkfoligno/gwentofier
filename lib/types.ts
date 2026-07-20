@@ -64,6 +64,7 @@ export interface VisibleMatchCardRow {
   is_face_up: boolean
   is_destroyed: boolean
   has_attacked_this_turn: boolean
+  entered_zone_turn?: number
   base_power?: number | null
   base_max_life?: number | null
   card_type?: string | null
