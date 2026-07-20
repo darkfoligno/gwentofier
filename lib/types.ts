@@ -153,6 +153,12 @@ export interface PendingCardTrigger {
   description: string
   expected_state_version: number
   expires_at: string
+  card_name?: string
+  image_url?: string | null
+  effect_text?: string
+  element?: string
+  power?: number
+  life?: number
 }
 
 export interface BanCandidate {
