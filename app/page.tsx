@@ -12,7 +12,6 @@ import { FriendsScreen } from "@/components/game/friends-screen"
 import { PatchNotesScreen } from "@/components/game/patch-notes-screen"
 import { CollectionScreen } from "@/components/game/collection-screen"
 import { DecksScreen } from "@/components/game/decks-screen"
-import { LabSandboxScreen } from "@/components/lab/LabSandboxScreen"
 import { ProfileModal, type ProfileSummary } from "@/components/game/profile-modal"
 import { Coins, LogOut, UserRound } from "lucide-react"
 import type { Screen } from "@/lib/types"
@@ -102,7 +101,6 @@ export default function Page() {
           {activeScreen === "patch-notes" && <PatchNotesScreen />}
           {activeScreen === "collection" && <CollectionScreen />}
           {activeScreen === "decks" && <DecksScreen />}
-          {activeScreen === "lab" && <LabSandboxScreen onEnter={setActiveScreen} />}
         </motion.div>
       </AnimatePresence>
       <AnimatePresence>{profileOpen && profile && <ProfileModal profile={profile} email={session.user.email ?? ""} onClose={() => setProfileOpen(false)} onSaved={setProfile} />}</AnimatePresence>
