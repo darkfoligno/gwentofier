@@ -156,7 +156,19 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const fetchPendingCardTrigger=useCallback(async()=>{if(!validMatch||!currentUserId){if(mounted.current)setPendingCardTrigger(null);return}const {data,error}=await supabase.rpc("get_my_pending_card_trigger",{p_match_id:matchId,p_user_id:currentUserId});if(error)throw error;const raw=(data??null)as Record<string,unknown>|null;const row=raw?{...raw,id:String(raw.trigger_id),source_match_card_id:String(raw.card_id),trigger_type:String(raw.trigger_reason),description:String(raw.effect_text??"")} as unknown as PendingCardTrigger:null;if(mounted.current)setPendingCardTrigger(row)},[currentUserId,matchId,validMatch])
   const fetchEffectUses=useCallback(async()=>{if(!validMatch||!matchState)return;const {data,error}=await supabase.from("match_effect_uses").select("match_card_id").eq("match_id",matchId).eq("turn_number",matchState.current_turn);if(error)throw error;if(mounted.current)setUsedEffectCardIds(new Set((data??[]).map(row=>row.match_card_id)))},[matchId,matchState?.current_turn,validMatch])
   const fetchEffectExecutionLogs=useCallback(async()=>{if(!validMatch)return;const{data,error}=await supabase.from("match_effect_execution_log").select("id,match_id,source_match_card_id,effect_code,result,created_at").eq("match_id",matchId).order("id",{ascending:true}).limit(100);if(error)throw error;if(mounted.current)setEffectExecutionLogs((data??[])as typeof effectExecutionLogs)},[matchId,validMatch])
-  const fetchPrivateReveals=useCallback(async()=>{if(!validMatch)return;const{data,error}=await supabase.rpc("get_my_active_private_reveals",{p_match_id:matchId});if(error){if(["42883","PGRST202"].includes(error.code??""))return;throw error}if(mounted.current)setPrivateReveals((data??[])as typeof privateReveals)},[matchId,validMatch])
+  const fetchPrivateReveals=useCallback(async()=>{
+    if(!validMatch)return
+    try{
+      const{data,error}=await supabase.rpc("get_my_active_private_reveals",{p_match_id:matchId,p_user_id:currentUserId||null})
+      if(error){
+        if(["42883","PGRST202","PGRST301","404","P0001"].includes(error.code??"")||(error.message&&(error.message.includes("404")||error.message.includes("not found")))) return;
+        return;
+      }
+      if(mounted.current)setPrivateReveals((data??[])as typeof privateReveals)
+    }catch{
+      if(mounted.current)setPrivateReveals([])
+    }
+  },[currentUserId,matchId,validMatch])
 
   const refresh = useCallback(async () => {
     if (!validMatch) return
