@@ -11,7 +11,7 @@
 
 html, body {
   overscroll-behavior-y: none; /* Impede o efeito "pull-to-refresh" (puxar pra atualizar) que estraga o jogo */
-  touch-action: manipulation; /* Desativa o duplo-clique para zoom do Android */
+  touch-action: pan-x pan-y pinch-zoom; /* Permite zoom de pinça (pinch) para ler cartas, mas segura outras ações indesejadas */
   background-color: #09090b;
   overflow-x: hidden;
 }
