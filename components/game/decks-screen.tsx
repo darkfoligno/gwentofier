@@ -16,6 +16,7 @@ export function DecksScreen() {
   const [rarityFilter, setRarityFilter] = useState<Rarity | null>(null)
   const [elementFilter, setElementFilter] = useState<OfficialCardType | null>(null)
   const [manaFilter, setManaFilter] = useState<number | null>(null)
+  const [inspectedCard, setInspectedCard] = useState<GameCardType | null>(null)
   
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null)
   const [deckName, setDeckName] = useState("Novo Deck")
@@ -169,6 +170,9 @@ export function DecksScreen() {
                   <div className="absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-950 text-xs font-black text-amber-400 shadow-lg">{card.quantity}</div>
                   <div className="absolute bottom-0 left-0 right-0 z-20 flex flex-col items-center justify-end bg-gradient-to-t from-black/90 to-transparent p-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <span className="text-center text-[9px] font-bold text-white leading-tight">{card.nome}</span>
+                    <button onClick={(e) => { e.stopPropagation(); setInspectedCard(card) }} className="mt-1 flex w-full items-center justify-center gap-1 rounded bg-zinc-800/90 py-1 text-[10px] font-bold text-amber-300 hover:bg-amber-600 hover:text-white">
+                      <Settings size={10} /> INSPECIONAR
+                    </button>
                   </div>
                 </div>
               ))}
@@ -215,6 +219,16 @@ export function DecksScreen() {
           </div>
         </aside>
       </div>
+      {inspectedCard && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-6 backdrop-blur-md" onClick={() => setInspectedCard(null)}>
+          <div className="relative max-w-sm" onClick={e => e.stopPropagation()}>
+            <GameCard card={inspectedCard} enableZoom interactive />
+            <button onClick={() => setInspectedCard(null)} className="absolute -right-4 -top-4 rounded-full border border-red-400 bg-red-950 p-2 text-red-200 shadow-[0_0_15px_rgba(220,38,38,0.5)] hover:bg-red-800">
+              X
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
