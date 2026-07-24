@@ -1,5 +1,8 @@
 BEGIN;
 
+ALTER TABLE public.matches DROP CONSTRAINT IF EXISTS matches_type_check;
+ALTER TABLE public.matches ADD CONSTRAINT matches_type_check CHECK (match_type IN ('friendly','ranked','campaign','training'));
+
 CREATE OR REPLACE FUNCTION public.start_training_match(p_deck_id text DEFAULT NULL)
 RETURNS uuid
 LANGUAGE plpgsql
