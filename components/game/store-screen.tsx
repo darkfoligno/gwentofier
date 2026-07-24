@@ -23,17 +23,14 @@ export function StoreScreen() {
     const userId = userResp.data.user?.id
     if (!userId) return
 
-    const [wallet, profile, packRows] = await Promise.all([
+    const [wallet, packRows] = await Promise.all([
       supabase.from("player_wallets").select("coins, last_claim_date").eq("user_id", userId).maybeSingle(),
-      supabase.from("profiles").select("coins").eq("id", userId).maybeSingle(),
       supabase.from("pack_types").select("*").eq("is_active", true).eq("is_daily", false).order("price_coins")
     ])
 
     let resolvedCoins = 1500
     if (wallet.data && wallet.data.coins !== null && wallet.data.coins !== undefined) {
       resolvedCoins = wallet.data.coins
-    } else if (profile.data && profile.data.coins !== null && profile.data.coins !== undefined) {
-      resolvedCoins = profile.data.coins
     }
     
     setCoins(Number(resolvedCoins))
@@ -54,15 +51,7 @@ export function StoreScreen() {
   const purchase = async (pack: PackType) => { 
     setBusy(pack.id); setError(null); 
     
-    let { data, error: rpcError } = await supabase.rpc("buy_and_open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() }); 
-    if (rpcError && (rpcError.message.includes("Could not find the function") || rpcError.code === 'PGRST202')) {
-      const fallback = await supabase.rpc("purchase_and_open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() });
-      data = fallback.data; rpcError = fallback.error;
-    }
-    if (rpcError && (rpcError.message.includes("Could not find the function") || rpcError.code === 'PGRST202')) {
-      const fallback2 = await supabase.rpc("open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() });
-      data = fallback2.data; rpcError = fallback2.error;
-    }
+    const { data, error: rpcError } = await supabase.rpc("purchase_and_open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() }); 
 
     setBusy(null); 
     if (rpcError) { setError(rpcError.message.includes("INSUFFICIENT_COINS") ? "Moedas de Ofier insuficientes!" : rpcError.message); return } 

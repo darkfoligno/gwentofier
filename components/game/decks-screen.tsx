@@ -97,6 +97,43 @@ export function DecksScreen() {
   })
   const maxMana = Math.max(...manaCurve, 1)
 
+  const saveDeck = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    
+    const total = deckCards.reduce((sum, c) => sum + c.quantity, 0)
+    if (total < 20 || total > 40) {
+      alert("O deck deve conter entre 20 e 40 cartas.")
+      return
+    }
+
+    try {
+      let deckId = activeDeck?.id;
+      if (!deckId) {
+        const { data, error } = await supabase.from('decks').insert({ user_id: user.id, name: deckName, total_cards: total, is_valid: true }).select().single()
+        if (error) throw error
+        deckId = data.id
+      } else {
+        const { error } = await supabase.from('decks').update({ name: deckName, total_cards: total, is_valid: true }).eq('id', deckId)
+        if (error) throw error
+      }
+
+      await supabase.from('deck_cards').delete().eq('deck_id', deckId)
+      
+      if (deckCards.length > 0) {
+        const inserts = deckCards.map(dc => ({ deck_id: deckId, card_id: dc.card_id, quantity: dc.quantity }))
+        const { error: cErr } = await supabase.from('deck_cards').insert(inserts)
+        if (cErr) throw cErr
+      }
+      
+      alert("Deck salvo com sucesso no Grimório!")
+      setActiveDeck({ id: deckId as string, name: deckName, is_valid: true, updated_at: new Date().toISOString(), is_active: false, deck_cards: deckCards })
+    } catch (err: any) {
+      console.error(err)
+      alert("Erro ao salvar deck: " + err.message)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-fixed bg-center p-6 pt-20 text-stone-100">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-[4px]" />
@@ -172,7 +209,7 @@ export function DecksScreen() {
             </div>
 
             <div className="mt-6 flex flex-col gap-2">
-              <button className="flex items-center justify-center gap-2 rounded border border-amber-600 bg-amber-900/40 py-3 font-bold text-amber-200 shadow-[0_0_15px_rgba(217,119,6,0.15)] hover:bg-amber-800"><Save size={18} /> Salvar no Grimório</button>
+              <button onClick={saveDeck} className="flex items-center justify-center gap-2 rounded border border-amber-600 bg-amber-900/40 py-3 font-bold text-amber-200 shadow-[0_0_15px_rgba(217,119,6,0.15)] hover:bg-amber-800"><Save size={18} /> Salvar no Grimório</button>
               <button className="flex items-center justify-center gap-2 rounded border border-emerald-600 bg-emerald-900/40 py-3 font-bold text-emerald-200 hover:bg-emerald-800"><Swords size={18} /> Ativar para Combate</button>
               <button onClick={() => { setDeckCards([]); setDeckName("Novo Deck") }} className="flex items-center justify-center gap-2 rounded border border-zinc-700 bg-zinc-900 py-2 text-sm font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"><Trash2 size={16} /> Novo Deck / Limpar</button>
             </div>
