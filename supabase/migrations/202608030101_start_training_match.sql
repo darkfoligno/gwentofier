@@ -8,7 +8,7 @@ SET search_path = ''
 AS $$
 DECLARE
     v_user_id uuid := game_private.require_authenticated();
-    v_bot_id uuid := '00000000-0000-0000-0000-000000000000'::uuid;
+    v_bot_id uuid := '00000000-0000-4000-8000-000000000071'::uuid;
     v_match_id uuid;
     v_rule_id uuid;
     v_player_match_deck_id uuid;
@@ -17,10 +17,6 @@ DECLARE
     v_position integer;
     v_deck_uuid uuid;
 BEGIN
-    INSERT INTO public.profiles (id, username)
-    VALUES (v_bot_id, 'Autômato de Ofier')
-    ON CONFLICT (id) DO NOTHING;
-
     SELECT id INTO v_rule_id FROM public.game_rule_versions WHERE is_active = true;
 
     INSERT INTO public.matches(
