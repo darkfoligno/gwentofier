@@ -10,7 +10,7 @@ type Contact = { request_id?: string; user_id: string; username: string; avatar_
 export function FriendsScreen() {
   const [contacts, setContacts] = useState<Contact[]>([]), [username, setUsername] = useState(""), [message, setMessage] = useState(""), [busy, setBusy] = useState(false)
   const [allProfiles, setAllProfiles] = useState<any[]>([])
-  const [inspectedUser, setInspectedUser] = useState<{username: string; avatarUrl: string | null; wins: number; losses: number; draws: number; deckCards: number} | null>(null)
+  const [inspectedUser, setInspectedUser] = useState<{username: string; avatarUrl: string | null; wins: number; losses: number; draws: number; collection: string[]} | null>(null)
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data, error } = await supabase.rpc("get_my_social_connections"); 
@@ -26,18 +26,19 @@ export function FriendsScreen() {
   
   const inspectUser = async (userId: string, uname: string, avatar: string | null) => {
     setBusy(true)
-    const [statsRes, deckRes] = await Promise.all([
+    const [statsRes, collRes] = await Promise.all([
       supabase.from('player_stats').select('wins, losses, draws').eq('user_id', userId).maybeSingle(),
-      supabase.from('decks').select('total_cards').eq('user_id', userId).order('updated_at', { ascending: false }).limit(1).maybeSingle()
+      supabase.from('user_cards').select('quantity, cards(image_url)').eq('user_id', userId).gt('quantity', 0)
     ])
     setBusy(false)
+    const cardImages = (collRes.data ?? []).map((row: any) => row.cards?.image_url).filter(Boolean)
     setInspectedUser({
       username: uname,
       avatarUrl: avatar,
       wins: statsRes.data?.wins || 0,
       losses: statsRes.data?.losses || 0,
       draws: statsRes.data?.draws || 0,
-      deckCards: deckRes.data?.total_cards || 0
+      collection: cardImages
     })
   }
   
@@ -74,9 +75,14 @@ export function FriendsScreen() {
             </div>
           </div>
           
-          <div className="mt-4 w-full rounded border border-amber-800/30 bg-amber-950/20 p-3 text-center">
-            <span className="block text-xs font-bold text-amber-500 uppercase tracking-widest">Cartas no Deck Ativo</span>
-            <b className="text-2xl text-amber-100">{inspectedUser.deckCards}</b>
+          <div className="mt-4 w-full">
+            <span className="block text-center text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">Coleção ({inspectedUser.collection.length} únicas)</span>
+            <div className="flex flex-wrap items-center justify-center gap-1 max-h-32 overflow-y-auto rounded border border-amber-800/30 bg-amber-950/20 p-2 scrollbar-thin scrollbar-thumb-amber-700/50">
+              {inspectedUser.collection.map((imgUrl, i) => (
+                <img key={i} src={secureImageUrl(imgUrl)} alt="" className="h-10 w-8 rounded object-cover shadow border border-stone-800" />
+              ))}
+              {inspectedUser.collection.length === 0 && <span className="text-xs text-stone-500 py-4">Nenhuma carta na coleção</span>}
+            </div>
           </div>
         </div>
       </div>
