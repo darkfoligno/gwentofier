@@ -49,9 +49,12 @@ BEGIN
                    coalesce((select jsonb_agg(jsonb_build_object('effect_order', ce.effect_order, 'trigger_type', ce.trigger_type, 'effect_code', ce.effect_code, 'target_mode', ce.target_mode, 'parameters', ce.parameters, 'priority', ce.priority, 'is_reaction', ce.is_reaction, 'once_per_turn', ce.once_per_turn) order by ce.effect_order) from public.card_effects ce where ce.card_id = c.id and ce.is_active = true), '[]'::jsonb) as effect_definition
             FROM public.cards c WHERE c.is_active = true ORDER BY random() LIMIT 40
         ) LOOP
-            INSERT INTO public.match_deck_cards(match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number, initial_deck_position)
-            VALUES (v_player_match_deck_id, v_card.id, 1, v_card.name, coalesce(v_card.image_url, ''), v_card.element, v_card.rarity, v_card.card_type, v_card.is_golden, coalesce(v_card.base_power, 0), coalesce(v_card.base_max_life, 0), coalesce(v_card.effect_mana_cost, 0), coalesce(v_card.tier, 0), coalesce(v_card.leader_cooldown, 0), coalesce(v_card.effect_definition, '[]'::jsonb), 1, v_position);
             v_position := v_position + 1;
+            INSERT INTO public.match_deck_cards(
+                match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number, initial_deck_position
+            ) VALUES (
+                v_player_match_deck_id, v_card.id, v_card.version, v_card.name, coalesce(v_card.image_url, ''), coalesce(v_card.element, 'Neutro'), v_card.rarity, v_card.card_type, v_card.is_golden, coalesce(v_card.base_power, 0), coalesce(v_card.base_max_life, 0), coalesce(v_card.effect_mana_cost, 0), coalesce(v_card.tier, 1), coalesce(v_card.leader_cooldown, 0), coalesce(v_card.effect_definition, '[]'::jsonb), 1, v_position
+            );
         END LOOP;
     ELSE
         v_deck_uuid := p_deck_id::uuid;
@@ -69,9 +72,12 @@ BEGIN
                coalesce((select jsonb_agg(jsonb_build_object('effect_order', ce.effect_order, 'trigger_type', ce.trigger_type, 'effect_code', ce.effect_code, 'target_mode', ce.target_mode, 'parameters', ce.parameters, 'priority', ce.priority, 'is_reaction', ce.is_reaction, 'once_per_turn', ce.once_per_turn) order by ce.effect_order) from public.card_effects ce where ce.card_id = c.id and ce.is_active = true), '[]'::jsonb) as effect_definition
         FROM public.cards c WHERE c.is_active = true ORDER BY random() LIMIT 40
     ) LOOP
-        INSERT INTO public.match_deck_cards(match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number, initial_deck_position)
-        VALUES (v_bot_match_deck_id, v_card.id, 1, v_card.name, coalesce(v_card.image_url, ''), v_card.element, v_card.rarity, v_card.card_type, v_card.is_golden, coalesce(v_card.base_power, 0), coalesce(v_card.base_max_life, 0), coalesce(v_card.effect_mana_cost, 0), coalesce(v_card.tier, 0), coalesce(v_card.leader_cooldown, 0), coalesce(v_card.effect_definition, '[]'::jsonb), 1, v_position);
         v_position := v_position + 1;
+        INSERT INTO public.match_deck_cards(
+            match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number, initial_deck_position
+        ) VALUES (
+            v_bot_match_deck_id, v_card.id, v_card.version, v_card.name, coalesce(v_card.image_url, ''), coalesce(v_card.element, 'Neutro'), v_card.rarity, v_card.card_type, v_card.is_golden, coalesce(v_card.base_power, 0), coalesce(v_card.base_max_life, 0), coalesce(v_card.effect_mana_cost, 0), coalesce(v_card.tier, 1), coalesce(v_card.leader_cooldown, 0), coalesce(v_card.effect_definition, '[]'::jsonb), 1, v_position
+        );
     END LOOP;
 
     INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username)
