@@ -17,6 +17,8 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [coins, setCoins] = useState(0)
   const [cards, setCards] = useState<GameCardType[]>([])
+  const [activeTab, setActiveTab] = useState<"library" | "decks">("library")
+  const [showAlphaWarning, setShowAlphaWarning] = useState(false)
   const [rarity, setRarity] = useState<Rarity | null>(null)
   const [cardType, setCardType] = useState<OfficialCardType | null>(null)
   const [query, setQuery] = useState("")
@@ -78,7 +80,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   return <main className="min-h-screen bg-stone-950 p-5 text-stone-100"><div className="mx-auto max-w-[1600px]">
     <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-700/40 bg-black/50 p-5">
       <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={secureImageUrl(profile.avatar_url)} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
-      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => void startTraining()} disabled={training} featured /><TopAction icon={Beaker} label="LAB: TESTAR CARTAS" onClick={() => onEnter("lab")} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => void searchOpponent()} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="MINHAS CARTAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="DUELOS" onClick={() => onEnter("spectator")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
+      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => setShowAlphaWarning(true)} disabled={training} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => void searchOpponent()} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="MINHAS CARTAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
     </header>
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
     {trainingStep && <div className="mb-4 rounded border border-blue-500/40 bg-blue-950/50 p-3 text-sm text-blue-100">{trainingStep}</div>}
@@ -87,6 +89,21 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       <div className="mb-5 flex flex-wrap gap-2">{filtrosElemento.map(filter => <button key={filter.key} onClick={() => setCardType(cardType === filter.key ? null : filter.key)} className={`rounded border px-3 py-1 text-xs ${cardType === filter.key ? "border-blue-400 bg-blue-950 text-blue-200" : "border-stone-700 text-stone-400"}`}>{filter.label}</button>)}</div>
       {filtered.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">{filtered.map(card => <GameCard key={card.id} card={card} interactive />)}</div> : <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-amber-800/40 font-serif text-amber-200/70">Nenhuma carta encontrada no grimório</div>}
     </section>
+    
+    {showAlphaWarning && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div className="w-[450px] max-w-[90vw] rounded-xl border border-amber-500/50 bg-stone-900 p-6 shadow-2xl">
+          <h2 className="mb-4 text-center font-serif text-2xl font-black tracking-widest text-amber-500">AVISO DE FASE ALFA</h2>
+          <p className="mb-6 text-center text-sm leading-relaxed text-stone-300">
+            O Gwentofier está em fase Alfa de testes de engine. A maioria dos efeitos de cartas complexas pode não responder corretamente e a partida pode sofrer instabilidades ou travamentos. Nesta arena, você jogará contra o Autômato de Ofier utilizando decks aleatórios.
+          </p>
+          <div className="flex gap-4">
+            <button onClick={() => setShowAlphaWarning(false)} className="flex-1 rounded border border-stone-600 bg-stone-800 py-3 font-bold text-stone-300 hover:bg-stone-700 transition-colors">CANCELAR</button>
+            <button onClick={() => { setShowAlphaWarning(false); void startTraining(); }} className="flex-1 rounded border border-amber-600 bg-amber-900 py-3 font-bold text-amber-200 hover:bg-amber-800 shadow-[0_0_15px_rgba(217,119,6,0.3)] transition-colors">ENTRAR NA ARENA MESMO ASSIM</button>
+          </div>
+        </div>
+      </div>
+    )}
   </div></main>
 }
 

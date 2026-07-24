@@ -7,7 +7,7 @@ import { AuthScreen } from "@/components/game/auth-screen"
 import { HubScreen } from "@/components/game/hub-screen"
 import { ArenaScreen } from "@/components/game/arena-screen"
 import { StoreScreen } from "@/components/game/store-screen"
-import { SpectatorScreen } from "@/components/game/spectator-screen"
+
 import { FriendsScreen } from "@/components/game/friends-screen"
 import { PatchNotesScreen } from "@/components/game/patch-notes-screen"
 import { CollectionScreen } from "@/components/game/collection-screen"
@@ -20,7 +20,7 @@ import { supabase } from "@/lib/supabase"
 const debugItems: { key: Screen; label: string }[] = [
   { key: "hub", label: "Hub" },
   { key: "store", label: "Loja" },
-  { key: "spectator", label: "Duelos" },
+
   { key: "arena", label: "Arena" },
 ]
 
@@ -95,7 +95,7 @@ export default function Page() {
           {activeScreen === "auth" && <AuthScreen onEnter={setActiveScreen} />}
           {activeScreen === "hub" && <HubScreen onEnter={setActiveScreen} />}
           {activeScreen === "store" && <StoreScreen />}
-          {activeScreen === "spectator" && <SpectatorScreen />}
+
           {activeScreen === "arena" && <ArenaScreen />}
           {activeScreen === "friends" && <FriendsScreen />}
           {activeScreen === "patch-notes" && <PatchNotesScreen />}
