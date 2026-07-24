@@ -162,14 +162,13 @@ export function DecksScreen() {
               <p>Seu acervo está vazio. Vá até o Mercado de Ofier para adquirir pacotes.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 xl:grid-cols-10">
               {filtered.map(card => (
-                <div key={card.id} className="group relative">
-                  <GameCard card={card} />
-                  <div className="absolute -right-2 -top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-900 font-black text-amber-300 shadow-lg">{card.quantity}x</div>
-                  <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/60 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 rounded-[11px]">
-                    <button onClick={() => addCard(card)} className="flex items-center gap-1 rounded bg-amber-600 px-4 py-2 font-bold text-white hover:bg-amber-500"><Plus size={16} /> Adicionar</button>
-                    <button className="flex items-center gap-1 rounded bg-zinc-700 px-4 py-2 text-xs font-bold text-white hover:bg-zinc-600"><Settings size={14} /> Inspecionar</button>
+                <div key={card.id} className="group relative cursor-pointer" onClick={() => addCard(card)}>
+                  <img src={secureImageUrl(card.image_url)} alt={card.nome} className="aspect-[2/3] w-full rounded-md object-cover shadow-md border border-stone-800 transition-all group-hover:scale-105 group-hover:border-amber-500 group-hover:shadow-amber-500/20" />
+                  <div className="absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-950 text-xs font-black text-amber-400 shadow-lg">{card.quantity}</div>
+                  <div className="absolute bottom-0 left-0 right-0 z-20 flex flex-col items-center justify-end bg-gradient-to-t from-black/90 to-transparent p-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="text-center text-[9px] font-bold text-white leading-tight">{card.nome}</span>
                   </div>
                 </div>
               ))}
