@@ -273,37 +273,20 @@ export function ArenaScreen() {
     void run();return()=>{cancelled=true;setScreenShake(false);setCombatSequenceActive(false);setCollisionStage(null);setVisualCards(latestBoardCards.current)}
   },[latestResolvedAction?.id])
 
-  useEffect(() => {
-    if (sandbox || !isTraining || !matchState || matchState.status !== "in_progress" || matchState.engine_state !== "turn_action" || pendingAttack || isCurrentPlayer || isActionPending || botRunning.current) return
-    setEffectMessage("O Autômato de Ofier está calculando a jogada…")
-    let cancelled=false;const pause=3000
-    void (async()=>{await sleep(pause);if(cancelled||botRunning.current)return;botRunning.current=true;await duel.runTrainingBotTurn();await duel.refresh()})().catch(error=>setEffectMessage(error?.message??"Falha no turno do Autômato.")).finally(()=>{botRunning.current=false})
-    return()=>{cancelled=true}
-  }, [isActionPending,isCurrentPlayer,isTraining,matchState?.engine_state,matchState?.match_version,matchState?.status,pendingAttack?.id,sandbox])
   useEffect(()=>{
-    if(sandbox||!isTraining||!matchState||matchState.status!=="in_progress"||matchState.engine_state!=="turn_action"||pendingAttack||isCurrentPlayer||isActionPending)return
-    const watchdog=window.setTimeout(()=>{
-      if(isRescuing.current)return
-      isRescuing.current=true
-      void duel.rescueTrainingBotTurn().then(()=>duel.refresh()).catch(error=>{
-        if(String(error?.message??"").includes("STALE_MATCH_VERSION"))void duel.refresh()
-        else setEffectMessage(error?.message??"O resgate do turno da IA falhou.")
-      }).finally(()=>{rescueUnlockTimer.current=window.setTimeout(()=>{isRescuing.current=false;rescueUnlockTimer.current=null},10000)})
-    },12000)
-    return()=>window.clearTimeout(watchdog)
+    /* [V39] REMOVIDO AUTO-RESCUE WATCHDOG DO BOT A PEDIDO DO USUÁRIO */
   },[isActionPending,isCurrentPlayer,isTraining,matchState?.engine_state,matchState?.match_version,matchState?.status,pendingAttack?.id,sandbox])
-  useEffect(()=>{if(sandbox||!isTraining||!pendingAttack||pendingAttack.defender_user_id===userId||pendingAttack.status!=="awaiting_reaction"||isActionPending)return;setEffectMessage("🛡️ O Autômato de Ofier está avaliando contra-ataques na Janela de Reação...");const timer=window.setTimeout(()=>{void duel.autoResolveTrainingAttack(matchState?.match_version??pendingAttack.declared_state_version).then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"A reação do Autômato falhou."))},3000);return()=>window.clearTimeout(timer)},[isActionPending,isTraining,matchState?.match_version,pendingAttack?.id,pendingAttack?.status,userId,sandbox])
+  useEffect(()=>{
+    /* [V39] REMOVIDO AUTO-REACTION DO BOT. DEVE SER MANUAL. */
+  },[isActionPending,isTraining,matchState?.match_version,pendingAttack?.id,pendingAttack?.status,userId,sandbox])
   useEffect(()=>{const suppressed=Boolean(pendingAttack?.result?.suppress_reinforcement_reaction);if(!pendingAttack||pendingAttack.defender_user_id!==userId||pendingAttack.status!=="awaiting_reaction"||!suppressed||isActionPending||suppressedReactionHandled.current===pendingAttack.id)return;suppressedReactionHandled.current=pendingAttack.id;setEffectMessage("🐗 O ataque do Javali suprimiu a revelação e toda reação defensiva. Resolvendo impacto…");void duel.declineAttackReaction().then(()=>duel.refresh()).catch(error=>{suppressedReactionHandled.current=null;setEffectMessage(error?.message??"Falha ao resolver o ataque sem reação.")})},[isActionPending,pendingAttack?.id,pendingAttack?.status,pendingAttack?.defender_user_id,pendingAttack?.result,userId])
-  useEffect(()=>{if(sandbox||!isTraining||matchState?.engine_state!=="pending_trigger"||pendingCardTrigger||isActionPending)return;setEffectMessage("⚡ O Autômato está avaliando um gatilho e a própria reserva de mana...");const timer=window.setTimeout(()=>{void duel.resolveTrainingBotTrigger().then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"O gatilho do Autômato falhou."))},3000);return()=>window.clearTimeout(timer)},[isActionPending,isTraining,matchState?.engine_state,matchState?.match_version,pendingCardTrigger?.id,sandbox])
+  useEffect(()=>{
+    /* [V39] REMOVIDO AUTO-TRIGGER DO BOT. DEVE SER MANUAL. */
+  },[isActionPending,isTraining,matchState?.engine_state,matchState?.match_version,pendingCardTrigger?.id,sandbox])
 
   useEffect(() => {
-    if (!matchState?.turn_deadline || matchState.status !== "in_progress") { setSecondsLeft(180); return }
-    const update = () => {
-      const left = Math.max(0, Math.ceil((new Date(matchState.turn_deadline!).getTime() - Date.now()) / 1000)); setSecondsLeft(left)
-      if (left === 0 && expiredVersion.current!==matchState.match_version) { expiredVersion.current=matchState.match_version; void duel.expireTurn().then(()=>duel.refresh()).catch(error => { if(String(error?.message??"").includes("STALE_MATCH_VERSION"))void duel.refresh(); else setEffectMessage(error?.message??"Falha ao encerrar o turno expirado.") }) }
-    }
-    update(); const timer = window.setInterval(update, 1000); return () => window.clearInterval(timer)
-  }, [isCurrentPlayer, matchState?.match_version, matchState?.status, matchState?.turn_deadline])
+    /* [V39] REMOVIDO EXPIRE TURN AUTO. DEVE SER MANUAL PELO USUÁRIO */
+  }, [matchState?.turn_deadline, matchState?.match_version, matchState?.status])
 
   useEffect(() => { if (matchState?.status !== "ban_phase") { setBanCandidates([]);setSelectedBan(null);return } void duel.getBanCandidates().then(cards=>{setBanCandidates(cards);setSelectedBan(cards[0]??null)}).catch(console.error) }, [matchId, matchState?.status])
   useEffect(() => {
@@ -362,10 +345,14 @@ export function ArenaScreen() {
       setBanError(full); setEffectMessage(`Falha no banimento: ${full}`)
     } finally { setBanBusy(false) }
   }
-  useEffect(()=>{if(matchState?.status!=="ban_phase"){setBanSeconds(60);autoBanSent.current=false;return}const timer=window.setInterval(()=>setBanSeconds(value=>Math.max(0,value-1)),1000);return()=>window.clearInterval(timer)},[matchState?.status])
-  useEffect(()=>{if(matchState?.status!=="ban_phase"||banSeconds>0||banBusy||autoBanSent.current||!banCandidates.length)return;autoBanSent.current=true;const random=banCandidates[Math.floor(Math.random()*banCandidates.length)];setSelectedBan(random);void submitBan(random.card_id)},[banBusy,banCandidates,banSeconds,matchState?.status])
-  const submitPreparation=async()=>{setSetupBotWaiting(false);if(setupTimer.current!==null){window.clearTimeout(setupTimer.current);setupTimer.current=null}try{await duel.submitSetup([...setupCards],[...setupReinforcements]);setSetupCards(new Set());setSetupReinforcements(new Set());await duel.refresh()}catch(error){setEffectMessage((error as Error)?.message??"Falha na preparação.")}}
-  const confirmPreparation=()=>{if(setupCards.size!==3||isActionPending)return;if(!isTraining){void submitPreparation();return}setSetupBotWaiting(true);setupTimer.current=window.setTimeout(()=>void submitPreparation(),8000)}
+  useEffect(()=>{
+    /* [V39] REMOVIDO AUTO-BAN TIMER */
+  },[matchState?.status])
+  useEffect(()=>{
+    /* [V39] REMOVIDO AUTO-BAN LOGIC */
+  },[banBusy,banCandidates,matchState?.status])
+  const submitPreparation=async()=>{setSetupBotWaiting(false);try{await duel.submitSetup([...setupCards],[...setupReinforcements]);setSetupCards(new Set());setSetupReinforcements(new Set());await duel.refresh()}catch(error){setEffectMessage((error as Error)?.message??"Falha na preparação.")}}
+  const confirmPreparation=()=>{if(setupCards.size!==3||isActionPending)return;void submitPreparation();}
   const submitTurn = async (expectedVersion?:number) => {
     if (!isCurrentPlayer || isActionPending || matchState?.engine_state !== "turn_action") return
     try {
@@ -402,7 +389,7 @@ export function ArenaScreen() {
 
   return <motion.main animate={screenShake?{x:[0,-8,7,-5,3,0],y:[0,4,-3,2,0]}:{x:0,y:0}} transition={{duration:.35}} className={`relative flex flex-col min-h-screen w-full mx-auto overflow-x-hidden overflow-y-auto pb-24 bg-zinc-950 text-zinc-100 ${effectSelection?"cursor-crosshair":""}`}><div className="absolute inset-0 bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-center bg-no-repeat opacity-40 mix-blend-overlay"/><div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/85 backdrop-blur-[2px]" />
     {isActionPending&&<div className="fixed inset-0 z-[185] flex items-start justify-center bg-black/20 pt-5 backdrop-blur-[1px]"><div className="rounded-full border border-cyan-300/60 bg-blue-950/95 px-5 py-2 text-xs font-black text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,.45)]"><Loader2 className="mr-2 inline animate-spin" size={14}/>Servidor resolvendo a ação · comandos bloqueados</div></div>}
-    {matchState?.status==="ban_phase"&&<div className={`fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border-2 px-6 py-2 font-mono text-2xl font-black shadow-2xl ${banSeconds<=10?"animate-pulse border-red-300 bg-red-950 text-red-100":"border-amber-300 bg-black/95 text-amber-100"}`}>BANIMENTO · {String(Math.floor(banSeconds/60)).padStart(2,"0")}:{String(banSeconds%60).padStart(2,"0")}</div>}
+    {matchState?.status==="ban_phase"&&<div className={`fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border-2 px-6 py-2 font-mono text-2xl font-black shadow-2xl border-amber-300 bg-black/95 text-amber-100`}>BANIMENTO ESTRATÉGICO</div>}
     {setupBotWaiting&&<div className="fixed inset-0 z-[190] flex items-center justify-center bg-black/95 p-8 backdrop-blur-md"><div className="max-w-lg text-center"><Loader2 className="mx-auto animate-spin text-amber-300" size={48}/><h3 className="mt-5 font-serif text-2xl font-black text-amber-100">O Autômato de Ofier está analisando suas sete cartas e posicionando as defesas...</h3><p className="mt-2 text-sm text-stone-400">A decisão tática será enviada após 8 segundos.</p><button onClick={()=>void submitPreparation()} className="mt-6 rounded-lg border-2 border-cyan-300 bg-blue-900 px-7 py-3 font-black text-cyan-50">AVANÇAR TREINO</button></div></div>}
     {sandbox && (typeof window !== "undefined" && (window.location.pathname.startsWith("/lab") || new URLSearchParams(window.location.search).get("screen") === "lab")) && <div className="fixed left-2 top-16 z-[120] w-[min(390px,92vw)] rounded-xl border-2 border-emerald-300 bg-[radial-gradient(circle_at_top,#14532d,#09090b_75%)] p-4 shadow-[0_0_35px_rgba(52,211,153,.35)]"><p className="font-serif text-sm font-black uppercase text-emerald-100">🧪 Partida laboratorial · turno único</p><p className="mt-2 text-[11px] leading-relaxed text-stone-200"><b className="text-amber-200">🎯 OBJETIVO INDIVIDUAL:</b> {sandbox.objective}</p><div className="mt-3 max-h-44 space-y-2 overflow-auto rounded border border-emerald-700/50 bg-black/60 p-2 text-[9px] text-emerald-100"><p>O teste não termina automaticamente. Execute a jogada, confira campo, pilhas e Crônica; depois gere o relatório antes/depois.</p>{sandbox.setup.length>0&&<div><b className="text-cyan-200">CENÁRIO PREPARADO</b>{sandbox.setup.map((item,index)=><p key={`setup-${index}`}>• {item}</p>)}</div>}{sandbox.visual.length>0&&<div><b className="text-fuchsia-200">SEQUÊNCIA VISUAL</b>{sandbox.visual.map((item,index)=><p key={`visual-${index}`}>{index+1}. {item}</p>)}</div>}{sandbox.expected.length>0&&<div><b className="text-amber-200">PROVA EXIGIDA</b>{sandbox.expected.map((item,index)=><p key={`expected-${index}`}>✓ {item}</p>)}</div>}</div>{["scripted_opponent_attack","scripted_discard","attempt_blocked_action","advance_turn","destroy","scripted_continuation"].includes(sandbox.actionType)&&!pendingAttack&&!pendingCardTrigger&&!sandboxReport&&<button disabled={sandboxBusy} onClick={()=>void beginSandboxOpponentAction()} className="mt-3 w-full rounded border-2 border-red-300 bg-red-950 px-3 py-3 text-[10px] font-black text-red-100 disabled:opacity-40">{sandboxBusy?"PREPARANDO CENÁRIO…":sandbox.actionType==="scripted_opponent_attack"?"⚔️ RECEBER ATAQUE PREPARADO":sandbox.actionType==="scripted_discard"?"🗑️ EXECUTAR DESCARTE PREPARADO":sandbox.actionType==="attempt_blocked_action"?"🛡️ TENTAR A AÇÃO QUE DEVE SER BLOQUEADA":sandbox.actionType==="advance_turn"?"⏭️ AVANÇAR PARA O GATILHO DE TURNO":sandbox.actionType==="scripted_continuation"?"▶️ EXECUTAR CONTINUAÇÃO APÓS ATIVAR O EFEITO":"💥 EXECUTAR DESTRUIÇÃO PREPARADA"}</button>}{!sandboxReport?<button disabled={sandboxBusy||isActionPending} onClick={()=>void reviewSandbox()} className="mt-3 w-full rounded border-2 border-amber-300 bg-amber-900 px-3 py-3 text-[10px] font-black text-amber-100 disabled:opacity-40">📋 GERAR RELATÓRIO DA RESOLUÇÃO</button>:<div className={`mt-3 rounded-lg border-2 p-3 ${sandboxReport.approved?"border-emerald-300 bg-emerald-950/80":"border-red-300 bg-red-950/80"}`}><b className={sandboxReport.approved?"text-emerald-100":"text-red-100"}>{sandboxReport.approved?"MECÂNICA OBSERVADA — REVISE A PROVA":"MECÂNICA NÃO COMPROVADA"}</b><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[8px] text-stone-200">{JSON.stringify({effect_code:sandboxReport.effect_code,before:sandboxReport.before,after:sandboxReport.after,prepared_action_proof:sandboxReport.prepared_action_proof,effect_execution_log:sandboxReport.effect_execution_log},null,2)}</pre><button disabled={sandboxBusy} onClick={()=>void finishSandbox()} className="mt-3 w-full rounded border-2 border-yellow-200 bg-yellow-700 px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">🏁 ENCERRAR TESTE COM ESTE RELATÓRIO</button></div>}<button onClick={()=>void restartSandbox()} className="mt-2 w-full rounded border border-cyan-300 bg-blue-950 px-2 py-2 text-[9px] font-black text-cyan-100">🔄 REINICIAR ESTE TESTE</button></div>}
     <AnimatePresence>{effectBanner&&<motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[188] flex items-center justify-center bg-black/80 p-5 backdrop-blur-md"><motion.div initial={{y:-180,scale:.55,rotate:-8}} animate={{y:0,scale:1,rotate:0}} transition={{type:"spring",stiffness:170,damping:18}} className="flex w-full max-w-3xl flex-col items-center">{effectBanner.cardData?<div className="aspect-[2/3] w-56 drop-shadow-[0_0_35px_rgba(250,204,21,.8)]"><GameCard card={effectBanner.cardData} enableZoom={false}/></div>:<Sparkles className="text-yellow-200" size={100}/>}<div className="mt-5 w-full border-y-2 border-yellow-200 bg-gradient-to-r from-transparent via-purple-950 to-transparent px-8 py-5 text-center shadow-[0_0_45px_rgba(192,132,252,.55)]"><h2 className={`font-serif text-2xl font-black uppercase ${effectBanner.isMine?"text-yellow-100":"text-red-200"}`}>{effectBanner.isMine?`✨ VOCÊ CONJUROU: ${effectBanner.card}!`:`⚠️ O RIVAL CONJUROU: ${effectBanner.card}!`}</h2><p className="mt-3 text-sm font-black uppercase leading-relaxed text-yellow-300">{effectBanner.description}</p></div></motion.div></motion.div>}</AnimatePresence>
@@ -458,10 +445,10 @@ export function ArenaScreen() {
     <AnimatePresence>{matchState?.status === "finished" && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[190] flex items-center justify-center bg-black/90"><div className="rounded-xl border border-amber-400 bg-stone-950 p-10 text-center"><Crown className="mx-auto mb-4 text-amber-300" size={48} /><h2 className="font-serif text-3xl font-black text-amber-200">{matchState.winner_id === userId ? "Vitória" : "Derrota"}</h2></div></motion.div>}</AnimatePresence>
     
     <AnimatePresence>
-      {matchState?.status === "initiative" && matchId && matchState.initiative_result?.first_player && (
+      {matchState?.status === "initiative" && matchId && matchState.initiative_result?.winner_user_id && (
         <CoinFlip 
           matchId={matchId} 
-          firstPlayerId={matchState.initiative_result.first_player} 
+          firstPlayerId={matchState.initiative_result.winner_user_id} 
           onComplete={() => duel.refresh()} 
         />
       )}

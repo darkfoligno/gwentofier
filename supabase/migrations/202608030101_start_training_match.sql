@@ -80,6 +80,17 @@ BEGIN
         );
     END LOOP;
 
+    -- Popular match_cards para o player e para o bot (já que pulamos o snapshot_deck)
+    IF p_deck_id = 'SYSTEM_GENERATED' OR p_deck_id IS NULL THEN
+        INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
+        SELECT p_match_id, v_user_id, v_user_id, mdc.id, mdc.source_card_id, 'deck', mdc.initial_deck_position, false, mdc.base_power, mdc.base_max_life, mdc.base_power, mdc.base_power, mdc.base_max_life, mdc.base_max_life
+        FROM public.match_deck_cards mdc WHERE mdc.match_deck_id = v_player_match_deck_id;
+    END IF;
+
+    INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
+    SELECT p_match_id, v_bot_id, v_bot_id, mdc.id, mdc.source_card_id, 'deck', mdc.initial_deck_position, false, mdc.base_power, mdc.base_max_life, mdc.base_power, mdc.base_power, mdc.base_max_life, mdc.base_max_life
+    FROM public.match_deck_cards mdc WHERE mdc.match_deck_id = v_bot_match_deck_id;
+
     INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username)
     SELECT v_match_id, p1.id, p1.username, p2.id, p2.username
     FROM public.profiles p1, public.profiles p2
