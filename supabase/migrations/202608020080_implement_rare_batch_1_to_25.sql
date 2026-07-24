@@ -129,6 +129,6 @@ BEGIN
             RETURN game_private.execute_common_effect_internal_v28_core(p_match_id, p_actor, p_source, p_code, p_params, p_target, p_event);
     END CASE;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 COMMIT;
