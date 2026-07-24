@@ -19,11 +19,26 @@ export function StoreScreen() {
   const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
-    const [wallet, packRows] = await Promise.all([supabase.from("my_wallet").select("coins, last_claim_date").maybeSingle(), supabase.from("pack_types").select("*").eq("is_active", true).eq("is_daily", false).order("price_coins")])
-    if (wallet.data) {
-      setCoins(wallet.data.coins || 0)
-      setLastClaimDate(wallet.data.last_claim_date)
+    const userResp = await supabase.auth.getUser()
+    const userId = userResp.data.user?.id
+    if (!userId) return
+
+    const [wallet, profile, packRows] = await Promise.all([
+      supabase.from("player_wallets").select("coins, last_claim_date").eq("user_id", userId).maybeSingle(),
+      supabase.from("profiles").select("coins").eq("id", userId).maybeSingle(),
+      supabase.from("pack_types").select("*").eq("is_active", true).eq("is_daily", false).order("price_coins")
+    ])
+
+    let resolvedCoins = 1500
+    if (wallet.data && wallet.data.coins !== null && wallet.data.coins !== undefined) {
+      resolvedCoins = wallet.data.coins
+    } else if (profile.data && profile.data.coins !== null && profile.data.coins !== undefined) {
+      resolvedCoins = profile.data.coins
     }
+    
+    setCoins(Number(resolvedCoins))
+    setLastClaimDate(wallet.data?.last_claim_date || null)
+    
     if (packRows.data) setPacks(packRows.data as PackType[])
   }, [])
   useEffect(() => { void refresh() }, [refresh])
@@ -36,7 +51,23 @@ export function StoreScreen() {
   }
 
   const openResult = async (result: any) => { setCards(await hydrate(result?.cards ?? [])); await refresh() }
-  const purchase = async (pack: PackType) => { setBusy(pack.id); setError(null); const { data, error: rpcError } = await supabase.rpc("purchase_and_open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() }); setBusy(null); if (rpcError) { setError(rpcError.message.includes("INSUFFICIENT_COINS") ? "Moedas de Ofier insuficientes!" : rpcError.message); return } await openResult(data) }
+  const purchase = async (pack: PackType) => { 
+    setBusy(pack.id); setError(null); 
+    
+    let { data, error: rpcError } = await supabase.rpc("buy_and_open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() }); 
+    if (rpcError && (rpcError.message.includes("Could not find the function") || rpcError.code === 'PGRST202')) {
+      const fallback = await supabase.rpc("purchase_and_open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() });
+      data = fallback.data; rpcError = fallback.error;
+    }
+    if (rpcError && (rpcError.message.includes("Could not find the function") || rpcError.code === 'PGRST202')) {
+      const fallback2 = await supabase.rpc("open_pack", { p_pack_type_id: pack.id, p_idempotency_key: crypto.randomUUID() });
+      data = fallback2.data; rpcError = fallback2.error;
+    }
+
+    setBusy(null); 
+    if (rpcError) { setError(rpcError.message.includes("INSUFFICIENT_COINS") ? "Moedas de Ofier insuficientes!" : rpcError.message); return } 
+    await openResult(data) 
+  }
   const daily = async () => { setBusy("daily"); setError(null); const user = (await supabase.auth.getUser()).data.user; if (!user) return; const { data, error: rpcError } = await supabase.rpc("claim_daily_login_reward", { p_user_id: user.id }); setBusy(null); if (rpcError) { setError(rpcError.message); return } if (data && !data.success) { setError(data.error || "Já resgatado hoje"); return } await refresh() }
 
   const canClaimDaily = () => {
@@ -53,7 +84,7 @@ export function StoreScreen() {
     {error && <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 rounded-lg border border-red-500 bg-red-950/80 p-3 text-center font-bold text-red-200">{error}</motion.div>}
     <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="mb-7 flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale"><span className="flex items-center gap-4"><Gift className="text-amber-300" size={35} /><span><b className="block font-serif text-xl text-amber-100">Resgate Diário</b><span className="text-sm text-stone-400">{isDailyAvailable ? "Reivindique sua recompensa gratuita nas Areias." : "Você já resgatou sua recompensa de hoje. Volte amanhã!"}</span></span></span><span className="rounded bg-amber-700 px-5 py-2 text-xs font-black">{busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}</span></button>
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack, index) => {
-      const canAfford = coins >= pack.price_coins;
+      const canAfford = Number(coins || 0) >= Number(pack.price_coins || 0);
       return <motion.article key={pack.id} whileHover={canAfford ? { scale: 1.05 } : {}} transition={{ duration: 0.3 }} className={`relative overflow-hidden rounded-xl border-2 bg-zinc-950 p-5 shadow-2xl ${canAfford ? 'border-amber-600/40 hover:border-amber-400' : 'border-zinc-800 opacity-80'}`}><div className={`mb-5 flex h-44 items-center justify-center rounded-lg border bg-[radial-gradient(circle,rgba(120,53,15,0.4),rgba(24,24,27,1)_65%)] ${canAfford ? 'border-amber-700/50' : 'border-zinc-800'}`}>{index === packs.length - 1 ? <Sparkles className={`animate-pulse ${canAfford ? 'text-amber-300' : 'text-zinc-600'}`} size={70} /> : <div className={`font-serif text-6xl ${canAfford ? 'text-amber-300/80' : 'text-zinc-600'}`}>🕮</div>}</div><h2 className={`font-serif text-xl font-black ${canAfford ? 'text-amber-100' : 'text-zinc-500'}`}>{pack.name}</h2><p className="mt-2 min-h-20 text-sm leading-relaxed text-zinc-400">{pack.description ?? ""}</p><div className="mt-5 flex items-center justify-between"><span className={`flex items-center gap-1 text-lg font-black ${canAfford ? 'text-amber-300' : 'text-red-400'}`}><Coins size={18} />{pack.price_coins}</span><button disabled={Boolean(busy) || !canAfford} onClick={() => void purchase(pack)} className={`rounded border px-4 py-2 text-[10px] font-black shadow-[0_0_10px_rgba(245,158,11,0.2)] disabled:opacity-40 ${canAfford ? 'border-amber-400 bg-amber-700 text-amber-50' : 'border-zinc-700 bg-zinc-800 text-zinc-500 shadow-none'}`}>{busy === pack.id ? "ABRINDO..." : "COMPRAR E ABRIR"}</button></div></motion.article>
     })}</div>
   </div><AnimatePresence>{cards && <GachaModal cards={cards} onCollect={() => { setCards(null); void refresh() }} />}</AnimatePresence></main>
