@@ -14,16 +14,15 @@ BEGIN
     -- Check if already has the system deck
     SELECT id INTO v_deck_id
     FROM public.decks
-    WHERE owner_user_id = v_user_id AND name = 'Deck Padrão do Sistema (V38)'
+    WHERE user_id = v_user_id AND name = 'Deck Padrão do Sistema (V38)'
     LIMIT 1;
 
     IF v_deck_id IS NOT NULL THEN
         RETURN v_deck_id;
     END IF;
 
-    -- Create new deck
-    INSERT INTO public.decks (owner_user_id, name, element, description, is_valid)
-    VALUES (v_user_id, 'Deck Padrão do Sistema (V38)', 'Cívil', 'Deck inicial de 30 cartas gerado automaticamente pelo sistema.', true)
+    INSERT INTO public.decks (user_id, name, is_valid)
+    VALUES (v_user_id, 'Deck Padrão do Sistema (V38)', true)
     RETURNING id INTO v_deck_id;
 
     -- Add 30 common/basic cards to the deck
