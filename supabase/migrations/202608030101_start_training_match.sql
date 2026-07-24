@@ -17,8 +17,8 @@ DECLARE
     v_position integer;
     v_deck_uuid uuid;
 BEGIN
-    INSERT INTO public.profiles (id, username, email)
-    VALUES (v_bot_id, 'O Autômato de Ofier', 'bot@gwentofier.local')
+    INSERT INTO public.profiles (id, username)
+    VALUES (v_bot_id, 'Autômato de Ofier')
     ON CONFLICT (id) DO NOTHING;
 
     SELECT id INTO v_rule_id FROM public.game_rule_versions WHERE is_active = true;
