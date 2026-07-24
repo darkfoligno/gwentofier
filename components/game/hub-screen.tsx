@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
 import type { Screen } from "@/lib/types"
 import { GameCard } from "./game-card"
+import { PreMatchModal } from "./pre-match-modal"
 import { secureImageUrl } from "@/lib/secure-url"
 
 interface Profile { username: string; avatar_url: string | null }
@@ -25,6 +26,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [training, setTraining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [trainingStep, setTrainingStep] = useState<string | null>(null)
+  const [preMatchMode, setPreMatchMode] = useState<"pvp" | "training" | null>(null)
   const [matchmaking, setMatchmaking] = useState(false)
 
   useEffect(() => {
@@ -44,19 +46,28 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   }, [])
 
   const filtered = useMemo(() => cards.filter(card => (!rarity || card.raridade === rarity) && (!cardType || card.elemento === cardType) && (!query || card.nome.toLowerCase().includes(query.toLowerCase()))), [cardType, cards, query, rarity])
-  const startTraining = async () => {
-    setTraining(true); setError(null)
+  
+  const searchOpponent = async (deckId: string, isMobile: boolean) => {
+    setMatchmaking(true); setError(null)
     try {
-      setTrainingStep("Verificando sua sessão…")
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-      if (sessionError) throw sessionError
-      if (!sessionData.session) throw new Error("Sessão expirada. Entre novamente.")
-      setTrainingStep("Montando dois decks de teste com 40 cartas…")
-      const { data: trainingResult, error: matchError } = await supabase.rpc("create_training_match", { p_deck_size: 40 })
-      if (matchError) throw matchError
-      const matchId = typeof trainingResult === "string" ? trainingResult : trainingResult?.match_id
-      if (!matchId) throw new Error("O servidor não retornou o match_id da nova partida.")
-      const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", matchId); window.history.pushState({}, "", url); onEnter("arena")
+      const { data: queueId, error: queueError } = await supabase.rpc("enqueue_matchmaking", { p_deck_id: deckId, p_match_type: "friendly" })
+      if (queueError) throw queueError
+      setError(`Busca iniciada com sucesso. Fila: ${queueId}. (Mobile: ${isMobile})`)
+      if (isMobile) window.localStorage.setItem('arena_mobile', 'true');
+      else window.localStorage.removeItem('arena_mobile');
+    } catch (cause) { setError(describeError(cause)) } finally { setMatchmaking(false) }
+  }
+
+  const startTrainingMatch = async (deckId: string, isMobile: boolean) => {
+    setTraining(true); setError(null); setTrainingStep("Solicitando combate local ao servidor...")
+    try {
+      const { data: queueId, error: queueError } = await supabase.rpc("start_training_match", { p_deck_id: deckId })
+      if (queueError) throw queueError
+      setTrainingStep("Sala de treino criada. Abrindo arena...")
+      if (isMobile) window.localStorage.setItem('arena_mobile', 'true');
+      else window.localStorage.removeItem('arena_mobile');
+      await new Promise(r => setTimeout(r, 600))
+      const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", queueId); url.searchParams.delete("preview"); window.history.pushState({}, "", url); onEnter("arena")
     } catch (cause) {
       const issue = cause as { message?: string }
       if (issue?.message?.includes("CARD_CATALOG_EMPTY")) {
@@ -65,22 +76,17 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     } finally { setTraining(false); setTrainingStep(null) }
   }
 
-  const searchOpponent = async () => {
-    setMatchmaking(true); setError(null)
-    try {
-      const { data: decks, error: deckError } = await supabase.from("decks").select("id").eq("is_valid", true).order("updated_at", { ascending: false }).limit(1)
-      if (deckError) throw deckError
-      if (!decks?.[0]?.id) throw new Error("Você precisa de um deck válido para buscar um oponente.")
-      const { data: queueId, error: queueError } = await supabase.rpc("enqueue_matchmaking", { p_deck_id: decks[0].id, p_match_type: "friendly" })
-      if (queueError) throw queueError
-      setError(`Busca iniciada com sucesso. Fila: ${queueId}`)
-    } catch (cause) { setError(describeError(cause)) } finally { setMatchmaking(false) }
+  const handlePreMatchConfirm = (deckId: string, isMobile: boolean) => {
+    const mode = preMatchMode
+    setPreMatchMode(null)
+    if (mode === "pvp") void searchOpponent(deckId, isMobile)
+    else if (mode === "training") void startTrainingMatch(deckId, isMobile)
   }
 
   return <main className="min-h-screen bg-stone-950 p-5 text-stone-100"><div className="mx-auto max-w-[1600px]">
     <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-700/40 bg-black/50 p-5">
       <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={secureImageUrl(profile.avatar_url)} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
-      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => setShowAlphaWarning(true)} disabled={training} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => void searchOpponent()} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="CARTAS ADQUIRIDAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
+      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => setShowAlphaWarning(true)} disabled={training} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="CARTAS ADQUIRIDAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
     </header>
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
     {trainingStep && <div className="mb-4 rounded border border-blue-500/40 bg-blue-950/50 p-3 text-sm text-blue-100">{trainingStep}</div>}
@@ -98,12 +104,18 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
             O Gwentofier está em fase Alfa de testes de engine. A maioria dos efeitos de cartas complexas pode não responder corretamente e a partida pode sofrer instabilidades ou travamentos. Nesta arena, você jogará contra o Autômato de Ofier utilizando decks aleatórios.
           </p>
           <div className="flex gap-4">
-            <button onClick={() => setShowAlphaWarning(false)} className="flex-1 rounded border border-stone-600 bg-stone-800 py-3 font-bold text-stone-300 hover:bg-stone-700 transition-colors">CANCELAR</button>
-            <button onClick={() => { setShowAlphaWarning(false); void startTraining(); }} className="flex-1 rounded border border-amber-600 bg-amber-900 py-3 font-bold text-amber-200 hover:bg-amber-800 shadow-[0_0_15px_rgba(217,119,6,0.3)] transition-colors">ENTRAR NA ARENA MESMO ASSIM</button>
+            <button onClick={() => setShowAlphaWarning(false)} className="flex-1 rounded border border-stone-600 bg-stone-800 py-3 text-xs font-black uppercase text-stone-300">
+              VOLTAR
+            </button>
+            <button onClick={() => { setShowAlphaWarning(false); setPreMatchMode("training"); }} className="flex-1 rounded border border-amber-500 bg-amber-700 py-3 text-xs font-black uppercase text-amber-100 shadow-[0_0_15px_rgba(217,119,6,0.3)]">
+              ACEITAR E CONTINUAR
+            </button>
           </div>
         </div>
       </div>
     )}
+    
+    <PreMatchModal mode={preMatchMode} onCancel={() => setPreMatchMode(null)} onConfirm={handlePreMatchConfirm} />
   </div></main>
 }
 

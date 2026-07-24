@@ -18,7 +18,7 @@ interface ReactionModalProps {
 }
 
 export function ReactionModal({ attack, attackerCards, defenses, reactionCards, mana, reactionUsed, onActivate, onDecline }: ReactionModalProps) {
-  const [deadline] = useState(() => Date.now()+40_000)
+  const [deadline] = useState(() => Date.now()+60_000)
   const [seconds,setSeconds]=useState(()=>Math.max(0,Math.ceil((deadline-Date.now())/1000)))
   const [busy,setBusy]=useState(false)
   const declined=useRef(false)
