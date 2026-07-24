@@ -44,6 +44,11 @@ export function PreMatchModal({
 
   if (!mode) return null
 
+  const handleGenerateDeck = () => {
+    setSelectedDeck("SYSTEM_GENERATED")
+    setStep("version")
+  }
+
   const handleConfirmDeck = () => {
     if (selectedDeck) setStep("version")
   }
