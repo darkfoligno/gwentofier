@@ -12,7 +12,11 @@ CREATE OR REPLACE FUNCTION game_private.execute_common_effect_internal(
     p_target uuid DEFAULT NULL,
     p_event jsonb DEFAULT NULL
 )
-RETURNS jsonb AS $$
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
     v_source_state jsonb;
     v_source_card jsonb;
