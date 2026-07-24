@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import { Cinzel, Inter } from 'next/font/google'
+import { GlobalMarquee } from '@/components/game/global-marquee'
 import './globals.css'
 
 const cinzel = Cinzel({
@@ -33,6 +34,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`dark ${cinzel.variable} ${inter.variable}`}>
       <body className="bg-background font-sans antialiased">
+        <GlobalMarquee />
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
