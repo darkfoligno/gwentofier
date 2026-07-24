@@ -65,7 +65,8 @@ export default function Page() {
 
   return (
     <main className="relative min-h-screen">
-      <div className="fixed right-3 top-3 z-[200] flex items-center gap-1 rounded-lg border border-gold/40 bg-wood-darkest/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.8)] backdrop-blur-md">
+      {activeScreen !== "arena" && (
+        <div className="fixed right-3 top-3 z-[200] flex items-center gap-1 rounded-lg border border-gold/40 bg-wood-darkest/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.8)] backdrop-blur-md">
         {debugItems.map((item) => (
           <button
             key={item.key}
@@ -83,6 +84,7 @@ export default function Page() {
         <button onClick={() => setProfileOpen(true)} className="ml-1 flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-amber-400 bg-amber-950" aria-label="Abrir perfil">{profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> : <UserRound size={15} />}</button>
         <button onClick={() => void supabase.auth.signOut()} className="rounded p-2 text-stone-400 hover:text-red-300" aria-label="Sair"><LogOut size={14} /></button>
       </div>
+      )}
 
       <AnimatePresence mode="wait">
         <motion.div

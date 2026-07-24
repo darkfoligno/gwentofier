@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Sparkles, Trophy } from "lucide-react"
 
+import { usePathname } from "next/navigation"
+
 interface LegendaryDrop {
   id: string
   player_name: string
@@ -11,8 +13,11 @@ interface LegendaryDrop {
 }
 
 export function GlobalMarquee() {
+  const pathname = usePathname()
   const [drops, setDrops] = useState<LegendaryDrop[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
+
+  if (pathname === "/arena") return null
 
   useEffect(() => {
     // For alpha, simulated drops are fine to show off the visual

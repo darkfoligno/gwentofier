@@ -54,7 +54,6 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const [pendingCardTrigger,setPendingCardTrigger]=useState<PendingCardTrigger|null>(null)
   const [pendingEffectChoice, setPendingEffectChoice] = useState<{ id: string; effect_code: string; choice_type: string; min_choices: number; max_choices: number; candidate_ids: string[]; public_prompt: string; expected_state_version: number } | null>(null)
   const [effectExecutionLogs,setEffectExecutionLogs]=useState<Array<{id:number;match_id:string;source_match_card_id:string|null;effect_code:string;result:Record<string,unknown>;created_at:string}>>([])
-  const [privateReveals,setPrivateReveals]=useState<Array<{id:string;reveal_type:string;source_match_card_id:string;revealed_match_card_id:string;card_data:NonNullable<VisibleMatchCard["card_data"]>;created_at:string}>>([])
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
   const [isTraining, setIsTraining] = useState(false)
   const [usedEffectCardIds,setUsedEffectCardIds]=useState<Set<string>>(new Set())
@@ -156,32 +155,19 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const fetchPendingCardTrigger=useCallback(async()=>{if(!validMatch||!currentUserId){if(mounted.current)setPendingCardTrigger(null);return}const {data,error}=await supabase.rpc("get_my_pending_card_trigger",{p_match_id:matchId,p_user_id:currentUserId});if(error)throw error;const raw=(data??null)as Record<string,unknown>|null;const row=raw?{...raw,id:String(raw.trigger_id),source_match_card_id:String(raw.card_id),trigger_type:String(raw.trigger_reason),description:String(raw.effect_text??"")} as unknown as PendingCardTrigger:null;if(mounted.current)setPendingCardTrigger(row)},[currentUserId,matchId,validMatch])
   const fetchEffectUses=useCallback(async()=>{if(!validMatch||!matchState)return;const {data,error}=await supabase.from("match_effect_uses").select("match_card_id").eq("match_id",matchId).eq("turn_number",matchState.current_turn);if(error)throw error;if(mounted.current)setUsedEffectCardIds(new Set((data??[]).map(row=>row.match_card_id)))},[matchId,matchState?.current_turn,validMatch])
   const fetchEffectExecutionLogs=useCallback(async()=>{if(!validMatch)return;const{data,error}=await supabase.from("match_effect_execution_log").select("id,match_id,source_match_card_id,effect_code,result,created_at").eq("match_id",matchId).order("id",{ascending:true}).limit(100);if(error)throw error;if(mounted.current)setEffectExecutionLogs((data??[])as typeof effectExecutionLogs)},[matchId,validMatch])
-  const fetchPrivateReveals=useCallback(async()=>{
-    if(!validMatch)return
-    try{
-      const{data,error}=await supabase.rpc("get_my_active_private_reveals",{p_match_id:matchId,p_user_id:currentUserId||null})
-      if(error){
-        if(["42883","PGRST202","PGRST301","404","P0001"].includes(error.code??"")||(error.message&&(error.message.includes("404")||error.message.includes("not found")))) return;
-        return;
-      }
-      if(mounted.current)setPrivateReveals((data??[])as typeof privateReveals)
-    }catch{
-      if(mounted.current)setPrivateReveals([])
-    }
-  },[currentUserId,matchId,validMatch])
 
   const refresh = useCallback(async () => {
     if (!validMatch) return
     setConnectionStatus("syncing")
     try {
-      await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack(), fetchPendingEffectChoice(),fetchPendingCardTrigger(),fetchEffectUses(),fetchEffectExecutionLogs(),fetchPrivateReveals()])
+      await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack(), fetchPendingEffectChoice(),fetchPendingCardTrigger(),fetchEffectUses(),fetchEffectExecutionLogs()])
       if (mounted.current) setConnectionStatus("connected")
     } catch (error) {
       console.error("Falha ao sincronizar a partida autoritativa", error)
       void reportDuelError(matchId, "realtime_refresh", error as PostgrestError | Error)
       if (mounted.current) setConnectionStatus("disconnected")
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs,fetchPrivateReveals, matchId, validMatch])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs, matchId, validMatch])
 
   const rpc = useCallback(async <T,>(name: string, args: Record<string, unknown>) => {
     if (actionPending.current) throw new Error("ACTION_IN_PROGRESS: aguarde a confirmação do servidor.")
@@ -236,7 +222,6 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_effect_choices", filter: `match_id=eq.${matchId}` }, () => { void fetchPendingEffectChoice(); void fetchBoardCards() })
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_card_triggers", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchPendingCardTrigger(),fetchMatchState(),fetchBoardCards(),fetchActions()]) })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_effect_execution_log", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchEffectExecutionLogs(),fetchBoardCards()]) })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_private_reveals", filter: `match_id=eq.${matchId}` }, () => { void fetchPrivateReveals() })
       .on("postgres_changes", { event: "*", schema: "public", table: "match_cards", filter: `match_id=eq.${matchId}` }, () => {
         // A linha bruta apenas invalida o cache. A leitura seguinte permanece na
         // view sanitizada e atualiza revelação, HP, zona e cemitério atomicamente.
@@ -255,7 +240,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       void supabase.removeChannel(channel)
       void supabase.removeChannel(actionChannel)
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectExecutionLogs,fetchPrivateReveals, matchId, refresh, validMatch])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectExecutionLogs, matchId, refresh, validMatch])
 
   const isPlayer1 = matchState?.player1_id === currentUserId
   const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
@@ -265,10 +250,10 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const reactionUsed = pendingAttack?.status === "reaction_used"
 
   return {
-    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs,privateReveals, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
+    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
     isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
     getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
-    submitBan: (cardId: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "highest_rarity" })),
+    submitBan: (cardId: string | null) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "highest_rarity" })),
     submitSetup: (lifeCardIds: string[], reinforcementCardIds: string[] = []) => isTraining ? rpc("submit_training_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds })) : rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds, p_leader_card_id: null })),
     playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
     replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
