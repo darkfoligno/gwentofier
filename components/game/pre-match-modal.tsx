@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase"
 interface Deck {
   id: string
   name: string
-  element: string
+  // Removido element pois não existe na tabela decks
   is_valid: boolean
 }
 
@@ -32,7 +32,7 @@ export function PreMatchModal({
     async function loadDecks() {
       const { data } = await supabase
         .from("decks")
-        .select("id, name, element, is_valid")
+        .select("id, name, is_valid")
         .eq("is_valid", true)
         .order("updated_at", { ascending: false })
       setDecks(data || [])
@@ -93,7 +93,7 @@ export function PreMatchModal({
                     >
                       <div>
                         <b className="block font-serif text-amber-100">{d.name}</b>
-                        <span className="text-xs text-stone-500">Elemento: {d.element}</span>
+                        <span className="text-xs text-stone-500">Cartas: Padrão</span>
                       </div>
                       {selectedDeck === d.id && <ChevronRight className="text-amber-400" />}
                     </button>
