@@ -44,16 +44,6 @@ export function PreMatchModal({
 
   if (!mode) return null
 
-  const handleGenerateDeck = async () => {
-    setBusy(true)
-    const { data, error } = await supabase.rpc("generate_system_deck")
-    if (data && !error) {
-      setSelectedDeck(data)
-      setStep("version")
-    }
-    setBusy(false)
-  }
-
   const handleConfirmDeck = () => {
     if (selectedDeck) setStep("version")
   }
