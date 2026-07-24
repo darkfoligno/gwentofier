@@ -75,7 +75,34 @@ function ManaOrb({ label }: { label: string }) { return <div className="flex ite
 type MatchBanView = { id: string; banned_by_user_id: string; target_user_id: string; source_card_id: string | null; is_skipped: boolean; created_at?:string; cards: { name: string; image_url: string; rarity:string } | null }
 function BannedCard({ ban, label }: { ban?: MatchBanView; label: string }) { return <div><p className="mb-2 text-center font-serif text-[9px] font-black uppercase text-amber-300">{label}</p>{ban?.cards ? <div className="overflow-hidden rounded-lg border border-red-500/60 bg-black"><img src={secureImageUrl(ban.cards.image_url)} alt={ban.cards.name} className="aspect-[2/3] w-full object-cover opacity-75 grayscale-[30%]" /><p className="border-t border-red-700 p-1 text-center text-[8px] font-bold text-red-200">BANIDA · {ban.cards.name}</p></div> : <EmptySlot label={ban?.is_skipped ? "Banimento dispensado" : "Aguardando banimento"} danger />}</div> }
 
-function BanPhaseModal({candidates,selected,busy,error,onSelect,onBan}:{candidates:BanCandidate[];selected:BanCandidate|null;busy:boolean;error:string|null;onSelect:(card:BanCandidate)=>void;onBan:(id:string)=>void}){const rarity={common:"border-slate-400",rare:"border-blue-400",epic:"border-purple-400",legendary:"border-orange-400",collab:"border-pink-400"}[selected?.rarity??"common"]??"border-slate-400";return <motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[170] flex items-center justify-center bg-black/95 p-5"><div className="max-h-[94vh] w-full max-w-7xl overflow-y-auto rounded-2xl border border-amber-400 bg-stone-950 p-6"><h2 className="text-center font-serif text-3xl font-black text-amber-100">Banimento Estratégico Ofieri</h2><p className="mb-5 mt-1 text-center text-sm text-stone-400">Clique para travar uma carta no Grimório e leia toda a ficha antes de bani-la.</p>{error&&<div className="mb-4 rounded border border-red-500 bg-red-950 p-3 text-red-100">{error}</div>}<div className="grid gap-6 lg:grid-cols-[1fr_360px]"><div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">{candidates.map(card=><button disabled={busy} key={card.card_id} onClick={()=>onSelect(card)} className={`rounded-xl border-2 bg-black p-1 transition ${selected?.card_id===card.card_id?"border-red-400 shadow-[0_0_28px_rgba(248,113,113,.5)]":"border-amber-700/50"}`}><img src={secureImageUrl(card.image_url)} alt={card.name} className="aspect-[2/3] w-full object-contain"/><span className="block p-2 text-xs font-black text-amber-100">{card.name}<small className="block uppercase text-stone-500">{card.raridade??card.rarity} · {card.copy_count}x</small></span></button>)}</div><aside className="sticky top-0 rounded-xl border border-red-500/40 bg-black/80 p-4">{selected?<><div className={`mx-auto aspect-[2/3] w-44 overflow-hidden rounded-xl border-4 ${rarity}`}><img src={secureImageUrl(selected.image_url)} alt={selected.name} className="h-full w-full object-contain"/></div><h3 className="mt-3 text-center font-serif text-xl font-black text-amber-100">{selected.name}</h3><div className="mt-3 grid grid-cols-2 gap-2 text-xs text-stone-300"><span>💎 Mana: <b>{selected.effect_mana_cost??0}</b></span><span>⚔️ ATK: <b>{selected.base_power??0}</b></span><span>❤️ HP: <b>{selected.base_max_life??0}</b></span><span>Tipo: <b>{selected.card_type??"normal"}</b></span><span>Elemento: <b>{selected.element??"Cívil"}</b></span><span>Raridade: <b>{selected.rarity}</b></span></div><p className="mt-3 border-t border-stone-700 pt-3 text-xs leading-relaxed text-stone-200">{highlightEffectText(selected.effect_text??"Sem efeito descrito.")}</p><button disabled={busy} onClick={()=>onBan(selected.card_id)} className="mt-4 w-full rounded-lg border-2 border-red-300 bg-red-800 px-4 py-4 font-black text-red-50 disabled:opacity-40">{busy?"VALIDANDO…":"🚫 BANIR ESTA CARTA DA PARTIDA"}</button></>:<p className="py-20 text-center text-stone-500">Selecione uma carta para inspecionar.</p>}</aside></div></div></motion.div>}
+function BanPhaseModal({candidates,selected,busy,error,onSelect,onBan}:{candidates:BanCandidate[];selected:BanCandidate|null;busy:boolean;error:string|null;onSelect:(card:BanCandidate)=>void;onBan:(id:string)=>void}){
+  if (!candidates.length) {
+    return <div className="fixed inset-0 z-[170] flex flex-col items-center justify-center bg-black/95 p-5 text-amber-100"><Loader2 className="animate-spin mb-4 text-amber-400" size={48} /><h2 className="font-serif text-2xl font-black">Identificando o Grimório Adversário...</h2></div>
+  }
+  return <motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[170] flex flex-col items-center justify-center bg-black/95 p-5">
+    <div className="w-full max-w-5xl rounded-2xl border border-amber-400 bg-stone-950 p-6 shadow-2xl flex flex-col max-h-[95vh]">
+      <h2 className="text-center font-serif text-3xl font-black text-amber-100 mb-2">Banimento Estratégico</h2>
+      <p className="text-center text-sm text-stone-400 mb-6">Inspecione o deck inimigo e escolha 1 carta para banir da partida.</p>
+      {error&&<div className="mb-4 rounded border border-red-500 bg-red-950 p-3 text-red-100">{error}</div>}
+      <div className="flex-1 overflow-y-auto min-h-0 px-2">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+          {candidates.map(card=><button disabled={busy} key={card.card_id} onClick={()=>onSelect(card)} className={`relative overflow-hidden rounded-xl border-2 transition-all hover:scale-105 ${selected?.card_id===card.card_id?"border-red-500 shadow-[0_0_20px_rgba(248,113,113,0.7)] z-10 scale-105":"border-amber-700/40 opacity-80"}`}>
+            <img src={secureImageUrl(card.image_url)} alt={card.name} className="aspect-[2/3] w-full object-cover"/>
+            <div className="absolute inset-x-0 bottom-0 bg-black/80 px-1 py-2 text-center">
+              <span className="block truncate text-[10px] font-black text-amber-100">{card.name}</span>
+              <span className="block text-[9px] uppercase text-stone-400">{card.raridade??card.rarity} · {card.copy_count}x</span>
+            </div>
+          </button>)}
+        </div>
+      </div>
+      <div className="mt-6 pt-4 border-t border-stone-800 flex flex-col items-center shrink-0">
+        <button disabled={busy || !selected} onClick={()=>selected&&onBan(selected.card_id)} className="w-full max-w-md rounded-lg border-2 border-red-500 bg-red-900 px-6 py-4 font-black text-white text-lg disabled:opacity-30 transition-transform active:scale-95 shadow-[0_0_25px_rgba(220,38,38,0.4)]">
+          {busy?"PROCESSANDO BANIMENTO...":selected?`🚫 BANIR ${selected.name.toUpperCase()}`:"SELECIONE UMA CARTA"}
+        </button>
+      </div>
+    </div>
+  </motion.div>
+}
 
 function Inspector({card,canRecall,onRecall}:{card:VisibleMatchCard|null;canRecall?:boolean;onRecall?:(card:VisibleMatchCard)=>void}) {
   if(!card?.card_data) return <div className="flex h-full flex-col items-center justify-center text-center text-stone-500"><BookOpen className="mb-3 text-amber-700" size={36}/><b className="font-serif text-amber-200/70">Grimório de Inspeção</b><p className="mt-2 text-[10px]">Selecione uma carta revelada para examinar seus detalhes.</p></div>
@@ -288,7 +315,25 @@ export function ArenaScreen() {
     /* [V39] REMOVIDO EXPIRE TURN AUTO. DEVE SER MANUAL PELO USUÁRIO */
   }, [matchState?.turn_deadline, matchState?.match_version, matchState?.status])
 
-  useEffect(() => { if (matchState?.status !== "ban_phase") { setBanCandidates([]);setSelectedBan(null);return } void duel.getBanCandidates().then(cards=>{setBanCandidates(cards);setSelectedBan(cards[0]??null)}).catch(console.error) }, [matchId, matchState?.status])
+  useEffect(() => {
+    if (matchState?.status !== "ban_phase") { 
+      setBanCandidates([]); setSelectedBan(null); return 
+    }
+    let isMounted = true;
+    const fetchBans = () => {
+      duel.getBanCandidates().then(cards => {
+        if (!isMounted) return;
+        if (cards.length > 0) {
+          setBanCandidates(cards); setSelectedBan(cards[0]??null);
+        } else {
+          // Refetch if empty due to replication lag
+          setTimeout(fetchBans, 1000);
+        }
+      }).catch(console.error);
+    }
+    fetchBans();
+    return () => { isMounted = false };
+  }, [matchId, matchState?.status])
   useEffect(() => {
     if (!matchId || preview) return
     const load = async () => { const { data } = await supabase.from("match_bans").select("id,banned_by_user_id,target_user_id,source_card_id,is_skipped,created_at,cards:source_card_id(name,image_url,rarity)").eq("match_id", matchId); setMatchBans((data ?? []) as unknown as MatchBanView[]) }
