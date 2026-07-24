@@ -2,6 +2,25 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 
+/* Blindagem Mobile Nativa - Gwentofier APK */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none; /* Impede que segurar o dedo na carta selecione o texto do feitiço */
+}
+
+html, body {
+  overscroll-behavior-y: none; /* Impede o efeito "pull-to-refresh" (puxar pra atualizar) que estraga o jogo */
+  touch-action: manipulation; /* Desativa o duplo-clique para zoom do Android */
+  background-color: #09090b;
+  overflow-x: hidden;
+}
+
+/* Permite rolagem de texto apenas em modais de lore ou chat */
+.allow-select {
+  user-select: text;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
