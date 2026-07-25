@@ -28,7 +28,12 @@ function MiniCard({ row, hidden=false }: { row: VisibleMatchCard; hidden?: boole
   if(hidden || !row.card_data) return <div className="relative h-full w-full overflow-hidden rounded-lg border-2 border-amber-800 bg-[radial-gradient(circle,#713f12,#09090b_65%)]"><div className="absolute inset-[18%] rotate-45 border border-amber-400/40" /><span className="absolute inset-0 flex items-center justify-center font-serif text-2xl text-amber-300/60">𓂀</span></div>
   const card=row.card_data
   return <div className={`relative h-full w-full overflow-hidden rounded-lg border-[3px] bg-black shadow-lg ${miniRarity[card.raridade]}`}>
-    <img src={secureImageUrl(card.image_url)} alt={card.nome} className="h-full w-full object-cover object-center" />
+    <img 
+      src={secureImageUrl(card.image_url)} 
+      alt={card.nome} 
+      className="h-full w-full object-cover object-center bg-zinc-900" 
+      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+    />
     <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/80" />
     <span className="absolute left-1 top-1 flex h-6 w-6 rotate-45 items-center justify-center border border-cyan-200 bg-blue-950 text-[9px] font-black text-cyan-50 shadow-[0_0_10px_#22d3ee]"><b className="-rotate-45">{card.mana}</b></span>
     <span className="absolute bottom-1 left-1 flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-amber-300 bg-stone-950 px-1 text-[9px] font-black text-amber-100"><Sword size={9}/>{row.current_power ?? card.ataque}</span>
@@ -498,7 +503,7 @@ export function ArenaScreen() {
     } finally { setBanBusy(false) }
   }
 
-  const submitPreparation = async () => {
+const submitPreparation = async () => {
     if (setupBusy || !matchId) return;
     setSetupBusy(true);
     setEffectMessage("Enviando formação de combate ao servidor...");
@@ -512,16 +517,13 @@ export function ArenaScreen() {
         reinforcements: reinforcementArray
       });
 
-      // 1. Envia o setup para o Supabase
       await duel.submitSetup(lifeArray, reinforcementArray);
       
       setSetupCards(new Set());
       setSetupReinforcements(new Set());
       
-      // 2. Força a atualização síncrona do estado da partida
       await duel.refresh();
       
-      // 3. Fallback: Força um segundo recarregamento para garantir que a tela de espera feche
       setTimeout(() => {
         void duel.refresh();
       }, 500);
