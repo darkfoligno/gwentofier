@@ -216,7 +216,6 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     if (!validMatch) return
     void refresh()
     if (isTraining) {
-      // Isolamento do Modo Treino: sem canais Realtime / WebSockets
       return
     }
     const channel = supabase.channel(`match:${matchId}`)
@@ -239,8 +238,6 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       .on("postgres_changes", { event: "*", schema: "public", table: "pending_card_triggers", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchPendingCardTrigger(),fetchMatchState(),fetchBoardCards(),fetchActions()]) })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_effect_execution_log", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchEffectExecutionLogs(),fetchBoardCards()]) })
       .on("postgres_changes", { event: "*", schema: "public", table: "match_cards", filter: `match_id=eq.${matchId}` }, () => {
-        // A linha bruta apenas invalida o cache. A leitura seguinte permanece na
-        // view sanitizada e atualiza revelação, HP, zona e cemitério atomicamente.
         void fetchBoardCards()
       })
       .subscribe(status => setConnectionStatus(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "CLOSED" ? "disconnected" : "syncing"))
@@ -269,8 +266,16 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
     isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
     getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
-    submitBan: (cardId: string | null, category: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: category })),
-    submitSetup: (lifeCardIds: string[], reinforcementCardIds: string[] = []) => isTraining ? rpc("submit_training_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds })) : rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds, p_leader_card_id: null })),
+    submitBan: async (cardId: string | null, category: string) => {
+      const res = await rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: category }))
+      await refresh()
+      return res
+    },
+    submitSetup: async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
+      const res = await rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds }))
+      await refresh()
+      return res
+    },
     playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
     replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
     declareAttack: (attackerCardIds: string[], isDirect: boolean,expectedVersion?:number) => rpc("declare_attack",expectedVersion===undefined?versioned({p_attacker_card_ids:attackerCardIds,p_is_direct:isDirect}):{p_match_id:matchId,p_attacker_card_ids:attackerCardIds,p_is_direct:isDirect,p_expected_version:expectedVersion}),
