@@ -272,7 +272,13 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       return res
     },
     submitSetup: async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
-      const res = await rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds }))
+      // Modo Treino / Teste usa exclusivamente a função de match setup universal unificada sem sobrecarga
+      const res = await rpc("submit_match_setup", {
+        p_match_id: matchId,
+        p_life_card_ids: lifeCardIds,
+        p_reinforcement_card_ids: reinforcementCardIds,
+        p_expected_version: matchState?.match_version ?? 0
+      })
       await refresh()
       return res
     },
