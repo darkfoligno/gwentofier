@@ -258,6 +258,45 @@ export function ArenaScreen() {
   const { matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed,usedEffectCardIds,isActionPending } = duel
   const latestResolvedAction=matchActions.findLast(action=>action.action_type==="attack_resolved")
   const latestEffectAction=matchActions.findLast(action=>action.action_type==="effect_activated")
+  const lastActionRef = useRef<number | null>(null)
+  
+  useEffect(() => {
+    if (!matchState || !isTraining) return;
+    
+    console.log("[TREINO-BOT] 🤖 Partida de Treino iniciada. Verificando deck do Bot...");
+    
+    const botCardsCount = boardCards.filter(c => c.owner_id === opponentId).length;
+    console.log("[TREINO-BOT] 🃏 Deck do Bot carregado com sucesso? Total de cartas:", botCardsCount);
+    
+    const botBanned = matchBans.find(ban => ban.banned_by_user_id === userId);
+    if (botBanned) {
+      console.log("[TREINO-BOT] 🚫 Fase de Banimento: Bot teve carta banida pelo jogador. Avançando para Turno 0...");
+    }
+    
+    const botLifeCount = boardCards.filter(c => c.owner_id === opponentId && c.zone === 'life').length;
+    if (botLifeCount === 3) {
+      console.log("[TREINO-BOT] ⚔️ Turno 0: Alocando 3 cartas de vida e 1 reforço automaticamente para o Bot via SQL...");
+    }
+    
+    if (matchState.status === 'in_progress' && matchState.current_turn === 1) {
+      const activePlayerName = matchState.current_player_id === userId ? 'Você' : 'Bot';
+      console.log("[TREINO-BOT] 🪙 Moeda de Iniciativa lançada. Quem começa o Turno 1:", activePlayerName);
+    }
+    
+    if (matchState.status === 'in_progress' && matchState.current_player_id === opponentId) {
+      console.log("[TREINO-BOT] 🧠 Turno do Bot iniciado. O Autômato está calculando sua jogada...");
+    }
+  }, [matchState?.status, matchState?.current_player_id, boardCards.length, isTraining, matchBans, opponentId, userId])
+
+  useEffect(() => {
+    if (!isTraining || !matchActions.length) return;
+    const lastAction = matchActions[matchActions.length - 1];
+    if (lastAction.actor_user_id === opponentId && lastAction.id !== lastActionRef.current) {
+      lastActionRef.current = lastAction.id;
+      console.log("[TREINO-BOT] 💥 O Bot executou uma jogada! Ação:", lastAction.action_type);
+    }
+  }, [matchActions.length, isTraining, matchActions, opponentId])
+
   const hasUnshownEffect=matchActions.some(action=>action.action_type==="effect_activated"&&action.id>seenEffect.current)
 
   useEffect(() => {

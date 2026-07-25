@@ -179,19 +179,31 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
     for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id","p_trigger_id"])
       if (key in clean && clean[key] !== null) clean[key] = requiredUuid(clean[key], key)
+    if (name === "activate_card_effect_v2") {
+      const cardId = clean.p_source_card_id;
+      const card = boardCards.find(c => c.id === cardId);
+      console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço da carta:", card?.card_data?.nome || cardId, "Custo de Mana:", card?.card_data?.mana || 0);
+      console.log("[ENGINE-EFEITO] 📦 Payload enviado para o backend:", JSON.stringify(clean));
+    }
     if (process.env.NODE_ENV === "development") console.debug(`[Duel RPC] ${name}`, { payload: clean, matchVersion: matchState?.match_version, at: new Date().toISOString() })
     const { data, error } = await supabase.rpc(name, clean)
     if (error) {
+      if (name === "activate_card_effect_v2") {
+        console.error("[ENGINE-EFEITO] ❌ ERRO AO ATIVAR EFEITO:", error.message, error.details);
+      }
       if (isStaleVersion(error)) await refresh()
       void reportDuelError(matchId, name, error)
       throw readableRpcError(error)
+    }
+    if (name === "activate_card_effect_v2") {
+      console.log("[ENGINE-EFEITO] ✅ Efeito resolvido com sucesso! Pilha atualizada:", data);
     }
     return data as T
     } finally {
       actionPending.current = false
       if (mounted.current) setIsActionPending(false)
     }
-  }, [matchId, refresh])
+  }, [matchId, refresh, boardCards])
 
   const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
     p_match_id: requiredUuid(matchId,"p_match_id"),

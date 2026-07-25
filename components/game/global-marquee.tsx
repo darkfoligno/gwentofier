@@ -15,32 +15,40 @@ interface LegendaryDrop {
 
 export function GlobalMarquee() {
   const pathname = usePathname()
-  const [drops, setDrops] = useState<LegendaryDrop[]>([])
+  const [drops, setDrops] = useState<LegendaryDrop[]>([
+    { id: 'f1', player_name: 'GeraltOfRivia', card_name: 'Ciri criança' },
+    { id: 'f2', player_name: 'YenneferOfVengerberg', card_name: 'Yennefer' },
+    { id: 'f3', player_name: 'Dandelion', card_name: 'Borch Três Gralhas' }
+  ])
   const [currentIndex, setCurrentIndex] = useState(0)
 
   if (pathname === "/arena") return null
 
   useEffect(() => {
     const fetchDrops = async () => {
-      const { data } = await supabase
-        .from('user_cards')
-        .select(`
-          created_at,
-          profiles:user_id(username),
-          cards:card_id(name, rarity)
-        `)
-        .eq('cards.rarity', 'legendary')
-        .order('created_at', { ascending: false })
-        .limit(5)
-      
-      if (data && data.length > 0) {
-        setDrops(data.map((row: any, i) => ({
-          id: String(i),
-          player_name: row.profiles?.username || 'GeraltOfRivia',
-          card_name: row.cards?.name || 'Ciri: Jovem'
-        })))
-      } else {
-        setDrops([])
+      try {
+        const { data, error } = await supabase
+          .from('user_cards')
+          .select(`
+            created_at,
+            profiles:user_id(username),
+            cards:card_id(name, rarity)
+          `)
+          .eq('cards.rarity', 'legendary')
+          .order('created_at', { ascending: false })
+          .limit(5)
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setDrops(data.map((row: any, i) => ({
+            id: String(i),
+            player_name: row.profiles?.username || 'GeraltOfRivia',
+            card_name: row.cards?.name || 'Ciri: Jovem'
+          })))
+        }
+      } catch (err) {
+        // Silencia erro 400 / PostgREST no letreiro rolante de produção na Vercel
       }
     }
     
