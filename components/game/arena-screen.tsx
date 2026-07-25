@@ -512,12 +512,20 @@ export function ArenaScreen() {
         reinforcements: reinforcementArray
       });
 
+      // 1. Envia o setup para o Supabase
       await duel.submitSetup(lifeArray, reinforcementArray);
       
       setSetupCards(new Set());
       setSetupReinforcements(new Set());
-      setEffectMessage("Formação confirmada! Aguardando transição de iniciativa...");
+      
+      // 2. Força a atualização síncrona do estado da partida
       await duel.refresh();
+      
+      // 3. Fallback: Força um segundo recarregamento para garantir que a tela de espera feche
+      setTimeout(() => {
+        void duel.refresh();
+      }, 500);
+
     } catch (error: any) {
       console.error("[TREINO-BOT] ❌ Erro ao enviar setup:", error);
       const errMsg = error?.message || error?.details || "O servidor rejeitou a alocação de Cartas de Vida.";
@@ -534,6 +542,7 @@ export function ArenaScreen() {
       return;
     }
     void submitPreparation();
+  }
   }
   const submitTurn = async (expectedVersion?:number) => {
     if (!isCurrentPlayer || isActionPending || matchState?.engine_state !== "turn_action") return
