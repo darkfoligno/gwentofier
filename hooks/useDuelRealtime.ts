@@ -203,6 +203,10 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     mounted.current = true
     if (!validMatch) return
     void refresh()
+    if (isTraining) {
+      // Isolamento do Modo Treino: sem canais Realtime / WebSockets
+      return
+    }
     const channel = supabase.channel(`match:${matchId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, payload => {
         const next = payload.new as MatchRow
@@ -240,7 +244,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       void supabase.removeChannel(channel)
       void supabase.removeChannel(actionChannel)
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectExecutionLogs, matchId, refresh, validMatch])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectExecutionLogs, matchId, refresh, validMatch, isTraining])
 
   const isPlayer1 = matchState?.player1_id === currentUserId
   const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
