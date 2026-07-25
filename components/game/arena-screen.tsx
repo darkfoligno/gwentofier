@@ -480,6 +480,7 @@ export function ArenaScreen() {
   const reactions = boardCards.filter(card => card.owner_user_id === userId && ["hand", "life", "reinforcement"].includes(card.zone) && (card.zone === "hand" || (card.current_life ?? 0) > 0) && card.card_data?.effect_definition?.some(effect => ["reaction","on_reaction","on_attacked","on_damage_received"].includes(effect.trigger_type??"") || effect.is_reaction))
   const toggleSetup = (id: string) => setSetupCards(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else if (!setupReinforcements.has(id) && next.size < 3) next.add(id); return next })
   const toggleSetupReinforcement = (id: string) => setSetupReinforcements(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else if (!setupCards.has(id) && next.size < 4) next.add(id); return next })
+  
   const submitBan = async (cardId: string | null, category: string) => {
     if (banBusy || !matchId) return
     setBanBusy(true); setBanError(null)
@@ -496,29 +497,42 @@ export function ArenaScreen() {
       setBanError(full); setEffectMessage(`Falha no banimento: ${full}`)
     } finally { setBanBusy(false) }
   }
-  useEffect(()=>{
-    /* [V39] REMOVIDO AUTO-BAN TIMER */
-  },[matchState?.status])
-  useEffect(()=>{
-    /* [V39] REMOVIDO AUTO-BAN LOGIC */
-  },[banBusy,banCandidates,matchState?.status])
-  const submitPreparation=async()=>{
-    if (setupBusy) return;
+
+  const submitPreparation = async () => {
+    if (setupBusy || !matchId) return;
     setSetupBusy(true);
-    try{
-      await duel.submitSetup([...setupCards],[...setupReinforcements]);
+    setEffectMessage("Enviando formação de combate ao servidor...");
+    try {
+      const lifeArray = Array.from(setupCards);
+      const reinforcementArray = Array.from(setupReinforcements);
+      
+      console.log("[TREINO-BOT] ⚔️ Executando submissão de setup transacional:", {
+        match_id: matchId,
+        lifes: lifeArray,
+        reinforcements: reinforcementArray
+      });
+
+      await duel.submitSetup(lifeArray, reinforcementArray);
+      
       setSetupCards(new Set());
       setSetupReinforcements(new Set());
-      await duel.refresh()
-    }catch(error){
-      setEffectMessage((error as Error)?.message??"Falha na preparação.")
-    }finally{
-      setSetupBusy(false)
+      setEffectMessage("Formação confirmada! Aguardando transição de iniciativa...");
+      await duel.refresh();
+    } catch (error: any) {
+      console.error("[TREINO-BOT] ❌ Erro ao enviar setup:", error);
+      const errMsg = error?.message || error?.details || "O servidor rejeitou a alocação de Cartas de Vida.";
+      setEffectMessage(`Falha na preparação: ${errMsg}`);
+    } finally {
+      setSetupBusy(false);
     }
   }
-  const confirmPreparation=()=>{
-    console.log("[TREINO-BOT] ⚔️ Jogador enviou alocação do Turno 0. Status do setupBusy:", setupBusy);
-    if(setupCards.size!==3||isActionPending||setupBusy)return;
+
+  const confirmPreparation = () => {
+    console.log("[TREINO-BOT] ⚔️ Solicitação de confirmação iniciada. Vidas selecionadas:", setupCards.size, "- Ocupado:", setupBusy);
+    if (setupCards.size !== 3 || setupBusy) {
+      setEffectMessage("Você deve selecionar exatamente 3 Cartas de Vida para iniciar o combate.");
+      return;
+    }
     void submitPreparation();
   }
   const submitTurn = async (expectedVersion?:number) => {
