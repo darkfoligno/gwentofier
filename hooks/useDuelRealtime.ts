@@ -253,7 +253,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
     isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
     getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
-    submitBan: (cardId: string | null) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: "highest_rarity" })),
+    submitBan: (cardId: string | null, category: string) => rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: category })),
     submitSetup: (lifeCardIds: string[], reinforcementCardIds: string[] = []) => isTraining ? rpc("submit_training_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds })) : rpc("submit_match_setup", versioned({ p_life_card_ids: lifeCardIds, p_reinforcement_card_ids: reinforcementCardIds, p_leader_card_id: null })),
     playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
     replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
