@@ -77,6 +77,8 @@ function BannedCard({ ban, label }: { ban?: MatchBanView; label: string }) { ret
 
 function BanPhaseModal({candidates,selected,busy,error,onSelect,onBan,onRefetch,onSkip}:{candidates:BanCandidate[];selected:BanCandidate|null;busy:boolean;error:string|null;onSelect:(card:BanCandidate)=>void;onBan:(id:string)=>void;onRefetch:()=>void;onSkip:()=>void}){
   const [showTimeout, setShowTimeout] = useState(false);
+  const [selectedCardForReview, setSelectedCardForReview] = useState<any>(null);
+  
   useEffect(() => {
     if (candidates.length > 0) return;
     const timer = setTimeout(() => setShowTimeout(true), 3000);
@@ -96,26 +98,45 @@ function BanPhaseModal({candidates,selected,busy,error,onSelect,onBan,onRefetch,
       )}
     </div>
   }
+
   return <motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[170] flex flex-col items-center justify-center bg-black/95 p-5">
-    <div className="w-full max-w-5xl rounded-2xl border border-amber-400 bg-stone-950 p-6 shadow-2xl flex flex-col max-h-[95vh]">
+    <div className="w-full max-w-6xl rounded-2xl border border-amber-400 bg-stone-950 p-6 shadow-2xl flex flex-col max-h-[95vh]">
       <h2 className="text-center font-serif text-3xl font-black text-amber-100 mb-2">Banimento Estratégico</h2>
       <p className="text-center text-sm text-stone-400 mb-6">Inspecione o deck inimigo e escolha 1 carta para banir da partida.</p>
       {error&&<div className="mb-4 rounded border border-red-500 bg-red-950 p-3 text-red-100">{error}</div>}
-      <div className="flex-1 overflow-y-auto min-h-0 px-2">
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
-          {candidates.map(card=><button disabled={busy} key={card.card_id} onClick={()=>onSelect(card)} className={`relative overflow-hidden rounded-xl border-2 transition-all hover:scale-105 ${selected?.card_id===card.card_id?"border-red-500 shadow-[0_0_20px_rgba(248,113,113,0.7)] z-10 scale-105":"border-amber-700/40 opacity-80"}`}>
-            <img src={secureImageUrl(card.image_url)} alt={card.name} className="aspect-[2/3] w-full object-cover"/>
-            <div className="absolute inset-x-0 bottom-0 bg-black/80 px-1 py-2 text-center">
-              <span className="block truncate text-[10px] font-black text-amber-100">{card.name}</span>
-              <span className="block text-[9px] uppercase text-stone-400">{card.raridade??card.rarity} · {card.copy_count}x</span>
-            </div>
-          </button>)}
+      
+      <div className="flex-1 flex gap-6 overflow-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto pr-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+            {candidates.map(card=><button disabled={busy} key={card.card_id} onClick={()=>{onSelect(card); setSelectedCardForReview(card);}} className={`relative overflow-hidden rounded-xl border-2 transition-all hover:scale-105 ${selectedCardForReview?.card_id===card.card_id?"border-red-500 shadow-[0_0_20px_rgba(248,113,113,0.7)] z-10 scale-105":"border-amber-700/40 opacity-80"}`}>
+              <img src={secureImageUrl(card.image_url)} alt={card.name} className="aspect-[2/3] w-full object-cover"/>
+              <div className="absolute inset-x-0 bottom-0 bg-black/80 px-1 py-2 text-center">
+                <span className="block truncate text-[10px] font-black text-amber-100">{card.name}</span>
+                <span className="block text-[9px] uppercase text-stone-400">{card.raridade??card.rarity} · {card.copy_count}x</span>
+              </div>
+            </button>)}
+          </div>
         </div>
-      </div>
-      <div className="mt-6 pt-4 border-t border-stone-800 flex flex-col items-center shrink-0">
-        <button disabled={busy || !selected} onClick={()=>selected&&onBan(selected.card_id)} className="w-full max-w-md rounded-lg border-2 border-red-500 bg-red-900 px-6 py-4 font-black text-white text-lg disabled:opacity-30 transition-transform active:scale-95 shadow-[0_0_25px_rgba(220,38,38,0.4)]">
-          {busy?"PROCESSANDO BANIMENTO...":selected?`🚫 BANIR ${selected.name.toUpperCase()}`:"SELECIONE UMA CARTA"}
-        </button>
+
+        {selectedCardForReview && (
+          <div className="w-80 border-l border-amber-900/40 pl-6 flex flex-col justify-between shrink-0 overflow-y-auto bg-black/35 p-4 rounded-xl">
+            <div>
+              <img src={secureImageUrl(selectedCardForReview.image_url)} alt={selectedCardForReview.name} className="w-full aspect-[2/3] object-cover rounded-lg border-2 border-red-500/60 mb-4" />
+              <h3 className="font-serif text-xl font-bold text-amber-200">{selectedCardForReview.name}</h3>
+              <p className="text-xs text-stone-400 uppercase tracking-widest mt-1">
+                {selectedCardForReview.raridade ?? selectedCardForReview.rarity} • {selectedCardForReview.card_type || "Carta"}
+              </p>
+              <p className="text-[11px] text-stone-200 mt-4 leading-relaxed bg-black/60 p-3 rounded-lg border border-stone-850">
+                {selectedCardForReview.effect_text || selectedCardForReview.description || "Sem descrição de efeito."}
+              </p>
+            </div>
+            <div className="mt-4 pt-4 border-t border-stone-800">
+              <button disabled={busy} onClick={()=>onBan(selectedCardForReview.card_id)} className="w-full rounded-lg border-2 border-red-500 bg-red-900 px-4 py-3 font-black text-white text-xs disabled:opacity-30 transition-transform active:scale-95 shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+                {busy ? "PROCESSANDO BANIMENTO..." : "CONFIRMAR BANIMENTO DESTA CARTA"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   </motion.div>
@@ -260,6 +281,15 @@ export function ArenaScreen() {
   const latestEffectAction=matchActions.findLast(action=>action.action_type==="effect_activated")
   const lastActionRef = useRef<number | null>(null)
   
+  const initialLogDone = useRef(false)
+  useEffect(() => {
+    if (matchState && !initialLogDone.current) {
+      initialLogDone.current = true;
+      const match = matchState as any;
+      console.log("[TREINO-BOT] 🤖 Arena iniciada. Tipo de partida:", match?.match_type, "Status atual:", match?.status);
+    }
+  }, [matchState])
+
   useEffect(() => {
     if (!matchState || !isTraining) return;
     
@@ -416,6 +446,10 @@ export function ArenaScreen() {
     const effect = card.card_data?.effect_definition?.find(item => item.trigger_type === "manual")
     if (!effect) return
     const order = effect.effect_order ?? 1;const code=effect.effect_code??""
+    const cardName = card.card_data?.nome ?? "Desconhecida";
+    const manaCost = card.card_data?.mana ?? 0;
+    const payload = { p_match_card_id: card.id, p_order: order, p_expected_version: expectedVersion };
+    console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço! Carta:", cardName, "Custo:", manaCost, "Payload:", JSON.stringify(payload));
     const mode=effect.target_mode??"none"; const fieldZones=["life","reinforcement","attacker","leader"]
     if (["selected", "ally", "enemy", "deck", "hand", "graveyard"].includes(mode)) {
       const zone = ["deck", "hand", "graveyard"].includes(mode) ? mode as MatchCardZone : undefined
@@ -471,7 +505,11 @@ export function ArenaScreen() {
       setSetupBusy(false)
     }
   }
-  const confirmPreparation=()=>{if(setupCards.size!==3||isActionPending||setupBusy)return;void submitPreparation();}
+  const confirmPreparation=()=>{
+    console.log("[TREINO-BOT] ⚔️ Jogador enviou alocação do Turno 0. Status do setupBusy:", setupBusy);
+    if(setupCards.size!==3||isActionPending||setupBusy)return;
+    void submitPreparation();
+  }
   const submitTurn = async (expectedVersion?:number) => {
     if (!isCurrentPlayer || isActionPending || matchState?.engine_state !== "turn_action") return
     try {
