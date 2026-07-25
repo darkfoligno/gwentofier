@@ -118,25 +118,36 @@ function BanPhaseModal({candidates,selected,busy,error,onSelect,onBan,onRefetch,
           </div>
         </div>
 
-        {selectedCardForReview && (
-          <div className="w-80 border-l border-amber-900/40 pl-6 flex flex-col justify-between shrink-0 overflow-y-auto bg-black/35 p-4 rounded-xl">
-            <div>
-              <img src={secureImageUrl(selectedCardForReview.image_url)} alt={selectedCardForReview.name} className="w-full aspect-[2/3] object-cover rounded-lg border-2 border-red-500/60 mb-4" />
-              <h3 className="font-serif text-xl font-bold text-amber-200">{selectedCardForReview.name}</h3>
-              <p className="text-xs text-stone-400 uppercase tracking-widest mt-1">
-                {selectedCardForReview.raridade ?? selectedCardForReview.rarity} • {selectedCardForReview.card_type || "Carta"}
-              </p>
-              <p className="text-[11px] text-stone-200 mt-4 leading-relaxed bg-black/60 p-3 rounded-lg border border-stone-850">
-                {selectedCardForReview.effect_text || selectedCardForReview.description || "Sem descrição de efeito."}
-              </p>
+        {selectedCardForReview && (() => {
+          const cardPower = selectedCardForReview.base_power ?? selectedCardForReview.power ?? selectedCardForReview.poder ?? selectedCardForReview.ataque ?? 0;
+          const cardLife = selectedCardForReview.base_max_life ?? selectedCardForReview.life ?? selectedCardForReview.hp ?? selectedCardForReview.vida ?? selectedCardForReview.maximum_life ?? 0;
+          const cardEffect = selectedCardForReview.effect_text ?? selectedCardForReview.effect ?? selectedCardForReview.description ?? selectedCardForReview.efeito ?? "Sem descrição de efeito.";
+          const cardMana = selectedCardForReview.effect_mana_cost ?? selectedCardForReview.mana ?? selectedCardForReview.mana_cost ?? 0;
+          return (
+            <div className="w-80 border-l border-amber-900/40 pl-6 flex flex-col justify-between shrink-0 overflow-y-auto bg-black/35 p-4 rounded-xl">
+              <div>
+                <img src={secureImageUrl(selectedCardForReview.image_url)} alt={selectedCardForReview.name} className="w-full aspect-[2/3] object-cover rounded-lg border-2 border-red-500/60 mb-4" />
+                <h3 className="font-serif text-xl font-bold text-amber-200">{selectedCardForReview.name}</h3>
+                <p className="text-xs text-stone-400 uppercase tracking-widest mt-1">
+                  {selectedCardForReview.raridade ?? selectedCardForReview.rarity} • {selectedCardForReview.card_type || "Carta"}
+                </p>
+                <div className="grid grid-cols-2 gap-2 mt-3 text-xs text-stone-300 bg-black/45 p-2 rounded border border-stone-800">
+                  <span>⚔️ Poder: <b>{cardPower}</b></span>
+                  <span>❤️ Vida: <b>{cardLife}</b></span>
+                  <span className="col-span-2">💎 Mana: <b>{cardMana}</b></span>
+                </div>
+                <p className="text-[11px] text-stone-200 mt-4 leading-relaxed bg-black/60 p-3 rounded-lg border border-stone-850">
+                  {cardEffect}
+                </p>
+              </div>
+              <div className="mt-4 pt-4 border-t border-stone-800">
+                <button disabled={busy} onClick={()=>onBan(selectedCardForReview.card_id)} className="w-full rounded-lg border-2 border-red-500 bg-red-900 px-4 py-3 font-black text-white text-xs disabled:opacity-30 transition-transform active:scale-95 shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+                  {busy ? "PROCESSANDO BANIMENTO..." : "CONFIRMAR BANIMENTO DESTA CARTA"}
+                </button>
+              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-stone-800">
-              <button disabled={busy} onClick={()=>onBan(selectedCardForReview.card_id)} className="w-full rounded-lg border-2 border-red-500 bg-red-900 px-4 py-3 font-black text-white text-xs disabled:opacity-30 transition-transform active:scale-95 shadow-[0_0_20px_rgba(220,38,38,0.4)]">
-                {busy ? "PROCESSANDO BANIMENTO..." : "CONFIRMAR BANIMENTO DESTA CARTA"}
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   </motion.div>
