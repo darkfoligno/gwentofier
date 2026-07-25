@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Sparkles, Trophy } from "lucide-react"
 
 import { usePathname } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 interface LegendaryDrop {
   id: string
@@ -20,14 +21,30 @@ export function GlobalMarquee() {
   if (pathname === "/arena") return null
 
   useEffect(() => {
-    // For alpha, simulated drops are fine to show off the visual
-    const dummy = [
-      { id: "1", player_name: "GeraltOfRivia", card_name: "Ciri: Jovem" },
-      { id: "2", player_name: "Yennefer", card_name: "Vilgefortz" },
-      { id: "3", player_name: "Dandelion", card_name: "Triss Merigold" },
-      { id: "4", player_name: "Foligno", card_name: "Ocultista de Ofier" }
-    ]
-    setDrops(dummy)
+    const fetchDrops = async () => {
+      const { data } = await supabase
+        .from('user_cards')
+        .select(`
+          created_at,
+          profiles:user_id(username),
+          cards:card_id(name, rarity)
+        `)
+        .eq('cards.rarity', 'legendary')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      
+      if (data && data.length > 0) {
+        setDrops(data.map((row: any, i) => ({
+          id: String(i),
+          player_name: row.profiles?.username || 'GeraltOfRivia',
+          card_name: row.cards?.name || 'Ciri: Jovem'
+        })))
+      } else {
+        setDrops([])
+      }
+    }
+    
+    void fetchDrops()
   }, [])
 
   useEffect(() => {

@@ -6,38 +6,30 @@ import { Coins, Gift, PackageOpen, Sparkles } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { GameCard as GameCardType, Rarity } from "@/lib/game-data"
 import { GachaModal } from "./gacha-modal"
+import { useWallet } from "@/components/wallet-provider"
 
 interface PackType { id: string; code: string; name: string; description: string | null; price_coins: number; cards_per_pack: number; is_daily: boolean }
 interface PackResult { card_id: string; name: string; image_url: string; rarity: Rarity; is_golden: boolean }
 
 export function StoreScreen() {
   const [packs, setPacks] = useState<PackType[]>([])
-  const [coins, setCoins] = useState(0)
-  const [lastClaimDate, setLastClaimDate] = useState<string | null>(null)
   const [cards, setCards] = useState<GameCardType[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const { coins, lastClaimDate, refresh: refreshWallet } = useWallet()
 
   const refresh = useCallback(async () => {
-    const userResp = await supabase.auth.getUser()
-    const userId = userResp.data.user?.id
-    if (!userId) return
-
-    const [wallet, packRows] = await Promise.all([
-      supabase.from("player_wallets").select("coins, last_claim_date").eq("user_id", userId).maybeSingle(),
-      supabase.from("pack_types").select("*").eq("is_active", true).eq("is_daily", false).order("price_coins")
-    ])
-
-    let resolvedCoins = 1500
-    if (wallet.data && wallet.data.coins !== null && wallet.data.coins !== undefined) {
-      resolvedCoins = wallet.data.coins
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    setUserId(user.id)
     
-    setCoins(Number(resolvedCoins))
-    setLastClaimDate(wallet.data?.last_claim_date || null)
+    await refreshWallet()
     
+    const packRows = await supabase.from("pack_types").select("*").eq("is_active", true).order("price_coins")
     if (packRows.data) setPacks(packRows.data as PackType[])
-  }, [])
+  }, [refreshWallet])
+  
   useEffect(() => { void refresh() }, [refresh])
 
   const hydrate = async (results: PackResult[]) => {

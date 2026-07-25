@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers } from "lucide-react"
+import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
 import type { Screen } from "@/lib/types"
@@ -16,7 +17,6 @@ interface Stats { wins: number; losses: number; draws: number; ranked_rating: nu
 export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
-  const [coins, setCoins] = useState(0)
   const [cards, setCards] = useState<GameCardType[]>([])
   const [activeTab, setActiveTab] = useState<"library" | "decks">("library")
   const [showAlphaWarning, setShowAlphaWarning] = useState(false)
@@ -29,18 +29,18 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [preMatchMode, setPreMatchMode] = useState<"pvp" | "training" | null>(null)
   const [matchmaking, setMatchmaking] = useState(false)
 
+  const { coins } = useWallet()
+
   useEffect(() => {
     void supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
-      const [profileResult, statsResult, walletResult, cardsResult] = await Promise.all([
+      const [profileResult, statsResult, cardsResult] = await Promise.all([
         supabase.from("profiles").select("username,avatar_url").eq("id", data.user.id).single(),
         supabase.from("my_stats").select("wins,losses,draws,ranked_rating,current_win_streak").maybeSingle(),
-        supabase.from("my_wallet").select("coins").maybeSingle(),
         supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").eq("is_active", true).order("name"),
       ])
       if (profileResult.data) setProfile(profileResult.data)
       if (statsResult.data) setStats(statsResult.data)
-      if (walletResult.data) setCoins(walletResult.data.coins)
       setCards((cardsResult.data ?? []).map((card: any) => ({ id: card.id, nome: card.name, image_url: card.image_url, elemento: card.element as OfficialCardType, raridade: card.rarity as Rarity, tipo: card.element, mana: card.effect_mana_cost, ataque: card.base_power, vida: card.base_max_life, efeito: card.effect_text ?? "", effect_definition: card.card_effects ?? [], is_original_rpg: card.is_original_rpg })))
     })
   }, [])

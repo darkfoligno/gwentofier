@@ -13,6 +13,7 @@ import { PatchNotesScreen } from "@/components/game/patch-notes-screen"
 import { CollectionScreen } from "@/components/game/collection-screen"
 import { DecksScreen } from "@/components/game/decks-screen"
 import { ProfileModal, type ProfileSummary } from "@/components/game/profile-modal"
+import { useWallet } from "@/components/wallet-provider"
 import { Coins, LogOut, UserRound } from "lucide-react"
 import type { Screen } from "@/lib/types"
 import { supabase } from "@/lib/supabase"
@@ -29,8 +30,9 @@ export default function Page() {
   const [session, setSession] = useState<Session | null>(null)
   const [checkingSession, setCheckingSession] = useState(true)
   const [profile, setProfile] = useState<ProfileSummary | null>(null)
-  const [coins, setCoins] = useState(0)
   const [profileOpen, setProfileOpen] = useState(false)
+  
+  const { coins } = useWallet()
 
   useEffect(() => {
     // Check initial session
@@ -56,8 +58,8 @@ export default function Page() {
   }, [])
 
   useEffect(() => {
-    if (!session) { setProfile(null); setCoins(0); return }
-    void Promise.all([supabase.from("profiles").select("username,avatar_url").eq("id", session.user.id).single(), supabase.from("my_wallet").select("coins").maybeSingle()]).then(([profileResult, walletResult]) => { if (profileResult.data) setProfile(profileResult.data); if (walletResult.data) setCoins(walletResult.data.coins) })
+    if (!session) { setProfile(null); return }
+    void Promise.all([supabase.from("profiles").select("username,avatar_url").eq("id", session.user.id).single()]).then(([profileResult]) => { if (profileResult.data) setProfile(profileResult.data); })
   }, [session])
 
   if (checkingSession) return <main className="flex min-h-screen items-center justify-center bg-stone-950 font-serif text-amber-200">Verificando sessão...</main>
