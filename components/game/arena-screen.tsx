@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
@@ -180,7 +180,7 @@ function actionText(action: MatchAction, state: MatchState | null, cards:Visible
   return ""
 }
 
-function effectOutcome(action:MatchAction,cards:VisibleMatchCard[]){const p=action.payload_public??{};const code=String(p.effect_code??"");const result=(p.result??{})as Record<string,unknown>;const inner=(result.result??{})as Record<string,unknown>;const name=(id:unknown)=>cards.find(card=>card.id===id)?.card_data?.nome??"carta registrada";if(code==="common_draw_three_common")return `${String(result.drawn_count??0)} carta(s) comum(ns) saíram do deck para a mão.`;if(code==="common_erinia_exchange")return `${name(result.stolen_card_id)} foi roubada e ${name(result.randomly_discarded_card_id)} foi descartada aleatoriamente.`;if(code==="common_endriuga_scaled_damage")return `${name(result.target_card_id)} recebeu ${String(result.poison_damage??0)} de veneno, calculado sobre ${String(result.enemy_reinforcement_count??0)} reforço(s).`;if(code==="common_henselt_attack_all_life")return `Henselt atacou todas as Cartas de Vida com ${String(result.power_per_target??0)} de poder em cada alvo.`;if(code==="common_night_wraith_silence_hand")return `${name(result.silenced_hand_card_id)} teve seu efeito permanentemente silenciado.`;if(code==="common_keira_replace_life")return `${name(result.replacement_card_id)} saiu do deck e ocupou o slot de Vida ${String(result.life_slot??"?")}.`;if(code==="common_ghoul_group_revive")return `${name(result.returned_card_id)} retornou do cemitério para a mão.`;if(code==="common_elemental_prevent_damage"||code==="common_gargoyle_cancel_single_attack")return `O ataque de ${String(result.cancelled_power??0)} foi integralmente reduzido a zero.`;if(code==="common_troll_discard_draw")return `A mão foi descartada e duas novas cartas foram compradas.`;if(code==="common_berserker_copy_stats")return `Berseker copiou ${String(result.copied_power??0)} de Poder e ${String(result.copied_life??0)} de Vida de ${name(result.copied_card_id)}.`;if(code==="common_puero_destroy_random_legendary")return `${name(result.random_legendary_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_necrophage_destroy_hand")return `${name(result.destroyed_enemy_hand_card_id)} foi destruída na mão por possuir poder abaixo de ${String(result.power_limit??0)}.`;if(code==="common_fairy_extra_draw")return `O saque adicional automático foi mantido enquanto Fada permanecer em campo.`;if(code==="common_shani_redeploy_life")return `Shani substituiu ${name(result.replaced_life_card_id)} no slot ${String(result.life_slot??"?")} e voltou com a Vida cheia.`;if(code==="common_barghest_overkill_to_deck")return `O golpe de ${String(result.incoming_attack_power??0)} ativou Barghest, que retornou embaralhado ao deck.`;if(code==="common_barroso_purge_enemy_hand")return `A mão adversária inteira foi enviada ao cemitério automaticamente.`;if(code==="common_atrocious_ghoul_draw_epic")return `${name(result.drawn_epic_card_id)} foi comprada após Carniçal Atroz sobreviver.`;if(code==="common_beggar_king_destroy_life")return `${name(result.random_destroyed_life_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_cleaver_discard_for_direct")return `O alvo direto foi marcado; agora escolha exatamente três descartes para pagar o ataque.`;if(code==="common_lugos_next_civil_double_power")return result.drawn?`${name(result.top_card_id)} era Cívil, foi comprada e teve o Poder dobrado permanentemente.`:`A carta do topo era ${String(result.top_card_element??"de outro tipo")}; nenhuma carta foi comprada.`;if(code==="common_halmar_coin_attack"){const targets=Object.keys(inner).map(id=>cards.find(card=>card.id===id)).filter((card):card is VisibleMatchCard=>Boolean(card));const names=targets.length?targets.map(card=>card.card_data?.nome??"Carta de Vida misteriosa").join(" e "):"Carta de Vida misteriosa";const backfire=targets.some(card=>card.owner_id===action.actor_user_id);return backfire?`O feitiço saiu pela culatra e atingiu diretamente a Carta de Vida ${names}!`:`A sorte sorriu: o ataque atingiu diretamente a Carta de Vida ${names}!`}if(code==="common_tomira_full_heal"){const target=cards.find(card=>card.id===p.target_card_id);return `A energia mágica restaurou ${target?.card_data?.nome??"a Carta de Vida"} até sua Vida máxima.`}if(result.message)return String(result.message);const target=cards.find(card=>card.id===p.target_card_id);if(target&&/destroy|purge/i.test(code))return `O feitiço despedaçou ${target.card_data?.nome??"a unidade atingida"} e a enviou ao cemitério!`;return `A magia alterou o estado da batalha conforme as condições da carta.`}
+function effectOutcome(action:MatchAction,cards:VisibleMatchCard[]){const p=action.payload_public??{};const code=String(p.effect_code??"");const result=(p.result??{})as Record<string,unknown>;const inner=(result.result??{})as Record<string,unknown>;const name=(id:unknown)=>cards.find(card=>card.id===id)?.card_data?.nome??"carta registrada";if(code==="epic_lambert_mill_random_deck")return `💥 [Lambert] triturou a carta ${String(result.destroyed_card_name??"")} direto do deck para o cemitério!`;if(code==="common_draw_three_common")return `${String(result.drawn_count??0)} carta(s) comum(ns) saíram do deck para a mão.`;if(code==="common_erinia_exchange")return `${name(result.stolen_card_id)} foi roubada e ${name(result.randomly_discarded_card_id)} foi descartada aleatoriamente.`;if(code==="common_endriuga_scaled_damage")return `${name(result.target_card_id)} recebeu ${String(result.poison_damage??0)} de veneno, calculado sobre ${String(result.enemy_reinforcement_count??0)} reforço(s).`;if(code==="common_henselt_attack_all_life")return `Henselt atacou todas as Cartas de Vida com ${String(result.power_per_target??0)} de poder em cada alvo.`;if(code==="common_night_wraith_silence_hand")return `${name(result.silenced_hand_card_id)} teve seu efeito permanentemente silenciado.`;if(code==="common_keira_replace_life")return `${name(result.replacement_card_id)} saiu do deck e ocupou o slot de Vida ${String(result.life_slot??"?")}.`;if(code==="common_ghoul_group_revive")return `${name(result.returned_card_id)} retornou do cemitério para a mão.`;if(code==="common_elemental_prevent_damage"||code==="common_gargoyle_cancel_single_attack")return `O ataque de ${String(result.cancelled_power??0)} foi integralmente reduzido a zero.`;if(code==="common_troll_discard_draw")return `A mão foi descartada e duas novas cartas foram compradas.`;if(code==="common_berserker_copy_stats")return `Berseker copiou ${String(result.copied_power??0)} de Poder e ${String(result.copied_life??0)} de Vida de ${name(result.copied_card_id)}.`;if(code==="common_puero_destroy_random_legendary")return `${name(result.random_legendary_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_necrophage_destroy_hand")return `${name(result.destroyed_enemy_hand_card_id)} foi destruída na mão por possuir poder abaixo de ${String(result.power_limit??0)}.`;if(code==="common_fairy_extra_draw")return `O saque adicional automático foi mantido enquanto Fada permanecer em campo.`;if(code==="common_shani_redeploy_life")return `Shani substituiu ${name(result.replaced_life_card_id)} no slot ${String(result.life_slot??"?")} e voltou com a Vida cheia.`;if(code==="common_barghest_overkill_to_deck")return `O golpe de ${String(result.incoming_attack_power??0)} ativou Barghest, que retornou embaralhado ao deck.`;if(code==="common_barroso_purge_enemy_hand")return `A mão adversária inteira foi enviada ao cemitério automaticamente.`;if(code==="common_atrocious_ghoul_draw_epic")return `${name(result.drawn_epic_card_id)} foi comprada após Carniçal Atroz sobreviver.`;if(code==="common_beggar_king_destroy_life")return `${name(result.random_destroyed_life_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_cleaver_discard_for_direct")return `O alvo direto foi marcado; agora escolha exatamente três descartes para pagar o ataque.`;if(code==="common_lugos_next_civil_double_power")return result.drawn?`${name(result.top_card_id)} era Cívil, foi comprada e teve o Poder dobrado permanentemente.`:`A carta do topo era ${String(result.top_card_element??"de outro tipo")}; nenhuma carta foi comprada.`;if(code==="common_halmar_coin_attack"){const targets=Object.keys(inner).map(id=>cards.find(card=>card.id===id)).filter((card):card is VisibleMatchCard=>Boolean(card));const names=targets.length?targets.map(card=>card.card_data?.nome??"Carta de Vida misteriosa").join(" e "):"Carta de Vida misteriosa";const backfire=targets.some(card=>card.owner_id===action.actor_user_id);return backfire?`O feitiço saiu pela culatra e atingiu diretamente a Carta de Vida ${names}!`:`A sorte sorriu: o ataque atingiu diretamente a Carta de Vida ${names}!`}if(code==="common_tomira_full_heal"){const target=cards.find(card=>card.id===p.target_card_id);return `A energia mágica restaurou ${target?.card_data?.nome??"a Carta de Vida"} até sua Vida máxima.`}if(result.message)return String(result.message);const target=cards.find(card=>card.id===p.target_card_id);if(target&&/destroy|purge/i.test(code))return `O feitiço despedaçou ${target.card_data?.nome??"a unidade atingida"} e a enviou ao cemitério!`;return `A magia alterou o estado da batalha conforme as condições da carta.`}
 
 const zoneNarrative:Record<string,string>={hand:"Mão",life:"Campo de Vida",reinforcement:"Campo de Reforço",attacker:"Campo de Ataque",graveyard:"Cemitério",deck:"Deck"}
 function actionChronicleLines(action:MatchAction,state:MatchState|null,cards:VisibleMatchCard[]){
@@ -370,7 +370,51 @@ export function ArenaScreen() {
     const finish=window.setTimeout(()=>{setScreenShake(false);setShowcase(null)},duration)
     return()=>{window.clearTimeout(impact);window.clearTimeout(finish)}
   },[showcase?.action.id])
-  useEffect(()=>{const action=latestEffectAction;if(!action||action.id<=seenEffect.current)return;seenEffect.current=action.id;const cardId=String(action.payload_public.source_card_id??"");const card=latestBoardCards.current.find(item=>item.id===cardId)??null;const snapshot=(action.payload_public.effect_card??{})as Record<string,unknown>;const snapshotCard=snapshot.name?{id:String(snapshot.id??cardId),nome:String(snapshot.name),image_url:String(snapshot.image_url??""),mana:Number(snapshot.mana??0),ataque:Number(snapshot.power??0),vida:Number(snapshot.life??1),elemento:String(snapshot.element??"Cívil"),tipo:String(snapshot.card_type??snapshot.element??"normal"),raridade:String(snapshot.rarity??"common"),efeito:String(snapshot.effect_text??"")} as NonNullable<VisibleMatchCard["card_data"]>:null;const cardData=card?.card_data??snapshotCard;const player=action.actor_user_id===matchState?.player1_id?matchState.player1_username:matchState?.player2_username;setEffectBanner({player:player??"Jogador",card:cardData?.nome??"Carta",description:cardData?.efeito||effectOutcome(action,latestBoardCards.current),cardData,isMine:action.actor_user_id===userId});const timer=window.setTimeout(()=>{setEffectBanner(null);setVisualCards(latestBoardCards.current);setVisibleLogSequence(previous=>Math.max(previous,action.sequence_number))},3000);return()=>window.clearTimeout(timer)},[latestEffectAction?.id])
+  useEffect(() => {
+    const action = latestEffectAction;
+    if (!action || action.id <= seenEffect.current) return;
+    seenEffect.current = action.id;
+    const cardId = String(action.payload_public.source_card_id ?? "");
+    const card = latestBoardCards.current.find(item => item.id === cardId) ?? null;
+    const snapshot = (action.payload_public.effect_card ?? {}) as Record<string, unknown>;
+    const snapshotCard = snapshot.name ? {
+      id: String(snapshot.id ?? cardId),
+      nome: String(snapshot.name),
+      image_url: String(snapshot.image_url ?? ""),
+      mana: Number(snapshot.mana ?? 0),
+      ataque: Number(snapshot.power ?? 0),
+      vida: Number(snapshot.life ?? 1),
+      elemento: String(snapshot.element ?? "Cívil"),
+      tipo: String(snapshot.card_type ?? snapshot.element ?? "normal"),
+      raridade: String(snapshot.rarity ?? "common"),
+      efeito: String(snapshot.effect_text ?? "")
+    } as NonNullable<VisibleMatchCard["card_data"]> : null;
+    const cardData = card?.card_data ?? snapshotCard;
+    const player = action.actor_user_id === matchState?.player1_id ? matchState.player1_username : matchState?.player2_username;
+
+    setEffectBanner({
+      player: player ?? "Jogador",
+      card: cardData?.nome ?? "Carta",
+      description: cardData?.efeito || effectOutcome(action, latestBoardCards.current),
+      cardData,
+      isMine: action.actor_user_id === userId
+    });
+
+    const resultPayload = action.payload_public?.result as any;
+    if (resultPayload && resultPayload.destroyed_card_name) {
+      setEffectMessage(`💥 [Lambert] triturou a carta ${resultPayload.destroyed_card_name} direto do deck para o cemitério!`);
+      setTimeout(() => {
+        setEffectMessage(prev => prev && prev.includes("triturou") ? null : prev);
+      }, 5000);
+    }
+
+    const timer = window.setTimeout(() => {
+      setEffectBanner(null);
+      setVisualCards(latestBoardCards.current);
+      setVisibleLogSequence(previous => Math.max(previous, action.sequence_number));
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [latestEffectAction?.id])
   useEffect(()=>{
     const action=latestResolvedAction;if(!action||action.id<=seenCombat.current)return;seenCombat.current=action.id
     const payload=action.payload_public??{};const reinforcements=Array.isArray(payload.reinforcements)?payload.reinforcements as Array<Record<string,unknown>>:[];const life=payload.life&&typeof payload.life==="object"?payload.life as Record<string,unknown>:null;const steps:Array<Record<string,unknown>&{originalZone:MatchCardZone}>=[...reinforcements.map(item=>({...item,originalZone:"reinforcement" as MatchCardZone})),...(life?[{...life,originalZone:"life" as MatchCardZone}]:[])]
@@ -393,16 +437,55 @@ export function ArenaScreen() {
     void run();return()=>{cancelled=true;setScreenShake(false);setCombatSequenceActive(false);setCollisionStage(null);setVisualCards(latestBoardCards.current)}
   },[latestResolvedAction?.id])
 
-  useEffect(()=>{
-    /* [V39] REMOVIDO AUTO-RESCUE WATCHDOG DO BOT A PEDIDO DO USUÁRIO */
-  },[isActionPending,isCurrentPlayer,isTraining,matchState?.engine_state,matchState?.match_version,matchState?.status,pendingAttack?.id,sandbox])
-  useEffect(()=>{
-    /* [V39] REMOVIDO AUTO-REACTION DO BOT. DEVE SER MANUAL. */
-  },[isActionPending,isTraining,matchState?.match_version,pendingAttack?.id,pendingAttack?.status,userId,sandbox])
+  useEffect(() => {
+    if (!isTraining || !matchState || matchState.status !== "in_progress" || matchState.engine_state !== "turn_action") return;
+    if (matchState.current_player_id !== opponentId) return;
+    if (botRunning.current || isActionPending) return;
+
+    let active = true;
+    const runBot = async () => {
+      botRunning.current = true;
+      console.log("[TREINO-BOT] 🤖 Iniciando ação do Bot local...");
+      await sleep(1000);
+      if (!active) return;
+      try {
+        await duel.runTrainingBotTurn();
+        await duel.refresh();
+      } catch (err) {
+        console.error("[TREINO-BOT] ❌ Erro na ação do Bot:", err);
+      } finally {
+        botRunning.current = false;
+      }
+    };
+    void runBot();
+    return () => { active = false; };
+  }, [isTraining, matchState?.status, matchState?.engine_state, matchState?.current_player_id, opponentId, isActionPending]);
+
+  useEffect(() => {
+    if (!isTraining || !pendingAttack || pendingAttack.status !== "awaiting_reaction") return;
+    if (pendingAttack.defender_user_id !== opponentId) return;
+    if (botRunning.current || isActionPending) return;
+
+    let active = true;
+    const runBotReaction = async () => {
+      botRunning.current = true;
+      console.log("[TREINO-BOT] 🛡️ Iniciando reação defensiva do Bot local...");
+      await sleep(1000);
+      if (!active) return;
+      try {
+        await duel.autoResolveTrainingAttack(matchState?.match_version ?? 0);
+        await duel.refresh();
+      } catch (err) {
+        console.error("[TREINO-BOT] ❌ Erro na reação do Bot:", err);
+      } finally {
+        botRunning.current = false;
+      }
+    };
+    void runBotReaction();
+    return () => { active = false; };
+  }, [isTraining, pendingAttack?.status, pendingAttack?.defender_user_id, opponentId, matchState?.match_version, isActionPending]);
+
   useEffect(()=>{const suppressed=Boolean(pendingAttack?.result?.suppress_reinforcement_reaction);if(!pendingAttack||pendingAttack.defender_user_id!==userId||pendingAttack.status!=="awaiting_reaction"||!suppressed||isActionPending||suppressedReactionHandled.current===pendingAttack.id)return;suppressedReactionHandled.current=pendingAttack.id;setEffectMessage("🐗 O ataque do Javali suprimiu a revelação e toda reação defensiva. Resolvendo impacto…");void duel.declineAttackReaction().then(()=>duel.refresh()).catch(error=>{suppressedReactionHandled.current=null;setEffectMessage(error?.message??"Falha ao resolver o ataque sem reação.")})},[isActionPending,pendingAttack?.id,pendingAttack?.status,pendingAttack?.defender_user_id,pendingAttack?.result,userId])
-  useEffect(()=>{
-    /* [V39] REMOVIDO AUTO-TRIGGER DO BOT. DEVE SER MANUAL. */
-  },[isActionPending,isTraining,matchState?.engine_state,matchState?.match_version,pendingCardTrigger?.id,sandbox])
 
   useEffect(() => {
     /* [V39] REMOVIDO EXPIRE TURN AUTO. DEVE SER MANUAL PELO USUÁRIO */
