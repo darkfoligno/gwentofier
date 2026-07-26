@@ -66,7 +66,7 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
   const fetchMatchState = useCallback(async () => {
     if (!validMatch) return
     const [matchResult, publicResult, trainingResult,usageResult] = await Promise.all([
-      supabase.from("matches").select("id,status,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result,engine_state").eq("id", matchId).single(),
+      supabase.from("matches").select("id,status,match_type,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result,engine_state").eq("id", matchId).single(),
       supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
       supabase.from("training_matches").select("match_id").eq("match_id", matchId).maybeSingle(),
       supabase.rpc("get_my_turn_usage",{p_match_id:matchId}),

@@ -19,19 +19,18 @@ export function GlobalMarquee() {
   useEffect(() => {
     async function loadTicker() {
       try {
-        const { data, error } = await supabase.rpc('get_recent_legendary_pulls')
-        if (error) throw error
-        if (data && data.length > 0) {
-          setTickerItems(data.map((item: any) => `✨ PARABÉNS! ${item.username.toUpperCase()} ACABA DE TIRAR A CARTA LENDÁRIA « ${item.card_name.toUpperCase()} » 🏆`))
-        } else {
-          setTickerItems(["⚔️ BEM-VINDO À ARENA OFIERI! CONQUISTE GRIMÓRIOS E DESAFIE OPONENTES NA LOJA."])
+        const { data, error } = await supabase.rpc('get_recent_legendary_pulls');
+        if (!error && Array.isArray(data) && data.length > 0) {
+          setTickerItems(data.map((item: any) => `✨ PARABÉNS! ${item.username.toUpperCase()} ACABA DE TIRAR A CARTA LENDÁRIA « ${item.card_name.toUpperCase()} » 🏆`));
+          return;
         }
-      } catch (err) {
-        setTickerItems(["⚔️ BEM-VINDO À ARENA OFIERI! CONQUISTE GRIMÓRIOS E DESAFIE OPONENTES NA LOJA."])
+      } catch (e) {
+        console.error("Erro silencioso no ticker:", e);
       }
+      setTickerItems(["⚔️ BEM-VINDO À ARENA OFIERI! CONQUISTE GRIMÓRIOS E DESAFIE OPONENTES NA LOJA."]);
     }
-    loadTicker()
-  }, [])
+    loadTicker();
+  }, []);
 
   useEffect(() => {
     if (tickerItems.length <= 1) return

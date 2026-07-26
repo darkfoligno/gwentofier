@@ -9,6 +9,7 @@ export type MatchEngineState = "lifecycle" | "ban_phase" | "setup" | "turn_actio
 export interface MatchRow {
   id: string
   status: MatchStatus
+  match_type: string
   active_player_id: string | null
   winner_id: string | null
   current_turn: number
