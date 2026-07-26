@@ -50,7 +50,8 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const searchOpponent = async (deckId: string, isMobile: boolean) => {
     setMatchmaking(true); setError(null)
     try {
-      const { data: queueId, error: queueError } = await supabase.rpc("enqueue_matchmaking", { p_deck_id: deckId, p_match_type: "friendly" })
+      const cleanDeckId = deckId === "SYSTEM_GENERATED" ? "00000000-0000-0000-0000-000000000000" : deckId
+      const { data: queueId, error: queueError } = await supabase.rpc("enqueue_matchmaking", { p_deck_id: cleanDeckId, p_match_type: "friendly" })
       if (queueError) throw queueError
       setError(`Busca iniciada com sucesso. Fila: ${queueId}. (Mobile: ${isMobile})`)
       if (isMobile) window.localStorage.setItem('arena_mobile', 'true');
