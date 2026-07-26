@@ -234,7 +234,8 @@ export function ArenaScreen() {
   const [combatSequenceActive,setCombatSequenceActive]=useState(false)
   const [collisionStage,setCollisionStage]=useState<{phase:"strike"|"reveal"|"impact"|"destroy";cardId:string;name:string;damage:number;finalHp:number}|null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  const botRunning = useRef(false)
+  const botActionRunning = useRef(false)
+  const botReactionRunning = useRef(false)
   const isRescuing = useRef(false)
   const rescueUnlockTimer = useRef<number | null>(null)
   const setupTimer=useRef<number|null>(null)
@@ -412,7 +413,7 @@ export function ArenaScreen() {
       setEffectBanner(null);
       setVisualCards(latestBoardCards.current);
       setVisibleLogSequence(previous => Math.max(previous, action.sequence_number));
-    }, 3000);
+    }, 5000);
     return () => window.clearTimeout(timer);
   }, [latestEffectAction?.id])
   useEffect(()=>{
@@ -423,14 +424,14 @@ export function ArenaScreen() {
     const run=async()=>{
       setCombatSequenceActive(true)
       setVisualCards(()=>{const latest=[...latestBoardCards.current];for(const item of steps){const id=String(item.card_id??"");const index=latest.findIndex(card=>card.id===id);if(index>=0)latest[index]={...latest[index],zone:item.originalZone,zone_position:Number(item.position??1),slot_index:Number(item.position??1),current_life:Number(item.initial_hp??item.life_before??latest[index].maximum_life??0),is_face_up:item.originalZone==="life"}}return latest})
-      await sleep(2000)
+      await sleep(3500)
       for(const item of steps){if(cancelled)return;const id=String(item.card_id??"");const frozenResult=(item.result??{})as Record<string,unknown>;const finalHp=Number(item.final_hp??frozenResult.current_life??0);const damage=Number(item.damage_dealt??item.damage_received??Math.max(0,Number(item.initial_hp??item.life_before??0)-finalHp));const name=String(item.card_name??latestBoardCards.current.find(card=>card.id===id)?.card_data?.nome??"Carta")
-        setCollisionStage({phase:"strike",cardId:id,name,damage,finalHp});await sleep(500);if(cancelled)return
+        setCollisionStage({phase:"strike",cardId:id,name,damage,finalHp});await sleep(2000);if(cancelled)return
         const revealSuppressed=Boolean(item.reveal_suppressed)
-        if(item.originalZone==="reinforcement"&&!revealSuppressed){setCollisionStage({phase:"reveal",cardId:id,name,damage,finalHp});setVisualCards(previous=>previous.map(card=>card.id===id?{...card,is_face_up:true}:card));await sleep(2500);if(cancelled)return}
-        setCollisionStage({phase:"impact",cardId:id,name:revealSuppressed?"Reforço oculto":name,damage,finalHp});setScreenShake(true);setVisualCards(previous=>previous.map(card=>card.id===id?{...card,current_life:finalHp,is_face_up:revealSuppressed?card.is_face_up:true}:card));setVisibleLogSequence(previous=>Math.max(previous,action.sequence_number));await sleep(1500);setScreenShake(false);if(cancelled)return
-        if(finalHp<=0){setCollisionStage({phase:"destroy",cardId:id,name,damage,finalHp});await sleep(700);setVisualCards(previous=>{const finalCard=latestBoardCards.current.find(card=>card.id===id);return [...previous.filter(card=>card.id!==id),...(finalCard?[finalCard]:[])]})}
-        setCollisionStage(null);await sleep(500)
+        if(item.originalZone==="reinforcement"&&!revealSuppressed){setCollisionStage({phase:"reveal",cardId:id,name,damage,finalHp});setVisualCards(previous=>previous.map(card=>card.id===id?{...card,is_face_up:true}:card));await sleep(4000);if(cancelled)return}
+        setCollisionStage({phase:"impact",cardId:id,name:revealSuppressed?"Reforço oculto":name,damage,finalHp});setScreenShake(true);setVisualCards(previous=>previous.map(card=>card.id===id?{...card,current_life:finalHp,is_face_up:revealSuppressed?card.is_face_up:true}:card));setVisibleLogSequence(previous=>Math.max(previous,action.sequence_number));await sleep(3000);setScreenShake(false);if(cancelled)return
+        if(finalHp<=0){setCollisionStage({phase:"destroy",cardId:id,name,damage,finalHp});await sleep(2200);setVisualCards(previous=>{const finalCard=latestBoardCards.current.find(card=>card.id===id);return [...previous.filter(card=>card.id!==id),...(finalCard?[finalCard]:[])]})}
+        setCollisionStage(null);await sleep(2000)
       }
       if(!cancelled){setVisualCards(latestBoardCards.current);setCombatSequenceActive(false);setCollisionStage(null)}
     }
@@ -440,11 +441,11 @@ export function ArenaScreen() {
   useEffect(() => {
     if (!isTraining || !matchState || matchState.status !== "in_progress" || matchState.engine_state !== "turn_action") return;
     if (matchState.current_player_id !== opponentId) return;
-    if (botRunning.current || isActionPending) return;
+    if (botActionRunning.current || isActionPending) return;
 
     let active = true;
     const runBot = async () => {
-      botRunning.current = true;
+      botActionRunning.current = true;
       console.log("[TREINO-BOT] 🤖 Iniciando ação do Bot local...");
       await sleep(1000);
       if (!active) return;
@@ -454,7 +455,7 @@ export function ArenaScreen() {
       } catch (err) {
         console.error("[TREINO-BOT] ❌ Erro na ação do Bot:", err);
       } finally {
-        botRunning.current = false;
+        botActionRunning.current = false;
       }
     };
     void runBot();
@@ -464,13 +465,13 @@ export function ArenaScreen() {
   useEffect(() => {
     if (!isTraining || !pendingAttack || pendingAttack.status !== "awaiting_reaction") return;
     if (pendingAttack.defender_user_id !== opponentId) return;
-    if (botRunning.current || isActionPending) return;
+    if (botReactionRunning.current || isActionPending) return;
 
     let active = true;
     const runBotReaction = async () => {
-      botRunning.current = true;
+      botReactionRunning.current = true;
       console.log("[TREINO-BOT] 🛡️ Iniciando reação defensiva do Bot local...");
-      await sleep(1000);
+      await sleep(500);
       if (!active) return;
       try {
         await duel.autoResolveTrainingAttack(matchState?.match_version ?? 0);
@@ -478,7 +479,7 @@ export function ArenaScreen() {
       } catch (err) {
         console.error("[TREINO-BOT] ❌ Erro na reação do Bot:", err);
       } finally {
-        botRunning.current = false;
+        botReactionRunning.current = false;
       }
     };
     void runBotReaction();
@@ -684,7 +685,10 @@ export function ArenaScreen() {
         <Zone label="Campo de Defesa do oponente" cards={theirs("reinforcement")} hidden selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} /><Zone label="Cartas de Vida do oponente" cards={theirs("life")} slots={3} danger={Boolean(pendingAttack)} selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} /><Zone label="Campo de Ataque do oponente" cards={theirs("attacker")} selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} />
         <div className="z-40 my-1 flex items-center justify-between gap-3 border-y border-amber-700/50 bg-stone-950/95 px-4 py-2 shadow-2xl">
           <div className="flex items-center gap-2 text-xs"><span className="h-7 w-7 rounded-full border border-blue-300 bg-blue-700 shadow-[0_0_14px_rgba(59,130,246,.8)]" /><b>{theirMana}</b><span className="text-stone-500">Rival</span></div>
-          <div className={`rounded px-3 py-1 text-center text-xs font-black ${isCurrentPlayer ? "bg-emerald-950 text-emerald-200 ring-1 ring-emerald-400" : "bg-red-950 text-red-200 ring-1 ring-red-500"}`}><span className="block">{matchState?.engine_state==="reaction_window"?"JANELA DE REAÇÃO":matchState?.engine_state==="resolving"?"RESOLVENDO COMBATE":isCurrentPlayer?"SUA VEZ":`VEZ DE ${isPlayer1 ? matchState?.player2_username : matchState?.player1_username}`}</span><span className="block font-serif text-[10px] text-yellow-100">[ ⏳ TURNO GLOBAL: {matchState?.current_turn??0} | RODADA ATUAL: {Math.max(1,Math.ceil((matchState?.current_turn??1)/2))} ]</span><span className="block text-[9px] text-cyan-200">[ ⚡ MANA {isPlayer1?matchState?.player1_username:matchState?.player2_username}: {myMana}/{isPlayer1?matchState?.player1_max_mana:matchState?.player2_max_mana} | ⚡ MANA RIVAL: {theirMana}/{isPlayer1?matchState?.player2_max_mana:matchState?.player1_max_mana} ]</span><span className="text-amber-200"><Hourglass className="mr-1 inline" size={13} />Iniciativa: {matchState?.active_player_id===matchState?.player1_id?matchState?.player1_username:matchState?.player2_username}</span>{matchState?.initiative_result?.player1 && matchState.current_turn===1 && <small className="block text-stone-400">D20: {matchState.initiative_result.player1} × {matchState.initiative_result.player2}</small>}</div>
+          <div className={`rounded px-3 py-1 text-center text-xs font-black ${isCurrentPlayer ? "bg-emerald-950 text-emerald-200 ring-1 ring-emerald-400" : "bg-red-950 text-red-200 ring-1 ring-red-500"}`}>
+            <span className="block">{matchState?.engine_state==="reaction_window"?"JANELA DE REAÇÃO":matchState?.engine_state==="resolving"?"RESOLVENDO COMBATE":isCurrentPlayer?"SUA VEZ":`VEZ DE ${isPlayer1 ? matchState?.player2_username : matchState?.player1_username}`}</span>
+            <span className="block font-serif text-[10px] text-yellow-100">[ ⏳ TURNO GLOBAL: {matchState?.current_turn??0} | RODADA ATUAL: {Math.max(1,Math.ceil((matchState?.current_turn??1)/2))} ]</span>
+          </div>
           <div className="flex items-center gap-2">{isCurrentPlayer?<>{(matchState?.my_actions_this_turn??0)===0&&!attackers.length&&<button onClick={passTurnWithoutActing} disabled={matchState?.engine_state!=="turn_action"||isActionPending} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-blue-400 bg-blue-900 text-blue-100 disabled:opacity-40">⏭️ PASSAR</button>}<button onClick={()=>setPreCombatOpen(true)} disabled={matchState?.engine_state!=="turn_action"||isActionPending||((matchState?.my_actions_this_turn??0)===0&&!attackers.length&&!turnEffectCards.length)} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-amber-400 bg-amber-700 text-amber-100 disabled:opacity-35">⚔️ COMBATE{attackers.length?` (${attackers.length})`:""}</button></>:<span className="min-h-[44px] flex items-center px-4 py-2 text-sm rounded-lg border border-stone-700 bg-black/60 font-bold text-stone-500">AGUARDE</span>}<button disabled={!isCurrentPlayer} onClick={()=>void duel.surrenderMatch()} className="min-h-[44px] px-4 py-2 rounded-lg border border-red-800 bg-red-950 text-red-300 disabled:opacity-30 active:scale-95 transition-transform" title="Se render"><Flag size={14}/></button></div>
           <div className="flex items-center gap-2 text-xs"><span className="text-stone-500">Você</span><b>{myMana}</b><span className="h-7 w-7 rounded-full border border-blue-300 bg-blue-700 shadow-[0_0_14px_rgba(59,130,246,.8)]" /></div>
         </div>

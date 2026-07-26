@@ -196,7 +196,13 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       throw readableRpcError(error)
     }
     if (name === "activate_card_effect_v2") {
-      console.log("[ENGINE-EFEITO] ✅ Efeito resolvido com sucesso! Pilha atualizada:", data);
+      const cardId = clean.p_source_card_id;
+      const card = boardCards.find(c => c.id === cardId);
+      const nameOrId = card?.card_data?.nome || cardId;
+      const order = clean.p_effect_order || 1;
+      const targetId = clean.p_target_card_id || "Nenhum";
+      const stateVersion = (data as any)?.state_version || (data as any)?.stateVersion || "Desconhecido";
+      console.log(`[EFEITO ATIVADO] ✨ Carta: ${nameOrId} | Ordem: ${order} | Alvo: ${targetId} | Status: SUCESSO | Versão do Estado: ${stateVersion}`);
     }
     return data as T
     } finally {
