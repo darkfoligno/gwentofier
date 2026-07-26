@@ -198,15 +198,12 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
     if (name === "activate_card_effect_v2") {
       console.log("[ENGINE-EFEITO] ✅ Efeito resolvido com sucesso! Pilha atualizada:", data);
     }
-    if (isTraining) {
-      await refresh()
-    }
     return data as T
     } finally {
       actionPending.current = false
       if (mounted.current) setIsActionPending(false)
     }
-  }, [matchId, refresh, boardCards, isTraining, matchState?.match_version])
+  }, [matchId, refresh, boardCards])
 
   const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
     p_match_id: requiredUuid(matchId,"p_match_id"),
@@ -275,25 +272,15 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       return res
     },
     submitSetup: async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
-      if (isTraining) {
-        const res = await rpc("submit_training_setup", {
-          p_match_id: matchId,
-          p_life_card_ids: lifeCardIds,
-          p_reinforcement_card_ids: reinforcementCardIds,
-          p_expected_version: matchState?.match_version ?? 0
-        })
-        await refresh()
-        return res
-      } else {
-        const res = await rpc("submit_match_setup", {
-          p_match_id: matchId,
-          p_life_card_ids: lifeCardIds,
-          p_reinforcement_card_ids: reinforcementCardIds,
-          p_expected_version: matchState?.match_version ?? 0
-        })
-        await refresh()
-        return res
-      }
+      // Modo Treino / Teste usa exclusivamente a função de match setup universal unificada sem sobrecarga
+      const res = await rpc("submit_match_setup", {
+        p_match_id: matchId,
+        p_life_card_ids: lifeCardIds,
+        p_reinforcement_card_ids: reinforcementCardIds,
+        p_expected_version: matchState?.match_version ?? 0
+      })
+      await refresh()
+      return res
     },
     playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
     replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
