@@ -273,4 +273,75 @@ BEGIN
 END;
 $$;
 
+-- 6. Recreate game_private.snapshot_random_training_deck without initial_deck_position
+CREATE OR REPLACE FUNCTION game_private.snapshot_random_training_deck(
+    p_match_id uuid,
+    p_user_id uuid,
+    p_size integer
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    deck_id uuid;
+BEGIN
+    IF p_size <> 40 THEN RAISE EXCEPTION 'TRAINING_DECK_SIZE_MUST_BE_40'; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.cards WHERE is_active) THEN RAISE EXCEPTION 'CARD_CATALOG_EMPTY'; END IF;
+    
+    INSERT INTO public.match_decks(match_id, user_id, total_cards, golden_cards_count)
+    VALUES (p_match_id, p_user_id, p_size, 0) RETURNING id INTO deck_id;
+
+    INSERT INTO public.match_deck_cards(
+        match_deck_id, source_card_id, card_version, card_name, image_url,
+        element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier,
+        leader_cooldown, effect_definition, copy_number
+    )
+    SELECT deck_id, c.id, c.version, c.name, c.image_url, c.element, c.rarity, c.card_type, c.is_golden,
+           c.base_power, c.base_max_life, c.effect_mana_cost, c.tier, c.leader_cooldown,
+           coalesce(
+               (
+                   SELECT jsonb_agg(
+                       jsonb_build_object(
+                           'effect_order', e.effect_order,
+                           'trigger_type', e.trigger_type,
+                           'effect_code', e.effect_code,
+                           'target_mode', e.target_mode,
+                           'parameters', e.parameters,
+                           'priority', e.priority,
+                           'is_reaction', e.is_reaction,
+                           'once_per_turn', e.once_per_turn
+                       ) ORDER BY e.effect_order
+                   )
+                   FROM public.card_effects e 
+                   WHERE e.card_id = c.id AND e.is_active = true
+               ),
+               '[]'::jsonb
+           ),
+           gs.n
+    FROM generate_series(1, p_size) gs(n)
+    CROSS JOIN LATERAL (
+        SELECT x.* 
+        FROM public.cards x 
+        WHERE x.is_active AND x.card_type = 'normal'
+        ORDER BY md5(x.id::text || gs.n::text || random()::text) 
+        LIMIT 1
+    ) c;
+
+    INSERT INTO public.match_cards(
+        match_id, owner_user_id, controller_user_id, match_deck_card_id,
+        source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power,
+        maximum_power, current_life, maximum_life
+    )
+    SELECT p_match_id, p_user_id, p_user_id, d.id, d.source_card_id,
+           'deck', row_number() over (order by random()), false,
+           d.base_power, d.base_max_life, d.base_power, d.base_power, d.base_max_life, d.base_max_life
+    FROM public.match_deck_cards d 
+    WHERE d.match_deck_id = deck_id;
+
+    RETURN deck_id;
+END;
+$$;
+
 COMMIT;
