@@ -27,7 +27,7 @@ export function StoreScreen() {
     await refreshWallet()
     
     const packRows = await supabase.from("pack_types").select("*").eq("is_active", true).order("price_coins")
-    if (packRows.data) setPacks(packRows.data as PackType[])
+    if (packRows.data) setPacks((packRows.data as PackType[]).filter(p => p.price_coins > 0))
   }, [refreshWallet])
   
   useEffect(() => { void refresh() }, [refresh])
@@ -60,13 +60,20 @@ export function StoreScreen() {
   };
   const isDailyAvailable = canClaimDaily();
 
+  const packImages: Record<string, string> = {
+    ofieri_pack: "/images/cards01.png",
+    mirage_pack: "/images/cards02.png",
+    zerrikanea_pack: "/images/card003.png",
+  }
+
   return <main className="relative min-h-screen w-full overflow-x-hidden overflow-y-auto pb-24 bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-fixed bg-center p-6 text-stone-100"><div className="absolute inset-0 bg-black/80 backdrop-blur-[2px]" /><div className="relative mx-auto max-w-7xl">
     <header className="mb-6 flex items-center justify-between rounded-xl border border-amber-600/40 bg-zinc-950/75 p-5"><div><h1 className="font-serif text-3xl font-black text-amber-200">Mercado de Ofier</h1><p className="text-sm text-zinc-400">Relíquias, grimórios e cartas escolhidas pelo destino.</p></div><div className="flex items-center gap-3 rounded-full border border-amber-400/60 bg-black/70 px-5 py-2 shadow-[0_0_20px_rgba(245,158,11,.3)]"><Coins className="text-amber-300" /><strong className="text-xl text-amber-100">{coins.toLocaleString("pt-BR")}</strong></div></header>
     {error && <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 rounded-lg border border-red-500 bg-red-950/80 p-3 text-center font-bold text-red-200">{error}</motion.div>}
     <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="mb-7 flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale"><span className="flex items-center gap-4"><Gift className="text-amber-300" size={35} /><span><b className="block font-serif text-xl text-amber-100">Resgate Diário</b><span className="text-sm text-stone-400">{isDailyAvailable ? "Reivindique sua recompensa gratuita nas Areias." : "Você já resgatou sua recompensa de hoje. Volte amanhã!"}</span></span></span><span className="rounded bg-amber-700 px-5 py-2 text-xs font-black">{busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}</span></button>
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack, index) => {
+    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack) => {
       const canAfford = Number(coins || 0) >= Number(pack.price_coins || 0);
-      return <motion.article key={pack.id} whileHover={canAfford ? { scale: 1.05 } : {}} transition={{ duration: 0.3 }} className={`relative overflow-hidden rounded-xl border-2 bg-zinc-950 p-5 shadow-2xl ${canAfford ? 'border-amber-600/40 hover:border-amber-400' : 'border-zinc-800 opacity-80'}`}><div className={`mb-5 flex h-44 items-center justify-center rounded-lg border bg-[radial-gradient(circle,rgba(120,53,15,0.4),rgba(24,24,27,1)_65%)] ${canAfford ? 'border-amber-700/50' : 'border-zinc-800'}`}>{index === packs.length - 1 ? <Sparkles className={`animate-pulse ${canAfford ? 'text-amber-300' : 'text-zinc-600'}`} size={70} /> : <div className={`font-serif text-6xl ${canAfford ? 'text-amber-300/80' : 'text-zinc-600'}`}>🕮</div>}</div><h2 className={`font-serif text-xl font-black ${canAfford ? 'text-amber-100' : 'text-zinc-500'}`}>{pack.name}</h2><p className="mt-2 min-h-20 text-sm leading-relaxed text-zinc-400">{pack.description ?? ""}</p><div className="mt-5 flex items-center justify-between"><span className={`flex items-center gap-1 text-lg font-black ${canAfford ? 'text-amber-300' : 'text-red-400'}`}><Coins size={18} />{pack.price_coins}</span><button disabled={Boolean(busy) || !canAfford} onClick={() => void purchase(pack)} className={`rounded border px-4 py-2 text-[10px] font-black shadow-[0_0_10px_rgba(245,158,11,0.2)] disabled:opacity-40 ${canAfford ? 'border-amber-400 bg-amber-700 text-amber-50' : 'border-zinc-700 bg-zinc-800 text-zinc-500 shadow-none'}`}>{busy === pack.id ? "ABRINDO..." : "COMPRAR E ABRIR"}</button></div></motion.article>
+      const imgUrl = packImages[pack.code];
+      return <motion.article key={pack.id} whileHover={canAfford ? { scale: 1.05 } : {}} transition={{ duration: 0.3 }} className={`relative overflow-hidden rounded-xl border-2 bg-zinc-950 p-5 shadow-2xl ${canAfford ? 'border-amber-600/40 hover:border-amber-400' : 'border-zinc-800 opacity-80'}`}><div className={`mb-5 flex h-44 items-center justify-center overflow-hidden rounded-lg border bg-[radial-gradient(circle,rgba(120,53,15,0.4),rgba(24,24,27,1)_65%)] ${canAfford ? 'border-amber-700/50' : 'border-zinc-800'}`}>{imgUrl ? <img src={imgUrl} alt={pack.name} className="h-full w-full object-cover" /> : <div className={`font-serif text-6xl ${canAfford ? 'text-amber-300/80' : 'text-zinc-600'}`}>🕮</div>}</div><h2 className={`font-serif text-xl font-black ${canAfford ? 'text-amber-100' : 'text-zinc-500'}`}>{pack.name}</h2><p className="mt-2 min-h-20 text-sm leading-relaxed text-zinc-400">{pack.description ?? ""}</p><div className="mt-5 flex items-center justify-between"><span className={`flex items-center gap-1 text-lg font-black ${canAfford ? 'text-amber-300' : 'text-red-400'}`}><Coins size={18} />{pack.price_coins}</span><button disabled={Boolean(busy) || !canAfford} onClick={() => void purchase(pack)} className={`rounded border px-4 py-2 text-[10px] font-black shadow-[0_0_10px_rgba(245,158,11,0.2)] disabled:opacity-40 ${canAfford ? 'border-amber-400 bg-amber-700 text-amber-50' : 'border-zinc-700 bg-zinc-800 text-zinc-500 shadow-none'}`}>{busy === pack.id ? "ABRINDO..." : "COMPRAR E ABRIR"}</button></div></motion.article>
     })}</div>
   </div><AnimatePresence>{cards && <GachaModal cards={cards} onCollect={() => { setCards(null); void refresh() }} />}</AnimatePresence></main>
 }

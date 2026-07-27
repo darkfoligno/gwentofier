@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState, useMemo } from "react"
-import { Layers, Search, Settings, Save, Swords, Trash2, Plus, Minus, X } from "lucide-react"
+import { Layers, Search, Settings, Save, Swords, Trash2, Plus, Minus, X, Info } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { GameCard as GameCardType, Rarity, OfficialCardType } from "@/lib/game-data"
 import { secureImageUrl } from "@/lib/secure-url"
@@ -19,39 +19,95 @@ export function DecksScreen() {
   const [manaFilter, setManaFilter] = useState<number | null>(null)
   const [inspectedCard, setInspectedCard] = useState<GameCardType | null>(null)
   
+  // Decks States
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null)
   const [deckName, setDeckName] = useState("Novo Deck")
   const [deckCards, setDeckCards] = useState<DeckCard[]>([])
+  const [myDecks, setMyDecks] = useState<Deck[]>([])
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [newDeckName, setNewDeckName] = useState("")
+
+  // Lixeira / Recycle States
+  const [trash, setTrash] = useState<{ [cardId: string]: number }>({})
+  const [showRecycleModal, setShowRecycleModal] = useState(false)
+
+  // Compare Owners States
+  const [comparingCard, setComparingCard] = useState<GameCardType | null>(null)
+  const [cardOwners, setCardOwners] = useState<{ username: string; quantity: number }[]>([])
+  const [loadingOwners, setLoadingOwners] = useState(false)
+
+  const loadDecks = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data, error } = await supabase
+      .from('decks')
+      .select('*, deck_cards(*, cards(*))')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+    
+    if (error) {
+      console.error(error)
+      return
+    }
+    
+    const mapped: Deck[] = (data ?? []).map((d: any) => ({
+      id: d.id,
+      name: d.name,
+      is_valid: d.is_valid,
+      updated_at: d.updated_at,
+      is_active: d.is_favorite || false,
+      deck_cards: (d.deck_cards ?? []).map((dc: any) => ({
+        card_id: dc.card_id,
+        quantity: dc.quantity,
+        card: {
+          id: dc.cards.id,
+          nome: dc.cards.name,
+          image_url: dc.cards.image_url,
+          elemento: dc.cards.element,
+          raridade: dc.cards.rarity,
+          tipo: dc.cards.card_type,
+          mana: dc.cards.effect_mana_cost,
+          ataque: dc.cards.base_power,
+          vida: dc.cards.base_max_life,
+          efeito: dc.cards.effect_text,
+          quantity: 1
+        }
+      }))
+    }))
+    setMyDecks(mapped)
+  }
+
+  const loadInventory = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data: userCards, error: invError } = await supabase
+      .from("user_cards")
+      .select("quantity, cards(id,name,image_url,element,rarity,card_type,base_power,base_max_life,effect_mana_cost,effect_text)")
+      .eq("user_id", user.id)
+      .gt("quantity", 0)
+    
+    if (invError) { setError(invError.message); return }
+    
+    const mapped = (userCards ?? []).map((row: any) => ({
+      id: row.cards.id,
+      nome: row.cards.name,
+      image_url: row.cards.image_url,
+      elemento: row.cards.element,
+      raridade: row.cards.rarity,
+      tipo: row.cards.card_type,
+      mana: row.cards.effect_mana_cost,
+      ataque: row.cards.base_power,
+      vida: row.cards.base_max_life,
+      efeito: row.cards.effect_text,
+      quantity: row.quantity
+    }))
+    setInventory(mapped)
+  }
 
   useEffect(() => {
-    async function loadData() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: userCards, error: invError } = await supabase
-        .from("user_cards")
-        .select("quantity, cards(id,name,image_url,element,rarity,card_type,base_power,base_max_life,effect_mana_cost,effect_text)")
-        .eq("user_id", user.id)
-        .gt("quantity", 0)
-      
-      if (invError) { setError(invError.message); return }
-      
-      const mapped = (userCards ?? []).map((row: any) => ({
-        id: row.cards.id,
-        nome: row.cards.name,
-        image_url: row.cards.image_url,
-        elemento: row.cards.element,
-        raridade: row.cards.rarity,
-        tipo: row.cards.card_type,
-        mana: row.cards.effect_mana_cost,
-        ataque: row.cards.base_power,
-        vida: row.cards.base_max_life,
-        efeito: row.cards.effect_text,
-        quantity: row.quantity
-      }))
-      setInventory(mapped)
-    }
-    void loadData()
+    void loadInventory()
+    void loadDecks()
   }, [])
 
   const filtered = useMemo(() => {
@@ -75,9 +131,13 @@ export function DecksScreen() {
     if (!invItem) return
     const existing = deckCards.find(c => c.card_id === card.id)
     const currentQty = existing?.quantity || 0
-    if (currentQty >= invItem.quantity) return // cannot add more than owned
-    if (currentQty >= 3 && card.raridade !== 'legendary') return // rules
-    if (currentQty >= 1 && card.raridade === 'legendary') return
+    
+    const inTrash = trash[card.id] || 0
+    const available = invItem.quantity - inTrash
+    
+    if (currentQty >= available) return // cannot add more than owned & not trashed
+    if (currentQty >= 3 && card.raridade !== 'legendary') return // rule: max 3 copies of non-legendary
+    if (currentQty >= 1 && card.raridade === 'legendary') return // rule: max 1 copy of legendary
     
     if (existing) {
       setDeckCards(deckCards.map(c => c.card_id === card.id ? { ...c, quantity: c.quantity + 1 } : c))
@@ -96,30 +156,120 @@ export function DecksScreen() {
     }
   }
 
-  const manaCurve = [0,1,2,3,4,5].map(cost => {
-    if (cost === 5) return deckCards.filter(c => c.card.mana >= 5).reduce((s, c) => s + c.quantity, 0)
-    return deckCards.filter(c => c.card.mana === cost).reduce((s, c) => s + c.quantity, 0)
-  })
-  const maxMana = Math.max(...manaCurve, 1)
+  // Lixeira Actions
+  const addToTrash = (card: GameCardType) => {
+    const invItem = inventory.find(i => i.id === card.id)
+    if (!invItem) return
+    
+    const inDeck = deckCards.find(c => c.card_id === card.id)?.quantity || 0
+    const inTrash = trash[card.id] || 0
+    
+    if (inTrash + inDeck >= invItem.quantity) {
+      alert("Você não possui cópias livres desta carta no inventário (remova do deck se necessário).")
+      return
+    }
+    
+    setTrash({
+      ...trash,
+      [card.id]: inTrash + 1
+    })
+  }
 
-  const saveDeck = async () => {
+  const removeFromTrash = (cardId: string) => {
+    const inTrash = trash[cardId] || 0
+    if (inTrash <= 1) {
+      const copy = { ...trash }
+      delete copy[cardId]
+      setTrash(copy)
+    } else {
+      setTrash({
+        ...trash,
+        [cardId]: inTrash - 1
+      })
+    }
+  }
+
+  const calculateRecycleValue = () => {
+    let total = 0
+    Object.entries(trash).forEach(([cardId, qty]) => {
+      const card = inventory.find(c => c.id === cardId)
+      if (!card) return
+      let value = 0
+      if (card.raridade === 'common') value = 10
+      else if (card.raridade === 'rare') value = 25
+      else if (card.raridade === 'epic') value = 100
+      else if (card.raridade === 'legendary') value = 250
+      total += value * qty
+    })
+    return total
+  }
+
+  const totalTrashCount = Object.values(trash).reduce((sum, qty) => sum + qty, 0)
+
+  const handleRecycleConfirm = async () => {
+    const totalCoins = calculateRecycleValue()
+    if (totalCoins <= 0) return
+    
+    const cardIdsArray: string[] = []
+    Object.entries(trash).forEach(([cardId, qty]) => {
+      for (let i = 0; i < qty; i++) {
+        cardIdsArray.push(cardId)
+      }
+    })
+    
+    try {
+      const { error } = await supabase.rpc('recycle_user_cards', { p_card_ids: cardIdsArray })
+      if (error) throw error
+      
+      alert(`Sucesso! Você reciclou ${totalTrashCount} carta(s) e ganhou +${totalCoins} moedas!`)
+      setTrash({})
+      setShowRecycleModal(false)
+      
+      // Reload inventory data
+      void loadInventory()
+      
+      // Refresh global layout coins by reloading window safely
+      window.location.reload()
+    } catch (err: any) {
+      alert("Erro ao reciclar: " + err.message)
+    }
+  }
+
+  // Compare Owners Action
+  const handleCompare = async (card: GameCardType) => {
+    setComparingCard(card)
+    setLoadingOwners(true)
+    setCardOwners([])
+    try {
+      const { data, error } = await supabase.rpc('get_card_owners', { p_card_id: card.id })
+      if (error) throw error
+      setCardOwners(data || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingOwners(false)
+    }
+  }
+
+  // Save Deck Actions
+  const handleSaveDeckConfirm = async () => {
+    if (!newDeckName.trim()) {
+      alert("Por favor, digite um nome para o deck.")
+      return
+    }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     
     const total = deckCards.reduce((sum, c) => sum + c.quantity, 0)
-    if (total < 20 || total > 40) {
-      alert("O deck deve conter entre 20 e 40 cartas.")
-      return
-    }
-
+    
     try {
       let deckId = activeDeck?.id;
       if (!deckId) {
-        const { data, error } = await supabase.from('decks').insert({ user_id: user.id, name: deckName, total_cards: total, is_valid: true }).select().single()
+        const { data, error } = await supabase.from('decks').insert({ user_id: user.id, name: newDeckName, total_cards: total, is_valid: true }).select().single()
         if (error) throw error
         deckId = data.id
       } else {
-        const { error } = await supabase.from('decks').update({ name: deckName, total_cards: total, is_valid: true }).eq('id', deckId)
+        const { error } = await supabase.from('decks').update({ name: newDeckName, total_cards: total, is_valid: true }).eq('id', deckId)
         if (error) throw error
       }
 
@@ -131,23 +281,138 @@ export function DecksScreen() {
         if (cErr) throw cErr
       }
       
-      alert("Deck salvo com sucesso no Grimório!")
-      setActiveDeck({ id: deckId as string, name: deckName, is_valid: true, updated_at: new Date().toISOString(), is_active: false, deck_cards: deckCards })
+      alert("Deck montado e salvo com sucesso!")
+      setShowSaveModal(false)
+      setActiveDeck({ id: deckId as string, name: newDeckName, is_valid: true, updated_at: new Date().toISOString(), is_active: false, deck_cards: deckCards })
+      void loadDecks()
     } catch (err: any) {
       console.error(err)
       alert("Erro ao salvar deck: " + err.message)
     }
   }
 
+  const editDeck = (deck: Deck) => {
+    setActiveDeck(deck)
+    setDeckName(deck.name)
+    setDeckCards(deck.deck_cards)
+  }
+
+  const deleteDeck = async (deckId: string) => {
+    if (!confirm("Tem certeza que deseja deletar este deck?")) return
+    try {
+      const { error: dcError } = await supabase.from('deck_cards').delete().eq('deck_id', deckId)
+      if (dcError) throw dcError
+      const { error: dError } = await supabase.from('decks').delete().eq('id', deckId)
+      if (dError) throw dError
+      
+      alert("Deck deletado com sucesso!")
+      if (activeDeck?.id === deckId) {
+        setActiveDeck(null)
+        setDeckCards([])
+        setDeckName("Novo Deck")
+      }
+      void loadDecks()
+    } catch (err: any) {
+      alert("Erro ao deletar deck: " + err.message)
+    }
+  }
+
+  const manaCurve = [0,1,2,3,4,5].map(cost => {
+    if (cost === 5) return deckCards.filter(c => c.card.mana >= 5).reduce((s, c) => s + c.quantity, 0)
+    return deckCards.filter(c => c.card.mana === cost).reduce((s, c) => s + c.quantity, 0)
+  })
+  const maxMana = Math.max(...manaCurve, 1)
+
   return (
     <main className="min-h-screen bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-fixed bg-center p-6 pt-20 text-stone-100">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-[4px]" />
       <div className="relative mx-auto grid max-w-[1800px] grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Painel Esquerdo - Inventário */}
-        <section className="lg:col-span-8">
-          <header className="mb-6 rounded-xl border border-amber-600/30 bg-zinc-950/80 p-5 shadow-xl">
-            <h1 className="font-serif text-3xl font-black text-amber-400">Grimório de Decks</h1>
-            <p className="mb-4 text-sm text-zinc-400">Monte suas estratégias com as cartas do seu Acervo Pessoal.</p>
+        
+        {/* Painel Esquerdo (Lixeira / Reciclagem Mística) - lg:col-span-3 */}
+        <section className="lg:col-span-3">
+          <div className="rounded-xl border border-amber-600/30 bg-zinc-950/85 p-5 shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-amber-500/20 pb-3 mb-4">
+              <Trash2 className="text-red-400" size={20} />
+              <h2 className="font-serif text-lg font-black text-amber-200 uppercase tracking-widest">Reciclagem Mística</h2>
+            </div>
+            
+            <p className="text-xs text-stone-400 mb-4 leading-relaxed">
+              Arraste cartas ou clique em <Trash2 className="inline text-red-500 mx-0.5" size={12} /> para converter suas cartas extras em moedas de Ofier.
+            </p>
+            
+            {/* Tabela de Valores */}
+            <div className="bg-black/40 border border-amber-900/20 rounded-lg p-3 text-xs mb-5 space-y-1 font-serif text-stone-300">
+              <div className="flex justify-between">
+                <span>🟢 Comum</span>
+                <span className="text-emerald-400 font-mono font-bold">+10 moedas</span>
+              </div>
+              <div className="flex justify-between">
+                <span>🔵 Rara</span>
+                <span className="text-blue-400 font-mono font-bold">+25 moedas</span>
+              </div>
+              <div className="flex justify-between">
+                <span>🟣 Épica</span>
+                <span className="text-purple-400 font-mono font-bold">+100 moedas</span>
+              </div>
+              <div className="flex justify-between">
+                <span>🟡 Lendária</span>
+                <span className="text-amber-400 font-mono font-bold">+250 moedas</span>
+              </div>
+            </div>
+
+            {/* Lista da Lixeira */}
+            <h4 className="text-[10px] font-serif font-bold text-amber-500 uppercase tracking-widest mb-2">Cartas na Lixeira ({totalTrashCount})</h4>
+            <div className="max-h-[220px] overflow-y-auto space-y-1.5 mb-5 pr-1.5 border border-zinc-900 rounded p-2 bg-black/20">
+              {Object.keys(trash).length === 0 ? (
+                <p className="text-xs text-zinc-600 text-center py-6">Lixeira vazia.</p>
+              ) : (
+                Object.entries(trash).map(([cardId, qty]) => {
+                  const card = inventory.find(c => c.id === cardId)
+                  if (!card) return null
+                  return (
+                    <div key={cardId} className="flex justify-between items-center bg-stone-900/60 border border-zinc-800 p-2 rounded text-xs transition-colors hover:border-red-950">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-stone-200 truncate max-w-[130px]">{card.nome}</span>
+                        <span className="text-[9px] text-zinc-500 uppercase font-serif">{card.raridade}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold font-mono text-amber-200">x{qty}</span>
+                        <button onClick={() => removeFromTrash(cardId)} className="p-1 rounded bg-red-950/40 text-red-400 hover:bg-red-900 hover:text-red-200 transition-colors">
+                          <Minus size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Ganhos e Confirmar */}
+            <div className="border-t border-amber-900/20 pt-4">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-xs font-serif text-stone-400">Ganhos Estimados:</span>
+                <span className="text-sm font-mono font-bold text-emerald-400">+{calculateRecycleValue()} moedas</span>
+              </div>
+              <button
+                disabled={totalTrashCount === 0}
+                onClick={() => setShowRecycleModal(true)}
+                className={`w-full py-2.5 rounded font-serif font-black text-xs uppercase tracking-widest transition-all duration-300 border ${
+                  totalTrashCount === 0 
+                    ? 'border-stone-850 bg-stone-900/30 text-stone-600 cursor-not-allowed opacity-50' 
+                    : 'border-red-500 bg-red-950/80 hover:bg-red-900 text-red-200 hover:text-white shadow-[0_0_10px_rgba(220,38,38,0.2)]'
+                }`}
+              >
+                Reciclar Cartas
+              </button>
+            </div>
+          </div>
+        </section>
+
+        {/* Painel Central - Acervo Pessoal (lg:col-span-6) */}
+        <section className="lg:col-span-6">
+          <header className="mb-6 rounded-xl border border-amber-600/30 bg-zinc-950/85 p-5 shadow-xl">
+            <h1 className="font-serif text-3xl font-black text-amber-400">Minhas Cartas</h1>
+            <p className="mb-4 text-sm text-zinc-400">Monte decks com as cartas que você tem disponível</p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
@@ -171,15 +436,30 @@ export function DecksScreen() {
               <p>Seu acervo está vazio. Vá até o Mercado de Ofier para adquirir pacotes.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 xl:grid-cols-10">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-7">
               {filtered.map(card => {
                 const countInDeck = deckCards.find(dc => dc.card_id === card.id)?.quantity || 0
+                const inTrash = trash[card.id] || 0
+                const available = card.quantity - inTrash
                 return (
                   <div key={card.id} className="group relative cursor-pointer" onClick={() => setInspectedCard(card)}>
-                    <img src={secureImageUrl(card.image_url)} alt={card.nome} className="aspect-[2/3] w-full rounded-md object-cover shadow-md border border-stone-800 transition-all group-hover:scale-105 group-hover:border-amber-500 group-hover:shadow-amber-500/20" />
-                    <div className="absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-950 text-xs font-black text-amber-400 shadow-lg">{card.quantity}</div>
+                    <img src={secureImageUrl(card.image_url)} alt={card.nome} className={`aspect-[2/3] w-full rounded-md object-cover shadow-md border transition-all group-hover:scale-105 group-hover:border-amber-500 group-hover:shadow-amber-500/20 ${available === 0 ? 'border-red-950 opacity-40' : 'border-stone-800'}`} />
                     
-                    {/* Add button direct overlay */}
+                    {/* Badge Quantity Top-Right */}
+                    <div className="absolute -right-1.5 -top-1.5 z-10 flex h-5.5 px-1.5 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-950 text-[10px] font-black text-amber-400 shadow-lg">
+                      x{card.quantity}
+                    </div>
+
+                    {/* Compare Button Top-Left */}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); void handleCompare(card); }} 
+                      className="absolute top-2 left-2 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-blue-500 bg-blue-950/90 text-blue-200 hover:bg-blue-800 hover:text-white transition-all shadow-md opacity-0 group-hover:opacity-100"
+                      title="Comparar Duelistas"
+                    >
+                      <Search size={10} />
+                    </button>
+
+                    {/* Add button direct overlay (Bottom-Right) */}
                     <button 
                       onClick={(e) => { e.stopPropagation(); addCard(card); }} 
                       className="absolute bottom-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-emerald-500 bg-emerald-950/90 text-emerald-200 hover:bg-emerald-800 hover:text-white transition-all shadow-md"
@@ -187,9 +467,25 @@ export function DecksScreen() {
                     >
                       <Plus size={12} />
                     </button>
+
+                    {/* Trash button direct overlay (Bottom-Left) */}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); addToTrash(card); }} 
+                      className="absolute bottom-2 left-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-red-500 bg-red-950/90 text-red-200 hover:bg-red-800 hover:text-white transition-all shadow-md opacity-0 group-hover:opacity-100"
+                      title="Mandar para Lixeira"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+
                     {countInDeck > 0 && (
-                      <div className="absolute left-2 bottom-2 z-20 flex h-5 px-1.5 items-center justify-center rounded border border-amber-500 bg-amber-950/90 text-[10px] font-bold text-amber-300">
-                        {countInDeck} no deck
+                      <div className="absolute left-2 top-10 z-10 flex h-5 px-1.5 items-center justify-center rounded border border-amber-500 bg-amber-950/90 text-[10px] font-bold text-amber-300 shadow-md">
+                        {countInDeck} deck
+                      </div>
+                    )}
+
+                    {inTrash > 0 && (
+                      <div className="absolute left-2 top-16 z-10 flex h-5 px-1.5 items-center justify-center rounded border border-red-500 bg-red-950/90 text-[10px] font-bold text-red-300 shadow-md">
+                        {inTrash} lixo
                       </div>
                     )}
                   </div>
@@ -199,13 +495,23 @@ export function DecksScreen() {
           )}
         </section>
 
-        {/* Painel Direito - Mesa de Edição */}
-        <aside className="lg:col-span-4">
+        {/* Painel Direito - Mesa de Edição e Decks Montados (lg:col-span-3) */}
+        <aside className="lg:col-span-3 space-y-6">
           <div className="sticky top-24 rounded-xl border border-amber-500/20 bg-zinc-950/90 p-5 shadow-2xl">
-            <input value={deckName} onChange={e => setDeckName(e.target.value)} className="w-full bg-transparent font-serif text-2xl font-black text-amber-400 outline-none" />
-            <p className="mt-1 text-sm text-zinc-400">Cartas no deck: <span className={`font-bold ${totalCards < 20 ? 'text-red-400' : 'text-amber-400'}`}>{totalCards}/40</span></p>
+            <div className="flex items-center justify-between gap-2 border-b border-amber-500/10 pb-2 mb-3">
+              <input value={deckName} onChange={e => setDeckName(e.target.value)} className="w-full bg-transparent font-serif text-xl font-black text-amber-400 outline-none" />
+              <button 
+                onClick={() => { setDeckCards([]); setDeckName("Novo Deck"); setActiveDeck(null); }} 
+                className="text-stone-500 hover:text-red-400 text-xs font-serif transition-colors"
+                title="Limpar Deck"
+              >
+                Limpar
+              </button>
+            </div>
+            
+            <p className="text-sm text-zinc-400">Cartas no deck: <span className={`font-bold ${totalCards < 40 ? 'text-red-400' : 'text-amber-400'}`}>{totalCards}/40</span></p>
 
-            <div className="mt-6 flex h-16 items-end gap-1 rounded bg-black/40 p-2">
+            <div className="mt-4 flex h-16 items-end gap-1 rounded bg-black/40 p-2">
               {manaCurve.map((count, i) => (
                 <div key={i} className="group relative flex flex-1 flex-col items-center justify-end">
                   <div className="w-full rounded-t bg-amber-600/80 transition-all hover:bg-amber-400" style={{ height: `${(count / maxMana) * 100}%`, minHeight: count > 0 ? '4px' : '0' }} />
@@ -214,7 +520,7 @@ export function DecksScreen() {
               ))}
             </div>
 
-            <div className="mt-4 flex max-h-[400px] flex-col gap-1 overflow-y-auto pr-2">
+            <div className="mt-4 flex max-h-[250px] flex-col gap-1 overflow-y-auto pr-2">
               {deckCards.map(dc => (
                 <div 
                   key={dc.card_id} 
@@ -223,7 +529,7 @@ export function DecksScreen() {
                 >
                   <div className="flex items-center gap-3">
                     <span className="flex h-6 w-6 items-center justify-center rounded border border-amber-500/30 bg-amber-950 text-xs font-black text-amber-200">{dc.quantity}</span>
-                    <span className="truncate text-sm font-bold text-zinc-200">{dc.card.nome}</span>
+                    <span className="truncate text-sm font-bold text-zinc-200 max-w-[130px]">{dc.card.nome}</span>
                   </div>
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     <span className="font-mono text-xs text-blue-300">{dc.card.mana}M</span>
@@ -231,17 +537,59 @@ export function DecksScreen() {
                   </div>
                 </div>
               ))}
-              {deckCards.length === 0 && <p className="py-10 text-center text-sm text-zinc-600">Adicione cartas do acervo para construir seu deck.</p>}
+              {deckCards.length === 0 && <p className="py-10 text-center text-sm text-zinc-650">Adicione cartas do acervo para construir seu deck.</p>}
             </div>
 
-            <div className="mt-6 flex flex-col gap-2">
-              <button onClick={saveDeck} className="flex items-center justify-center gap-2 rounded border border-amber-600 bg-amber-900/40 py-3 font-bold text-amber-200 shadow-[0_0_15px_rgba(217,119,6,0.15)] hover:bg-amber-800"><Save size={18} /> Salvar no Grimório</button>
-              <button className="flex items-center justify-center gap-2 rounded border border-emerald-600 bg-emerald-900/40 py-3 font-bold text-emerald-200 hover:bg-emerald-800"><Swords size={18} /> Ativar para Combate</button>
-              <button onClick={() => { setDeckCards([]); setDeckName("Novo Deck") }} className="flex items-center justify-center gap-2 rounded border border-zinc-700 bg-zinc-900 py-2 text-sm font-bold text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"><Trash2 size={16} /> Novo Deck / Limpar</button>
+            {/* Montar Deck Button */}
+            <div className="mt-5 pt-3 border-t border-amber-500/10">
+              <button 
+                disabled={totalCards < 40} 
+                onClick={() => { setNewDeckName(deckName); setShowSaveModal(true); }}
+                className={`w-full flex items-center justify-center gap-2 rounded-lg border py-3 font-serif font-black text-xs tracking-widest uppercase transition-all duration-300 ${
+                  totalCards < 40 
+                    ? 'border-stone-850 bg-stone-900/30 text-stone-600 cursor-not-allowed opacity-50' 
+                    : 'border-amber-500 bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] shadow-[0_4px_12px_rgba(0,0,0,0.5)]'
+                }`}
+              >
+                {totalCards < 40 ? `Faltam ${40 - totalCards} cartas` : "Montar Deck"}
+              </button>
+            </div>
+          </div>
+
+          {/* Seção Decks Montados */}
+          <div className="rounded-xl border border-amber-600/20 bg-zinc-950/85 p-5 shadow-2xl">
+            <div className="flex items-center gap-2 border-b border-amber-500/10 pb-2.5 mb-3">
+              <Layers className="text-amber-400" size={18} />
+              <h3 className="font-serif text-sm font-black text-amber-200 uppercase tracking-widest">Decks Salvos</h3>
+            </div>
+            
+            <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+              {myDecks.length === 0 ? (
+                <p className="text-xs text-zinc-600 text-center py-6">Nenhum deck salvo ainda.</p>
+              ) : (
+                myDecks.map(deck => (
+                  <div key={deck.id} className="border border-zinc-800 bg-black/40 rounded-lg p-2.5 flex justify-between items-center transition-colors hover:border-amber-950">
+                    <div>
+                      <h4 className="font-bold text-xs text-stone-200 truncate max-w-[120px]">{deck.name}</h4>
+                      <p className="text-[10px] text-zinc-500">{deck.deck_cards.reduce((sum, c) => sum + c.quantity, 0)} cartas</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => editDeck(deck)} className="px-2 py-1 bg-amber-950/40 hover:bg-amber-900/80 text-amber-300 border border-amber-700/30 text-[9px] font-black uppercase rounded transition-colors">
+                        Editar
+                      </button>
+                      <button onClick={() => deleteDeck(deck.id)} className="px-2 py-1 bg-red-950/40 hover:bg-red-900/80 text-red-300 border border-red-700/30 text-[9px] font-black uppercase rounded transition-colors">
+                        Deletar
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </aside>
       </div>
+
+      {/* Modal Zoom/Inspeção Split-panel */}
       {inspectedCard && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md" onClick={() => setInspectedCard(null)}>
           <div className="relative w-[750px] max-w-[95vw] rounded-2xl border-2 border-amber-500/60 bg-stone-900 shadow-2xl p-6 flex flex-col md:flex-row gap-6 items-center md:items-start text-stone-100" onClick={e => e.stopPropagation()}>
@@ -310,6 +658,84 @@ export function DecksScreen() {
           </div>
         </div>
       )}
+
+      {/* Modal Salvar Deck */}
+      {showSaveModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowSaveModal(false)}>
+          <div className="w-[450px] max-w-[90vw] rounded-xl border border-amber-500/50 bg-stone-900 p-6 shadow-2xl text-stone-100" onClick={e => e.stopPropagation()}>
+            <h2 className="mb-4 text-center font-serif text-xl font-black tracking-widest text-amber-500">SALVAR E MONTAR DECK</h2>
+            <p className="mb-4 text-center text-xs text-stone-400 leading-relaxed">
+              O seu deck contem exatamente {totalCards} cartas e atende aos requisitos mínimos de combate. Digite um nome para salvar no seu Grimório.
+            </p>
+            <div className="mb-6">
+              <label className="block text-[10px] font-serif text-amber-500 uppercase tracking-widest mb-1.5">Nome do Deck</label>
+              <input 
+                type="text"
+                value={newDeckName}
+                onChange={e => setNewDeckName(e.target.value)}
+                placeholder="Ex: Ofensa zerrikana, Muralha Élfica..."
+                className="w-full rounded border border-amber-800/40 bg-black py-2.5 px-3 text-sm text-zinc-200 outline-none focus:border-amber-500"
+              />
+            </div>
+            <div className="flex gap-4">
+              <button onClick={() => setShowSaveModal(false)} className="flex-1 rounded border border-stone-600 bg-stone-800 py-3 text-xs font-black uppercase text-stone-300">
+                Cancelar
+              </button>
+              <button onClick={handleSaveDeckConfirm} className="flex-1 rounded border border-amber-500 bg-amber-700 py-3 text-xs font-black uppercase text-amber-100 shadow-[0_0_15px_rgba(217,119,6,0.3)]">
+                Confirmar e Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmação de Reciclagem */}
+      {showRecycleModal && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/80 backdrop-blur-sm" onClick={() => setShowRecycleModal(false)}>
+          <div className="w-[450px] max-w-[90vw] rounded-xl border border-red-500/50 bg-stone-900 p-6 shadow-2xl text-stone-100" onClick={e => e.stopPropagation()}>
+            <h2 className="mb-4 text-center font-serif text-xl font-black tracking-widest text-red-500 uppercase">Confirmar Reciclagem</h2>
+            <p className="mb-6 text-center text-sm leading-relaxed text-stone-300">
+              Tem certeza que deseja reciclar <strong className="text-red-400 font-mono">{totalTrashCount}</strong> carta(s)? Você receberá <strong className="text-emerald-400 font-mono">+{calculateRecycleValue()}</strong> moedas e essa ação não pode ser desfeita!
+            </p>
+            <div className="flex gap-4">
+              <button onClick={() => setShowRecycleModal(false)} className="flex-1 rounded border border-stone-600 bg-stone-800 py-3 text-xs font-black uppercase text-stone-300">
+                Voltar
+              </button>
+              <button onClick={handleRecycleConfirm} className="flex-1 rounded border border-emerald-500 bg-emerald-800 hover:bg-emerald-700 py-3 text-xs font-black uppercase text-emerald-100 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                Reciclar Agora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Comparar Duelistas */}
+      {comparingCard && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md" onClick={() => setComparingCard(null)}>
+          <div className="relative w-[450px] max-w-[95vw] rounded-xl border border-amber-500/40 bg-stone-900 p-6 shadow-2xl text-stone-100" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setComparingCard(null)} className="absolute -right-3 -top-3 rounded-full border border-red-500 bg-red-950 p-2 text-red-200 shadow-lg hover:bg-red-900 transition-colors">
+              <X size={14} />
+            </button>
+            <h3 className="font-serif text-xl font-black text-amber-200 mb-2">Quem possui "{comparingCard.nome}"?</h3>
+            <p className="text-xs text-zinc-400 mb-4">Outros duelistas que possuem esta carta no inventário:</p>
+            {loadingOwners ? (
+              <p className="text-sm text-zinc-400 py-4 text-center">Buscando na biblioteca...</p>
+            ) : cardOwners.length === 0 ? (
+              <p className="text-sm text-zinc-400 py-4 text-center">Nenhum outro duelista possui esta carta ainda.</p>
+            ) : (
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+                {cardOwners.map((owner, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-black/40 border border-zinc-800 rounded p-2 text-sm">
+                    <span className="font-bold text-amber-100">{owner.username}</span>
+                    <span className="text-xs text-zinc-400 font-mono">Quantidade: x{owner.quantity}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }

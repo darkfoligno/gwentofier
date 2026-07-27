@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock } from "lucide-react"
+import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
@@ -102,8 +102,8 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
           locked={!isTestUser}
         />
         <TopAction icon={Swords} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured />
-        <TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} />
-        <TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} />
+        <TopAction icon={Wallet} label="LOJA" onClick={() => onEnter("store")} />
+        <TopAction icon={Layers} label="MINHAS CARTAS" onClick={() => onEnter("decks")} />
         <TopAction icon={Users} label="DUELISTAS" onClick={() => onEnter("friends")} />
         <TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} />
       </nav>

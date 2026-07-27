@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   description: 'Duelo de cartas de fantasia sombria inspirado em Gwent e Yu-Gi-Oh!',
   generator: 'v0.app',
   icons: {
-    icon: '/icon.svg',
+    icon: '/favicon.png',
     apple: '/apple-icon.png',
   },
 }
