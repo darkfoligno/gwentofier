@@ -211,7 +211,7 @@ export function ArenaScreen() {
   const [labModalStatus, setLabModalStatus] = useState<string>("")
   const [labRedirectTimer, setLabRedirectTimer] = useState<number | null>(null)
   
-  const isBoardFrozen = hasBeenPlayed || labModalOpen;
+  const isBoardFrozen = labModalOpen;
 
   const leaveLabSandbox = () => {
     const url = new URL(window.location.href);
@@ -392,17 +392,6 @@ export function ArenaScreen() {
     if(inspectedCard) setInspectedCard(boardCards.find(card=>card.id===inspectedCard.id)??inspectedCard)
   },[boardCards,combatSequenceActive,effectBanner,hasUnshownEffect,showcase,showcaseQueue.length])
 
-  useEffect(() => {
-    if (!isLabSandbox || !testCardId || boardCards.length === 0 || hasBeenPlayed) return;
-    const isInPlayOrGraveyard = boardCards.some(c => c.source_card_id === testCardId && c.zone !== "hand" && c.zone !== "deck");
-    if (isInPlayOrGraveyard) {
-      setHasBeenPlayed(true);
-      const t = setTimeout(() => {
-        void triggerLabConclusion();
-      }, 4000);
-      return () => clearTimeout(t);
-    }
-  }, [boardCards, isLabSandbox, testCardId, hasBeenPlayed]);
   useEffect(()=>setPendingChoiceSelection(new Set()),[pendingEffectChoice?.id])
   useEffect(() => {
     if(!matchActions.length)return
@@ -756,13 +745,13 @@ export function ArenaScreen() {
             <span className="block font-serif text-[10px] text-yellow-100">[ ⏳ TURNO GLOBAL: {matchState?.current_turn??0} | RODADA ATUAL: {Math.max(1,Math.ceil((matchState?.current_turn??1)/2))} ]</span>
           </div>
           <div className="flex items-center gap-2">
-            {isLabSandbox ? (
+            {isLabSandbox && matchState && matchState.current_turn > 9 ? (
               <button 
                 onClick={() => void triggerLabConclusion()} 
                 disabled={isActionPending} 
-                className="min-h-[44px] px-4 py-2 font-serif font-black text-xs uppercase tracking-wider rounded-lg shadow-md active:scale-95 transition-transform border border-emerald-500 bg-emerald-900 text-emerald-100"
+                className="min-h-[44px] px-5 py-2 font-serif font-black text-xs uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(245,158,11,0.4)] border border-amber-400 bg-amber-800 text-yellow-100 animate-pulse active:scale-95 transition-transform"
               >
-                🧪 Concluir Análise / Encerrar Teste
+                🏆 Concluir Teste e Resgatar Moedas
               </button>
             ) : isCurrentPlayer ? (
               <>
@@ -774,7 +763,7 @@ export function ArenaScreen() {
             ) : (
               <span className="min-h-[44px] flex items-center px-4 py-2 text-sm rounded-lg border border-stone-700 bg-black/60 font-bold text-stone-500">AGUARDE</span>
             )}
-            {!isLabSandbox && (
+            {!(isLabSandbox && matchState && matchState.current_turn > 9) && (
               <button disabled={!isCurrentPlayer} onClick={() => void duel.surrenderMatch()} className="min-h-[44px] px-4 py-2 rounded-lg border border-red-800 bg-red-950 text-red-300 disabled:opacity-30 active:scale-95 transition-transform" title="Se render">
                 <Flag size={14} />
               </button>
