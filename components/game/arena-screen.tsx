@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { BookOpen, Crown, Flag, Hand, Heart, Hourglass, Layers, Loader2, Shield, Skull, Sparkles, Sword, Swords, Wifi, WifiOff, X, Zap } from "lucide-react"
+import { BookOpen, Crown, Flag, Hand, Heart, Hourglass, Layers, Loader2, Shield, Skull, Sparkles, Sword, Swords, Wifi, WifiOff, X, Zap, Beaker } from "lucide-react"
 import { GameCard } from "./game-card"
 import { ReactionModal } from "./reaction-modal"
 import { PreCombatModal } from "./pre-combat-modal"
@@ -201,10 +201,55 @@ function actionChronicleLines(action:MatchAction,state:MatchState|null,cards:Vis
 
 export function ArenaScreen() {
   const [matchId, setMatchId] = useState("")
+  // Lab Sandbox states
+  const testCardId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get("test_card_id") : null;
+  const isLabSandbox = !!testCardId;
+  const [hasBeenPlayed, setHasBeenPlayed] = useState(false)
+  const [labModalOpen, setLabModalOpen] = useState(false)
+  const [labRewardCoins, setLabRewardCoins] = useState<number>(0)
+  const [labIsFirstTime, setLabIsFirstTime] = useState<boolean>(false)
+  const [labModalStatus, setLabModalStatus] = useState<string>("")
+  const [labRedirectTimer, setLabRedirectTimer] = useState<number | null>(null)
+  
+  const isBoardFrozen = hasBeenPlayed || labModalOpen;
+
+  const leaveLabSandbox = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("screen", "lab");
+    url.searchParams.delete("matchId");
+    url.searchParams.delete("test_card_id");
+    window.location.assign(url.toString());
+  };
+
+  const triggerLabConclusion = async () => {
+    if (labModalOpen) return;
+    setLabModalOpen(true);
+    setLabModalStatus("Processando recompensas...");
+    try {
+      const { data, error } = await supabase.rpc("claim_lab_reward", { p_card_id: testCardId });
+      if (error) throw error;
+      setLabRewardCoins(data?.reward ?? 0);
+      setLabIsFirstTime(data?.first_time ?? false);
+    } catch (err) {
+      console.error(err);
+    }
+
+    let count = 4;
+    setLabRedirectTimer(count);
+    const interval = setInterval(() => {
+      count -= 1;
+      setLabRedirectTimer(count);
+      if (count <= 0) {
+        clearInterval(interval);
+        leaveLabSandbox();
+      }
+    }, 1000);
+  };
+
   const [preview, setPreview] = useState(false)
-  const [sandbox,setSandbox]=useState<{cardId:string;objective:string;actionType:string;setup:string[];expected:string[];visual:string[]}|null>(null)
-  const [sandboxReport,setSandboxReport]=useState<{approved:boolean;status:string;effect_code:string;before:Record<string,unknown>;after:Record<string,unknown>;effect_execution_log:unknown[];prepared_action_proof?:unknown}|null>(null)
-  const [sandboxBusy,setSandboxBusy]=useState(false)
+  const [sandbox,setSandbox] = useState<{cardId:string;objective:string;actionType:string;setup:string[];expected:string[];visual:string[]}|null>(null)
+  const [sandboxReport,setSandboxReport] = useState<{approved:boolean;status:string;effect_code:string;before:Record<string,unknown>;after:Record<string,unknown>;effect_execution_log:unknown[];prepared_action_proof?:unknown}|null>(null)
+  const [sandboxBusy,setSandboxBusy] = useState(false)
   const [userId, setUserId] = useState("")
   const [selectedHand, setSelectedHand] = useState<string | null>(null)
   const [selectedAttackers, setSelectedAttackers] = useState<Set<string>>(new Set())
@@ -346,6 +391,18 @@ export function ArenaScreen() {
     if(!showcase && !showcaseQueue.length && !effectBanner && !combatSequenceActive && !hasUnshownEffect) setVisualCards(boardCards)
     if(inspectedCard) setInspectedCard(boardCards.find(card=>card.id===inspectedCard.id)??inspectedCard)
   },[boardCards,combatSequenceActive,effectBanner,hasUnshownEffect,showcase,showcaseQueue.length])
+
+  useEffect(() => {
+    if (!isLabSandbox || !testCardId || boardCards.length === 0 || hasBeenPlayed) return;
+    const isInPlayOrGraveyard = boardCards.some(c => c.source_card_id === testCardId && c.zone !== "hand" && c.zone !== "deck");
+    if (isInPlayOrGraveyard) {
+      setHasBeenPlayed(true);
+      const t = setTimeout(() => {
+        void triggerLabConclusion();
+      }, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [boardCards, isLabSandbox, testCardId, hasBeenPlayed]);
   useEffect(()=>setPendingChoiceSelection(new Set()),[pendingEffectChoice?.id])
   useEffect(() => {
     if(!matchActions.length)return
@@ -526,14 +583,18 @@ export function ArenaScreen() {
   const myMana = matchState ? (isPlayer1 ? matchState.player1_mana : matchState.player2_mana) : 0
   const theirMana = matchState ? (isPlayer1 ? matchState.player2_mana : matchState.player1_mana) : 0
   const selectedCard = hand.find(card => card.id === selectedHand)
-  const playSelected = (zone: "attacker" | "reinforcement", position: number) => selectedCard && void duel.playCard(selectedCard.id, zone, position).then(() => { setSelectedHand(null); void duel.refresh() })
+  const playSelected = (zone: "attacker" | "reinforcement", position: number) => {
+    if (isBoardFrozen) return;
+    if (selectedCard) void duel.playCard(selectedCard.id, zone, position).then(() => { setSelectedHand(null); void duel.refresh() })
+  }
   const dropCard = (cardId: string, zone: "attacker" | "reinforcement", position: number) => {
-    if (!isCurrentPlayer || matchState?.status !== "in_progress" || matchState.engine_state !== "turn_action" || isActionPending) return
+    if (isBoardFrozen || !isCurrentPlayer || matchState?.status !== "in_progress" || matchState.engine_state !== "turn_action" || isActionPending) return
     setEffectMessage(`Movendo carta para ${zone === "attacker" ? "o Campo de Ataque" : "o Campo de Defesa"}…`)
     void duel.playCard(cardId, zone, position).then(() => { setSelectedHand(null); setEffectMessage("Carta posicionada. A ação foi registrada no servidor."); void duel.refresh() }).catch(error => setEffectMessage(error?.message ?? "Jogada recusada pelo servidor."))
   }
   const toggleAttacker = (card: VisibleMatchCard) => setSelectedAttackers(previous => { const next = new Set(previous); next.has(card.id) ? next.delete(card.id) : next.add(card.id); return next })
   const activateEffect = (card:VisibleMatchCard,afterResolve?:(version:number)=>void,expectedVersion?:number) => {
+    if (isBoardFrozen) return;
     const effect = card.card_data?.effect_definition?.find(item => item.trigger_type === "manual")
     if (!effect) return
     const order = effect.effect_order ?? 1;const code=effect.effect_code??""
@@ -659,6 +720,11 @@ export function ArenaScreen() {
     <button onClick={()=>{if(confirm("Atenção: Sair da arena agora resultará em DERROTA automática. Deseja continuar?")){void duel.surrenderMatch();const url=new URL(window.location.href);url.searchParams.set("screen","hub");url.searchParams.delete("matchId");window.location.assign(url.toString())}}} className="fixed left-3 top-3 z-[200] rounded border border-red-500/50 bg-red-950/80 px-3 py-1.5 text-[10px] font-black tracking-wider text-red-200 shadow-md transition-colors hover:bg-red-900">SAIR DA ARENA</button>
     <div className="absolute inset-0 bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-center bg-no-repeat opacity-40 mix-blend-overlay"/><div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/85 backdrop-blur-[2px]" />
     {isActionPending&&<div className="fixed inset-0 z-[185] flex items-start justify-center bg-black/20 pt-5 backdrop-blur-[1px]"><div className="rounded-full border border-cyan-300/60 bg-blue-950/95 px-5 py-2 text-xs font-black text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,.45)]"><Loader2 className="mr-2 inline animate-spin" size={14}/>Servidor resolvendo a ação · comandos bloqueados</div></div>}
+    {isLabSandbox && (
+      <div className="fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border border-emerald-500/50 bg-black/95 px-6 py-2 text-center text-xs font-black uppercase tracking-wider text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+        🧪 LABORATÓRIO OFIERI — Teste de Artefato. Conjure a carta ou ative seu efeito para ver a mecânica em ação!
+      </div>
+    )}
     {matchState?.status==="ban_phase"&&<div className={`fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border-2 px-6 py-2 font-mono text-2xl font-black shadow-2xl border-amber-300 bg-black/95 text-amber-100`}>BANIMENTO ESTRATÉGICO</div>}
     {sandbox && (typeof window !== "undefined" && (window.location.pathname.startsWith("/lab") || new URLSearchParams(window.location.search).get("screen") === "lab")) && <div className="fixed left-2 top-16 z-[120] w-[min(390px,92vw)] rounded-xl border-2 border-emerald-300 bg-[radial-gradient(circle_at_top,#14532d,#09090b_75%)] p-4 shadow-[0_0_35px_rgba(52,211,153,.35)]"><p className="font-serif text-sm font-black uppercase text-emerald-100">🧪 Partida laboratorial · turno único</p><p className="mt-2 text-[11px] leading-relaxed text-stone-200"><b className="text-amber-200">🎯 OBJETIVO INDIVIDUAL:</b> {sandbox.objective}</p><div className="mt-3 max-h-44 space-y-2 overflow-auto rounded border border-emerald-700/50 bg-black/60 p-2 text-[9px] text-emerald-100"><p>O teste não termina automaticamente. Execute a jogada, confira campo, pilhas e Crônica; depois gere o relatório antes/depois.</p>{sandbox.setup.length>0&&<div><b className="text-cyan-200">CENÁRIO PREPARADO</b>{sandbox.setup.map((item,index)=><p key={`setup-${index}`}>• {item}</p>)}</div>}{sandbox.visual.length>0&&<div><b className="text-fuchsia-200">SEQUÊNCIA VISUAL</b>{sandbox.visual.map((item,index)=><p key={`visual-${index}`}>{index+1}. {item}</p>)}</div>}{sandbox.expected.length>0&&<div><b className="text-amber-200">PROVA EXIGIDA</b>{sandbox.expected.map((item,index)=><p key={`expected-${index}`}>✓ {item}</p>)}</div>}</div>{["scripted_opponent_attack","scripted_discard","attempt_blocked_action","advance_turn","destroy","scripted_continuation"].includes(sandbox.actionType)&&!pendingAttack&&!pendingCardTrigger&&!sandboxReport&&<button disabled={sandboxBusy} onClick={()=>void beginSandboxOpponentAction()} className="mt-3 w-full rounded border-2 border-red-300 bg-red-950 px-3 py-3 text-[10px] font-black text-red-100 disabled:opacity-40">{sandboxBusy?"PREPARANDO CENÁRIO…":sandbox.actionType==="scripted_opponent_attack"?"⚔️ RECEBER ATAQUE PREPARADO":sandbox.actionType==="scripted_discard"?"🗑️ EXECUTAR DESCARTE PREPARADO":sandbox.actionType==="attempt_blocked_action"?"🛡️ TENTAR A AÇÃO QUE DEVE SER BLOQUEADA":sandbox.actionType==="advance_turn"?"⏭️ AVANÇAR PARA O GATILHO DE TURNO":sandbox.actionType==="scripted_continuation"?"▶️ EXECUTAR CONTINUAÇÃO APÓS ATIVAR O EFEITO":"💥 EXECUTAR DESTRUIÇÃO PREPARADA"}</button>}{!sandboxReport?<button disabled={sandboxBusy||isActionPending} onClick={()=>void reviewSandbox()} className="mt-3 w-full rounded border-2 border-amber-300 bg-amber-900 px-3 py-3 text-[10px] font-black text-amber-100 disabled:opacity-40">📋 GERAR RELATÓRIO DA RESOLUÇÃO</button>:<div className={`mt-3 rounded-lg border-2 p-3 ${sandboxReport.approved?"border-emerald-300 bg-emerald-950/80":"border-red-300 bg-red-950/80"}`}><b className={sandboxReport.approved?"text-emerald-100":"text-red-100"}>{sandboxReport.approved?"MECÂNICA OBSERVADA — REVISE A PROVA":"MECÂNICA NÃO COMPROVADA"}</b><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[8px] text-stone-200">{JSON.stringify({effect_code:sandboxReport.effect_code,before:sandboxReport.before,after:sandboxReport.after,prepared_action_proof:sandboxReport.prepared_action_proof,effect_execution_log:sandboxReport.effect_execution_log},null,2)}</pre><button disabled={sandboxBusy} onClick={()=>void finishSandbox()} className="mt-3 w-full rounded border-2 border-yellow-200 bg-yellow-700 px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">🏁 ENCERRAR TESTE COM ESTE RELATÓRIO</button></div>}<button onClick={()=>void restartSandbox()} className="mt-2 w-full rounded border border-cyan-300 bg-blue-950 px-2 py-2 text-[9px] font-black text-cyan-100">🔄 REINICIAR ESTE TESTE</button></div>}
     <AnimatePresence>{effectBanner&&<motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[188] flex items-center justify-center bg-black/80 p-5 backdrop-blur-md"><motion.div initial={{y:-180,scale:.55,rotate:-8}} animate={{y:0,scale:1,rotate:0}} transition={{type:"spring",stiffness:170,damping:18}} className="flex w-full max-w-3xl flex-col items-center">{effectBanner.cardData?<div className="aspect-[2/3] w-56 drop-shadow-[0_0_35px_rgba(250,204,21,.8)]"><GameCard card={effectBanner.cardData} enableZoom={false}/></div>:<Sparkles className="text-yellow-200" size={100}/>}<div className="mt-5 w-full border-y-2 border-yellow-200 bg-gradient-to-r from-transparent via-purple-950 to-transparent px-8 py-5 text-center shadow-[0_0_45px_rgba(192,132,252,.55)]"><h2 className={`font-serif text-2xl font-black uppercase ${effectBanner.isMine?"text-yellow-100":"text-red-200"}`}>{effectBanner.isMine?`✨ VOCÊ CONJUROU: ${effectBanner.card}!`:`⚠️ O RIVAL CONJUROU: ${effectBanner.card}!`}</h2><p className="mt-3 text-sm font-black uppercase leading-relaxed text-yellow-300">{effectBanner.description}</p></div></motion.div></motion.div>}</AnimatePresence>
@@ -689,7 +755,31 @@ export function ArenaScreen() {
             <span className="block">{matchState?.engine_state==="reaction_window"?"JANELA DE REAÇÃO":matchState?.engine_state==="resolving"?"RESOLVENDO COMBATE":isCurrentPlayer?"SUA VEZ":`VEZ DE ${isPlayer1 ? matchState?.player2_username : matchState?.player1_username}`}</span>
             <span className="block font-serif text-[10px] text-yellow-100">[ ⏳ TURNO GLOBAL: {matchState?.current_turn??0} | RODADA ATUAL: {Math.max(1,Math.ceil((matchState?.current_turn??1)/2))} ]</span>
           </div>
-          <div className="flex items-center gap-2">{isCurrentPlayer?<>{(matchState?.my_actions_this_turn??0)===0&&!attackers.length&&<button onClick={passTurnWithoutActing} disabled={matchState?.engine_state!=="turn_action"||isActionPending} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-blue-400 bg-blue-900 text-blue-100 disabled:opacity-40">⏭️ PASSAR</button>}<button onClick={()=>setPreCombatOpen(true)} disabled={matchState?.engine_state!=="turn_action"||isActionPending||((matchState?.my_actions_this_turn??0)===0&&!attackers.length&&!turnEffectCards.length)} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-amber-400 bg-amber-700 text-amber-100 disabled:opacity-35">⚔️ COMBATE{attackers.length?` (${attackers.length})`:""}</button></>:<span className="min-h-[44px] flex items-center px-4 py-2 text-sm rounded-lg border border-stone-700 bg-black/60 font-bold text-stone-500">AGUARDE</span>}<button disabled={!isCurrentPlayer} onClick={()=>void duel.surrenderMatch()} className="min-h-[44px] px-4 py-2 rounded-lg border border-red-800 bg-red-950 text-red-300 disabled:opacity-30 active:scale-95 transition-transform" title="Se render"><Flag size={14}/></button></div>
+          <div className="flex items-center gap-2">
+            {isLabSandbox ? (
+              <button 
+                onClick={() => void triggerLabConclusion()} 
+                disabled={isActionPending} 
+                className="min-h-[44px] px-4 py-2 font-serif font-black text-xs uppercase tracking-wider rounded-lg shadow-md active:scale-95 transition-transform border border-emerald-500 bg-emerald-900 text-emerald-100"
+              >
+                🧪 Concluir Análise / Encerrar Teste
+              </button>
+            ) : isCurrentPlayer ? (
+              <>
+                {(matchState?.my_actions_this_turn ?? 0) === 0 && !attackers.length && (
+                  <button onClick={passTurnWithoutActing} disabled={matchState?.engine_state !== "turn_action" || isActionPending} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-blue-400 bg-blue-900 text-blue-100 disabled:opacity-40">⏭️ PASSAR</button>
+                )}
+                <button onClick={() => setPreCombatOpen(true)} disabled={matchState?.engine_state !== "turn_action" || isActionPending || ((matchState?.my_actions_this_turn ?? 0) === 0 && !attackers.length && !turnEffectCards.length)} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-amber-400 bg-amber-700 text-amber-100 disabled:opacity-35">⚔️ COMBATE{attackers.length ? ` (${attackers.length})` : ""}</button>
+              </>
+            ) : (
+              <span className="min-h-[44px] flex items-center px-4 py-2 text-sm rounded-lg border border-stone-700 bg-black/60 font-bold text-stone-500">AGUARDE</span>
+            )}
+            {!isLabSandbox && (
+              <button disabled={!isCurrentPlayer} onClick={() => void duel.surrenderMatch()} className="min-h-[44px] px-4 py-2 rounded-lg border border-red-800 bg-red-950 text-red-300 disabled:opacity-30 active:scale-95 transition-transform" title="Se render">
+                <Flag size={14} />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2 text-xs"><span className="text-stone-500">Você</span><b>{myMana}</b><span className="h-7 w-7 rounded-full border border-blue-300 bg-blue-700 shadow-[0_0_14px_rgba(59,130,246,.8)]" /></div>
         </div>
         <Zone label="Campo de Ataque" cards={attackers} selected={effectSelection?.validIds??selectedAttackers} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} onEmpty={position => playSelected("attacker", position)} onDropCard={(id,position) => dropCard(id,"attacker",position)} /><Zone label="Campo de Defesa" cards={mine("reinforcement")} hidden ownerPreview selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} onEmpty={position => playSelected("reinforcement", position)} onDropCard={(id,position) => dropCard(id,"reinforcement",position)} /><Zone label="Suas cartas de vida" cards={mine("life")} slots={3} danger selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} onEmpty={selectedCard && matchState && matchState.current_turn > 0 && matchState.current_turn < 4 ? position => void duel.replaceEarlyLifeCard(selectedCard.id, position).then(() => setSelectedHand(null)) : undefined} />
@@ -722,6 +812,42 @@ export function ArenaScreen() {
           firstPlayerId={matchState.initiative_result.winner_user_id} 
           onComplete={() => duel.refresh()} 
         />
+      )}
+    </AnimatePresence>
+    <AnimatePresence>
+      {labModalOpen && (
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          exit={{ opacity: 0 }} 
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md"
+        >
+          <div className="rounded-xl border border-emerald-500/40 bg-stone-950 p-10 text-center max-w-md shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+            <Beaker className="mx-auto mb-4 text-emerald-400 animate-pulse" size={56} />
+            <h2 className="font-serif text-2xl font-black text-emerald-200 uppercase tracking-widest mb-4">
+              {labRewardCoins > 0 ? "Análise Concluída!" : "Simulação Finalizada!"}
+            </h2>
+            <p className="text-sm text-stone-300 leading-relaxed mb-6">
+              {labRewardCoins > 0 
+                ? "Você dominou os segredos desta arte e recebeu 🪙 +25 Moedas Ofieri!"
+                : "Dados do artefato coletados com sucesso."}
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={leaveLabSandbox}
+                className="w-full py-3 rounded-lg border border-emerald-500 bg-emerald-950/80 hover:bg-emerald-900 font-serif font-black text-xs uppercase tracking-widest text-emerald-100 transition-all"
+              >
+                Voltar ao Laboratório
+              </button>
+              {labRedirectTimer !== null && (
+                <span className="text-[10px] text-stone-500">
+                  Redirecionando automaticamente em {labRedirectTimer}s...
+                </span>
+              )}
+            </div>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   </motion.main>

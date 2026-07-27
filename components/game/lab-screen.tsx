@@ -86,9 +86,9 @@ export function LabScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
         await new Promise(r => setTimeout(r, 1200))
       }
 
-      // 2. Start customized lab simulation match
-      setStatusMessage("Iniciando Arena de Simulação (mana extra e carta na mão)...")
-      const { data: matchId, error: matchError } = await supabase.rpc("start_lab_match", { p_test_card_id: cardId })
+      // 2. Start customized lab simulation sandbox match
+      setStatusMessage("Iniciando Arena de Simulação (1 Turno, pulando banimentos/setup)...")
+      const { data: matchId, error: matchError } = await supabase.rpc("start_lab_sandbox", { p_test_card_id: cardId })
       if (matchError) throw matchError
 
       window.localStorage.removeItem('arena_mobile') // default PC version
@@ -100,6 +100,7 @@ export function LabScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       const url = new URL(window.location.href)
       url.searchParams.set("screen", "arena")
       url.searchParams.set("matchId", matchId)
+      url.searchParams.set("test_card_id", cardId)
       url.searchParams.delete("preview")
       window.history.pushState({}, "", url)
       
