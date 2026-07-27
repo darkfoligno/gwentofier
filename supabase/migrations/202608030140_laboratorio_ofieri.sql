@@ -140,17 +140,17 @@ DECLARE
     v_bot_match_deck_id uuid;
     
     -- Card records
-    v_test_card record;
-    v_lobo_card record;
-    v_shani_card record;
-    v_barnabas_card record;
-    v_gargula_card record;
-    v_erinia_card record;
-    v_centopeia_card record;
-    v_aracnomorfo_card record;
-    v_anabelle_card record;
-    v_geralt_card record;
-    v_arnaghad_card record;
+    v_test_card public.cards;
+    v_lobo_card public.cards;
+    v_shani_card public.cards;
+    v_barnabas_card public.cards;
+    v_gargula_card public.cards;
+    v_erinia_card public.cards;
+    v_centopeia_card public.cards;
+    v_aracnomorfo_card public.cards;
+    v_anabelle_card public.cards;
+    v_geralt_card public.cards;
+    v_arnaghad_card public.cards;
     
     -- Loop helper
     v_mdc_id uuid;
@@ -206,12 +206,13 @@ BEGIN
     IF p_test_card_id = '66d0f400-141a-4591-9c1a-f4400be91bc9' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Tomira + 2x Lobo
+        -- Player Hand: Tomira + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: Slot 1 Shani (Damaged 500/3000), Slot 2 Barnabas (2000), Slot 3 Barnabas (2000)
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_shani_card, 'life', 1, true, null, 3000, 500);
@@ -253,13 +254,13 @@ BEGIN
     ELSIF p_test_card_id = 'cc6cc445-8484-470f-a71e-3e63dbf0008d' THEN
         -- Public state: Hand 5 vs 2
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 5, 2, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 2, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Pantera + 4x Lobo
+        -- Player Hand: Pantera + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
-        FOR v_index IN 2..5 LOOP
-            PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', v_index, true);
-        END LOOP;
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -299,13 +300,14 @@ BEGIN
 
     -- CASE 3: DIJKISTRA (1c224f7d-52e8-4793-8a38-fe9f30d8bb3b)
     ELSIF p_test_card_id = '1c224f7d-52e8-4793-8a38-fe9f30d8bb3b' THEN
-        -- Public state: Hand 2 vs 2
+        -- Public state: Hand 3 vs 2
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 2, 2, 5, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 2, 5, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Dijkistra + Erinia (to discard it)
+        -- Player Hand: Dijkistra + Erinia + 1 Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_erinia_card, 'hand', 2, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -346,12 +348,13 @@ BEGIN
     ELSIF p_test_card_id = 'e0ea21e2-0922-4632-951e-b8c67d950087' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Alpor + 2x Lobo
+        -- Player Hand: Alpor + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 1x Shani (Damaged 1000/3000), 2x Barnabas (2000/2000)
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_shani_card, 'life', 1, true, null, 3000, 1000);
@@ -393,12 +396,13 @@ BEGIN
     ELSIF p_test_card_id = 'cb068893-6065-4437-9cdc-0a23dba9d833' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Barão Sanguinário + 2x Lobo
+        -- Player Hand: Barão Sanguinário + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -444,12 +448,13 @@ BEGIN
     ELSIF p_test_card_id = 'be85f335-f299-4094-af13-ae6c7c0230a1' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Ekimmu (ATK 3000, HP 4000) + 2x Lobo
+        -- Player Hand: Ekimmu (ATK 3000, HP 4000) + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true, 3000, 4000);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -491,12 +496,13 @@ BEGIN
     ELSIF p_test_card_id = '7b11c636-7ec8-46aa-917a-d47ff19b456f' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 5, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 5, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Fringilla + 2x Lobo
+        -- Player Hand: Fringilla + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -539,12 +545,13 @@ BEGIN
     ELSIF p_test_card_id = 'a28fa8e8-ab19-4fc7-809d-b8246bf01652' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Lisandro (ATK: 3000) + 2x Lobo
+        -- Player Hand: Lisandro (ATK: 3000) + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true, 3000);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -587,12 +594,13 @@ BEGIN
     ELSIF p_test_card_id = '7258635f-0be9-47ba-8257-6c4ae95067f0' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 3, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Gaunter + 2x Lobo
+        -- Player Hand: Gaunter + 3x Lobo
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
@@ -636,12 +644,13 @@ BEGIN
     ELSIF p_test_card_id = '44ea442e-cfb3-4cdb-a8b9-66fdc84b1ddd' THEN
         -- Public state
         INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username, player1_hand_count, player2_hand_count, player1_deck_count, player2_deck_count, player1_graveyard_count, player2_graveyard_count, player1_life_remaining, player2_life_remaining, player1_mana_available, player2_mana_available)
-        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 3, 2, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+        SELECT v_match_id, p1.id, p1.username, p2.id, p2.username, 4, 2, 10, 12, 5, 0, 3, 3, 10, 10 FROM public.profiles p1, public.profiles p2 WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
-        -- Player Hand: Dandelion + 2x Lobo (Mana: 0, ATK: 1000 - weak cards)
+        -- Player Hand: Dandelion + 3x Lobo (Mana: 0, ATK: 1000 - weak cards)
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_test_card, 'hand', 1, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 2, true);
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 3, true);
+        PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_lobo_card, 'hand', 4, true);
 
         -- Player Life: 3x Barnabas
         PERFORM game_private.add_sandbox_card(v_match_id, v_player_match_deck_id, v_user_id, v_barnabas_card, 'life', 1, true);
