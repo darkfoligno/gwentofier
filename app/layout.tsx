@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   title: 'Gwent Ofieri: Card Game',
   description: 'Duelo de cartas de fantasia sombria inspirado em Gwent e Yu-Gi-Oh!',
   generator: 'v0.app',
+  icons: {
+    icon: '/icon.svg',
+    apple: '/apple-icon.png',
+  },
 }
 
 export const viewport: Viewport = {

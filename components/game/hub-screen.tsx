@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers } from "lucide-react"
+import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
@@ -28,12 +28,14 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [trainingStep, setTrainingStep] = useState<string | null>(null)
   const [preMatchMode, setPreMatchMode] = useState<"pvp" | "training" | null>(null)
   const [matchmaking, setMatchmaking] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
 
   const { coins } = useWallet()
 
   useEffect(() => {
     void supabase.auth.getUser().then(async ({ data }) => {
       if (!data.user) return
+      setUserId(data.user.id)
       const [profileResult, statsResult, cardsResult] = await Promise.all([
         supabase.from("profiles").select("username,avatar_url").eq("id", data.user.id).single(),
         supabase.from("my_stats").select("wins,losses,draws,ranked_rating,current_win_streak").maybeSingle(),
@@ -84,16 +86,66 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     else if (mode === "training") void startTrainingMatch(deckId, isMobile)
   }
 
+  const isTestUser = userId === "b6cd0821-39ae-451f-a8ca-25694c3e553c"
+
   return <main className="min-h-screen bg-stone-950 p-5 text-stone-100"><div className="mx-auto max-w-[1600px]">
     <header className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-amber-700/40 bg-black/50 p-5">
       <div className="flex items-center gap-3">{profile?.avatar_url ? <img src={secureImageUrl(profile.avatar_url)} alt="" className="h-14 w-14 rounded-full border border-amber-400 object-cover" /> : <div className="flex h-14 w-14 items-center justify-center rounded-full border border-amber-500 bg-amber-950"><Shield /></div>}<div><h1 className="font-serif text-xl font-black text-amber-200">{profile?.username ?? "Jogador"}</h1>{stats && <p className="text-xs text-stone-400">Rating {stats.ranked_rating} · {stats.wins} vitórias · {stats.losses} derrotas · {stats.draws} empates</p>}</div></div>
-      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby"><span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span><TopAction icon={Swords} label={training ? "CRIANDO…" : "MODO TREINO"} onClick={() => setShowAlphaWarning(true)} disabled={training} featured /><TopAction icon={Users} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured /><TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} /><TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} /><TopAction icon={Library} label="CARTAS ADQUIRIDAS" onClick={() => onEnter("collection")} /><TopAction icon={Users} label="CONTATOS" onClick={() => onEnter("friends")} /><TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} /></nav>
+      <nav className="flex flex-1 flex-wrap items-center justify-end gap-2" aria-label="Atalhos do lobby">
+        <span className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-black px-4 py-2 font-black text-amber-200"><Coins size={18} />{coins.toLocaleString("pt-BR")}</span>
+        <TopAction 
+          icon={isTestUser ? Swords : Lock} 
+          label={training ? "CRIANDO…" : "MODO TREINO"} 
+          onClick={() => { if (isTestUser) setShowAlphaWarning(true) }} 
+          disabled={training || !isTestUser} 
+          featured={isTestUser} 
+          locked={!isTestUser}
+        />
+        <TopAction icon={Swords} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured />
+        <TopAction icon={Gem} label="LOJA" onClick={() => onEnter("store")} />
+        <TopAction icon={Layers} label="MEUS DECKS" onClick={() => onEnter("decks")} />
+        <TopAction icon={Users} label="DUELISTAS" onClick={() => onEnter("friends")} />
+        <TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} />
+      </nav>
     </header>
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
     {trainingStep && <div className="mb-4 rounded border border-blue-500/40 bg-blue-950/50 p-3 text-sm text-blue-100">{trainingStep}</div>}
     {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
-    <section className="rounded-xl border border-amber-800/30 bg-black/35 p-4"><div className="mb-4 flex flex-wrap items-center gap-2"><div className="relative min-w-60 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquisar no grimório" className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm" /></div>{filtrosRaridade.map(filter => <button key={filter.key} onClick={() => setRarity(rarity === filter.key ? null : filter.key)} className={`rounded-full border px-3 py-1 text-xs ${rarity === filter.key ? "border-amber-300 text-amber-200" : "border-stone-700 text-stone-400"}`}>{filter.label}</button>)}</div>
-      <div className="mb-5 flex flex-wrap gap-2">{filtrosElemento.map(filter => <button key={filter.key} onClick={() => setCardType(cardType === filter.key ? null : filter.key)} className={`rounded border px-3 py-1 text-xs ${cardType === filter.key ? "border-blue-400 bg-blue-950 text-blue-200" : "border-stone-700 text-stone-400"}`}>{filter.label}</button>)}</div>
+    <section className="rounded-xl border border-amber-800/30 bg-black/35 p-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-60 flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} />
+          <input value={query} onChange={event => setQuery(event.target.value)} placeholder="Pesquisar no grimório" className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm" />
+        </div>
+        {filtrosRaridade.map(filter => (
+          <button 
+            key={filter.key} 
+            onClick={() => setRarity(rarity === filter.key ? null : filter.key)} 
+            className={`rounded-full border px-3.5 py-1 text-[11px] font-serif tracking-wider transition-all duration-200 ${
+              rarity === filter.key 
+                ? "border-amber-400 bg-amber-950/30 text-amber-200 shadow-[0_0_10px_rgba(245,158,11,0.25)]" 
+                : "border-stone-800 bg-stone-950/50 text-stone-400 hover:border-stone-700 hover:text-stone-300"
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+      <div className="mb-5 flex flex-wrap gap-2">
+        {filtrosElemento.map(filter => (
+          <button 
+            key={filter.key} 
+            onClick={() => setCardType(cardType === filter.key ? null : filter.key)} 
+            className={`rounded border px-3.5 py-1 text-[11px] font-serif tracking-wider transition-all duration-200 ${
+              cardType === filter.key 
+                ? "border-amber-500 bg-amber-950/30 text-amber-200 shadow-[0_0_10px_rgba(194,155,56,0.2)]" 
+                : "border-stone-800 bg-stone-950/50 text-stone-400 hover:border-stone-700 hover:text-stone-300"
+            }`}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
       {filtered.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">{filtered.map(card => <GameCard key={card.id} card={card} interactive />)}</div> : <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-amber-800/40 font-serif text-amber-200/70">Nenhuma carta encontrada no grimório</div>}
     </section>
     
@@ -121,6 +173,43 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
 }
 
 function Stat({ icon: Icon, label, value }: { icon: typeof Trophy; label: string; value: number }) { return <motion.div whileHover={{ y: -2 }} className="rounded-lg border border-amber-800/30 bg-black/40 p-3"><Icon className="mb-2 text-amber-400" size={18} /><p className="text-xs text-stone-500">{label}</p><p className="text-xl font-black text-amber-100">{value}</p></motion.div> }
-function TopAction({ icon: Icon, label, onClick, featured = false, disabled = false }: { icon: typeof Swords; label: string; onClick: () => void; featured?: boolean; disabled?: boolean }) { return <motion.button disabled={disabled} whileHover={{ y: -2 }} onClick={onClick} className={`rounded border px-3 py-2 text-[10px] font-black disabled:opacity-50 ${featured ? "border-emerald-400 bg-emerald-950 text-emerald-100" : "border-amber-700/60 bg-stone-900 text-amber-100"}`}><Icon className="mr-1 inline" size={14} />{label}</motion.button> }
+
+function TopAction({ 
+  icon: Icon, 
+  label, 
+  onClick, 
+  featured = false, 
+  disabled = false, 
+  locked = false 
+}: { 
+  icon: any; 
+  label: string; 
+  onClick: () => void; 
+  featured?: boolean; 
+  disabled?: boolean; 
+  locked?: boolean 
+}) { 
+  return (
+    <motion.button 
+      disabled={disabled} 
+      whileHover={locked ? undefined : { y: -2, scale: 1.03 }} 
+      whileTap={locked ? undefined : { scale: 0.97 }} 
+      onClick={onClick} 
+      className={`relative overflow-hidden rounded-lg px-4.5 py-2.5 text-[11px] font-serif font-black tracking-widest uppercase transition-all duration-300 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(0,0,0,0.6)] border ${
+        locked 
+          ? "border-stone-850 bg-stone-900/30 text-stone-600 cursor-not-allowed opacity-50" 
+          : featured 
+            ? "border-emerald-500/80 bg-gradient-to-b from-stone-900 via-stone-950 to-emerald-950/40 text-emerald-300 hover:text-emerald-100 hover:border-emerald-400 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
+            : "border-amber-600/70 bg-gradient-to-b from-stone-900 via-stone-950 to-amber-950/20 text-amber-200 hover:text-amber-100 hover:border-amber-400 hover:shadow-[0_0_15px_rgba(194,155,56,0.3)]"
+      }`}
+    >
+      {!locked && (
+        <span className="absolute inset-x-0 bottom-0 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/30 to-transparent" />
+      )}
+      <Icon className={locked ? "text-stone-600" : "text-amber-500 transition-colors"} size={14} />
+      <span>{label}</span>
+    </motion.button>
+  )
+}
 
 function describeError(cause: unknown) { if (cause instanceof Error) return cause.message; if (cause && typeof cause === "object") { const issue = cause as { message?: string; details?: string; hint?: string; code?: string }; const parts = [issue.message, issue.details, issue.hint, issue.code ? `Código: ${issue.code}` : null].filter(Boolean); if (parts.length) return parts.join(" · ") } return `Erro desconhecido: ${String(cause)}` }

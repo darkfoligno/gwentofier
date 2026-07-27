@@ -10,7 +10,6 @@ import { StoreScreen } from "@/components/game/store-screen"
 
 import { FriendsScreen } from "@/components/game/friends-screen"
 import { PatchNotesScreen } from "@/components/game/patch-notes-screen"
-import { CollectionScreen } from "@/components/game/collection-screen"
 import { DecksScreen } from "@/components/game/decks-screen"
 import { ProfileModal, type ProfileSummary } from "@/components/game/profile-modal"
 import { useWallet } from "@/components/wallet-provider"
@@ -103,7 +102,6 @@ export default function Page() {
           {activeScreen === "arena" && <ArenaScreen />}
           {activeScreen === "friends" && <FriendsScreen />}
           {activeScreen === "patch-notes" && <PatchNotesScreen />}
-          {activeScreen === "collection" && <CollectionScreen />}
           {activeScreen === "decks" && <DecksScreen />}
         </motion.div>
       </AnimatePresence>

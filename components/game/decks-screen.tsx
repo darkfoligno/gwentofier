@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState, useMemo } from "react"
-import { Layers, Search, Settings, Save, Swords, Trash2, Plus, Minus } from "lucide-react"
+import { Layers, Search, Settings, Save, Swords, Trash2, Plus, Minus, X } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { GameCard as GameCardType, Rarity, OfficialCardType } from "@/lib/game-data"
 import { secureImageUrl } from "@/lib/secure-url"
@@ -13,6 +13,7 @@ export function DecksScreen() {
   const [inventory, setInventory] = useState<(GameCardType & { quantity: number })[]>([])
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
+  const [effectFilter, setEffectFilter] = useState("")
   const [rarityFilter, setRarityFilter] = useState<Rarity | null>(null)
   const [elementFilter, setElementFilter] = useState<OfficialCardType | null>(null)
   const [manaFilter, setManaFilter] = useState<number | null>(null)
@@ -55,7 +56,8 @@ export function DecksScreen() {
 
   const filtered = useMemo(() => {
     return inventory.filter(c => {
-      if (search && !c.nome.toLowerCase().includes(search.toLowerCase()) && !c.efeito.toLowerCase().includes(search.toLowerCase())) return false
+      if (search && !c.nome.toLowerCase().includes(search.toLowerCase())) return false
+      if (effectFilter && !c.efeito.toLowerCase().includes(effectFilter.toLowerCase())) return false
       if (rarityFilter && c.raridade !== rarityFilter) return false
       if (elementFilter && c.elemento !== elementFilter) return false
       if (manaFilter !== null) {
@@ -64,15 +66,17 @@ export function DecksScreen() {
       }
       return true
     })
-  }, [inventory, search, rarityFilter, elementFilter, manaFilter])
+  }, [inventory, search, effectFilter, rarityFilter, elementFilter, manaFilter])
 
   const totalCards = deckCards.reduce((sum, c) => sum + c.quantity, 0)
   
-  const addCard = (card: GameCardType & { quantity: number }) => {
+  const addCard = (card: GameCardType) => {
+    const invItem = inventory.find(i => i.id === card.id)
+    if (!invItem) return
     const existing = deckCards.find(c => c.card_id === card.id)
     const currentQty = existing?.quantity || 0
-    if (currentQty >= card.quantity) return // cannot add more than owned
-    if (currentQty >= 3 && card.raridade !== 'legendary') return // rules?
+    if (currentQty >= invItem.quantity) return // cannot add more than owned
+    if (currentQty >= 3 && card.raridade !== 'legendary') return // rules
     if (currentQty >= 1 && card.raridade === 'legendary') return
     
     if (existing) {
@@ -147,7 +151,11 @@ export function DecksScreen() {
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
-                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar por nome ou efeito..." className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-amber-500" />
+                <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar por nome..." className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-amber-500" />
+              </div>
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
+                <input value={effectFilter} onChange={e => setEffectFilter(e.target.value)} placeholder="Filtrar por efeito..." className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-amber-500" />
               </div>
               <div className="flex gap-1">
                 {[0,1,2,3,4,5,6].map(m => (
@@ -164,18 +172,29 @@ export function DecksScreen() {
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 xl:grid-cols-10">
-              {filtered.map(card => (
-                <div key={card.id} className="group relative cursor-pointer" onClick={() => addCard(card)}>
-                  <img src={secureImageUrl(card.image_url)} alt={card.nome} className="aspect-[2/3] w-full rounded-md object-cover shadow-md border border-stone-800 transition-all group-hover:scale-105 group-hover:border-amber-500 group-hover:shadow-amber-500/20" />
-                  <div className="absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-950 text-xs font-black text-amber-400 shadow-lg">{card.quantity}</div>
-                  <div className="absolute bottom-0 left-0 right-0 z-20 flex flex-col items-center justify-end bg-gradient-to-t from-black/90 to-transparent p-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <span className="text-center text-[9px] font-bold text-white leading-tight">{card.nome}</span>
-                    <button onClick={(e) => { e.stopPropagation(); setInspectedCard(card) }} className="mt-1 flex w-full items-center justify-center gap-1 rounded bg-zinc-800/90 py-1 text-[10px] font-bold text-amber-300 hover:bg-amber-600 hover:text-white">
-                      <Settings size={10} /> INSPECIONAR
+              {filtered.map(card => {
+                const countInDeck = deckCards.find(dc => dc.card_id === card.id)?.quantity || 0
+                return (
+                  <div key={card.id} className="group relative cursor-pointer" onClick={() => setInspectedCard(card)}>
+                    <img src={secureImageUrl(card.image_url)} alt={card.nome} className="aspect-[2/3] w-full rounded-md object-cover shadow-md border border-stone-800 transition-all group-hover:scale-105 group-hover:border-amber-500 group-hover:shadow-amber-500/20" />
+                    <div className="absolute -right-2 -top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-amber-500 bg-zinc-950 text-xs font-black text-amber-400 shadow-lg">{card.quantity}</div>
+                    
+                    {/* Add button direct overlay */}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); addCard(card); }} 
+                      className="absolute bottom-2 right-2 z-20 flex h-7 w-7 items-center justify-center rounded-full border border-emerald-500 bg-emerald-950/90 text-emerald-200 hover:bg-emerald-800 hover:text-white transition-all shadow-md"
+                      title="Adicionar ao Deck"
+                    >
+                      <Plus size={12} />
                     </button>
+                    {countInDeck > 0 && (
+                      <div className="absolute left-2 bottom-2 z-20 flex h-5 px-1.5 items-center justify-center rounded border border-amber-500 bg-amber-950/90 text-[10px] font-bold text-amber-300">
+                        {countInDeck} no deck
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>
@@ -197,12 +216,16 @@ export function DecksScreen() {
 
             <div className="mt-4 flex max-h-[400px] flex-col gap-1 overflow-y-auto pr-2">
               {deckCards.map(dc => (
-                <div key={dc.card_id} className="flex items-center justify-between rounded border border-zinc-800 bg-black/60 p-2 hover:border-amber-900/50">
+                <div 
+                  key={dc.card_id} 
+                  className="flex items-center justify-between rounded border border-zinc-800 bg-black/60 p-2 hover:border-amber-900/50 cursor-pointer transition-colors"
+                  onClick={() => setInspectedCard(dc.card)}
+                >
                   <div className="flex items-center gap-3">
                     <span className="flex h-6 w-6 items-center justify-center rounded border border-amber-500/30 bg-amber-950 text-xs font-black text-amber-200">{dc.quantity}</span>
                     <span className="truncate text-sm font-bold text-zinc-200">{dc.card.nome}</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     <span className="font-mono text-xs text-blue-300">{dc.card.mana}M</span>
                     <button onClick={() => removeCard(dc.card_id)} className="rounded bg-red-950 p-1 text-red-400 hover:bg-red-900 hover:text-red-200"><Minus size={14} /></button>
                   </div>
@@ -220,12 +243,70 @@ export function DecksScreen() {
         </aside>
       </div>
       {inspectedCard && (
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-6 backdrop-blur-md" onClick={() => setInspectedCard(null)}>
-          <div className="relative max-w-sm" onClick={e => e.stopPropagation()}>
-            <GameCard card={inspectedCard} enableZoom interactive />
-            <button onClick={() => setInspectedCard(null)} className="absolute -right-4 -top-4 rounded-full border border-red-400 bg-red-950 p-2 text-red-200 shadow-[0_0_15px_rgba(220,38,38,0.5)] hover:bg-red-800">
-              X
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md" onClick={() => setInspectedCard(null)}>
+          <div className="relative w-[750px] max-w-[95vw] rounded-2xl border-2 border-amber-500/60 bg-stone-900 shadow-2xl p-6 flex flex-col md:flex-row gap-6 items-center md:items-start text-stone-100" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setInspectedCard(null)} className="absolute -right-3 -top-3 rounded-full border border-red-500 bg-red-950/90 hover:bg-red-900 p-2 text-red-200 hover:text-white transition-colors shadow-lg z-50">
+              <X size={16} />
             </button>
+            
+            {/* Left side: Card Render */}
+            <div className="w-[240px] flex-shrink-0">
+              <GameCard card={inspectedCard} enableZoom={false} />
+            </div>
+
+            {/* Right side: Detailed typography and info */}
+            <div className="flex-1 flex flex-col h-full justify-between self-stretch">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={`text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded border font-serif ${
+                    inspectedCard.raridade === 'legendary' ? 'border-amber-500 bg-amber-950/40 text-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.2)]' :
+                    inspectedCard.raridade === 'epic' ? 'border-purple-500 bg-purple-950/40 text-purple-200 shadow-[0_0_8px_rgba(168,85,247,0.2)]' :
+                    inspectedCard.raridade === 'rare' ? 'border-blue-500 bg-blue-950/40 text-blue-200 shadow-[0_0_8px_rgba(59,130,246,0.2)]' :
+                    'border-zinc-700 bg-zinc-950/40 text-zinc-300'
+                  }`}>{inspectedCard.raridade}</span>
+                  <span className="text-[11px] font-serif font-bold tracking-widest uppercase text-stone-400">{inspectedCard.elemento}</span>
+                </div>
+                
+                <h2 className="font-serif text-2xl font-black text-amber-200 mb-4 tracking-wider">{inspectedCard.nome}</h2>
+                
+                {/* Atributos / Stats Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-950/20 p-2 text-center shadow-inner">
+                    <span className="block text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Mana</span>
+                    <span className="text-lg font-bold font-mono text-blue-200">{inspectedCard.mana}</span>
+                  </div>
+                  <div className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-2 text-center shadow-inner">
+                    <span className="block text-[9px] font-bold text-amber-400 uppercase tracking-widest mb-0.5">Poder</span>
+                    <span className="text-lg font-bold font-mono text-amber-200">{inspectedCard.ataque}</span>
+                  </div>
+                  <div className="rounded-lg border border-red-500/20 bg-red-950/20 p-2 text-center shadow-inner">
+                    <span className="block text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">Vida</span>
+                    <span className="text-lg font-bold font-mono text-red-200">{inspectedCard.vida}</span>
+                  </div>
+                </div>
+
+                <div className="border border-amber-900/30 bg-black/60 rounded-xl p-4.5 mb-6 shadow-inner">
+                  <h4 className="text-[10px] font-serif font-bold text-amber-500 uppercase tracking-widest mb-2">Efeito de Combate</h4>
+                  <p className="text-xs text-stone-300 leading-relaxed font-sans font-medium">{inspectedCard.efeito || "Sem efeito ativo."}</p>
+                </div>
+              </div>
+
+              {/* Action buttons inside zoom modal */}
+              <div className="flex gap-3 mt-auto">
+                <button 
+                  onClick={() => addCard(inspectedCard)}
+                  className="flex-1 rounded-lg border border-emerald-500 bg-emerald-950/80 hover:bg-emerald-900 py-3 text-xs font-serif font-black uppercase text-emerald-100 shadow-[0_4px_12px_rgba(16,185,129,0.15)] flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Plus size={14} /> Adicionar
+                </button>
+                <button 
+                  onClick={() => removeCard(inspectedCard.id)}
+                  className="flex-1 rounded-lg border border-red-500 bg-red-950/80 hover:bg-red-900 py-3 text-xs font-serif font-black uppercase text-red-100 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Minus size={14} /> Remover
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
