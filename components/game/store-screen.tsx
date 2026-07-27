@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Coins, Gift, PackageOpen, Sparkles } from "lucide-react"
+import { Coins, Gift, PackageOpen, Sparkles, Scroll, Hourglass } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { GameCard as GameCardType, Rarity } from "@/lib/game-data"
 import { GachaModal } from "./gacha-modal"
@@ -17,6 +17,7 @@ export function StoreScreen() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [lastClaimInfo, setLastClaimInfo] = useState<{ claimed_at: string; missed_days_before: number } | null>(null)
   const { coins, lastClaimDate, refresh: refreshWallet } = useWallet()
 
   const refresh = useCallback(async () => {
@@ -25,6 +26,20 @@ export function StoreScreen() {
     setUserId(user.id)
     
     await refreshWallet()
+
+    const { data: claimData } = await supabase
+      .from("daily_claims")
+      .select("claimed_at, missed_days_before")
+      .eq("user_id", user.id)
+      .order("claimed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (claimData) {
+      setLastClaimInfo({
+        claimed_at: claimData.claimed_at,
+        missed_days_before: claimData.missed_days_before
+      })
+    }
     
     const packRows = await supabase.from("pack_types").select("*").eq("is_active", true).order("price_coins")
     if (packRows.data) setPacks((packRows.data as PackType[]).filter(p => p.price_coins > 0))
@@ -60,6 +75,21 @@ export function StoreScreen() {
   };
   const isDailyAvailable = canClaimDaily();
 
+  const formatClaimDate = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr)
+      const pad = (n: number) => String(n).padStart(2, "0")
+      const day = pad(d.getDate())
+      const month = pad(d.getMonth() + 1)
+      const year = d.getFullYear()
+      const hours = pad(d.getHours())
+      const minutes = pad(d.getMinutes())
+      return `${day}/${month}/${year} às ${hours}:${minutes}`
+    } catch {
+      return dateStr
+    }
+  }
+
   const packImages: Record<string, string> = {
     ofieri_pack: "/images/cards01.png",
     mirage_pack: "/images/cards02.png",
@@ -69,7 +99,37 @@ export function StoreScreen() {
   return <main className="relative min-h-screen w-full overflow-x-hidden overflow-y-auto pb-24 bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-fixed bg-center p-6 text-stone-100"><div className="absolute inset-0 bg-black/80 backdrop-blur-[2px]" /><div className="relative mx-auto max-w-7xl">
     <header className="mb-6 flex items-center justify-between rounded-xl border border-amber-600/40 bg-zinc-950/75 p-5"><div><h1 className="font-serif text-3xl font-black text-amber-200">Mercado de Ofier</h1><p className="text-sm text-zinc-400">Relíquias, grimórios e cartas escolhidas pelo destino.</p></div><div className="flex items-center gap-3 rounded-full border border-amber-400/60 bg-black/70 px-5 py-2 shadow-[0_0_20px_rgba(245,158,11,.3)]"><Coins className="text-amber-300" /><strong className="text-xl text-amber-100">{coins.toLocaleString("pt-BR")}</strong></div></header>
     {error && <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 rounded-lg border border-red-500 bg-red-950/80 p-3 text-center font-bold text-red-200">{error}</motion.div>}
-    <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="mb-7 flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale"><span className="flex items-center gap-4"><Gift className="text-amber-300" size={35} /><span><b className="block font-serif text-xl text-amber-100">Resgate Diário</b><span className="text-sm text-stone-400">{isDailyAvailable ? "Reivindique sua recompensa gratuita nas Areias." : "Você já resgatou sua recompensa de hoje. Volte amanhã!"}</span></span></span><span className="rounded bg-amber-700 px-5 py-2 text-xs font-black">{busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}</span></button>
+    <div className="mb-7">
+      <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale"><span className="flex items-center gap-4"><Gift className="text-amber-300" size={35} /><span><b className="block font-serif text-xl text-amber-100">Resgate Diário</b><span className="text-sm text-stone-400">{isDailyAvailable ? "Reivindique sua recompensa gratuita nas Areias." : "Você já resgatou sua recompensa de hoje. Volte amanhã!"}</span></span></span><span className="rounded bg-amber-700 px-5 py-2 text-xs font-black">{busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}</span></button>
+      
+      {!isDailyAvailable && lastClaimInfo && (
+        <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-950/40 p-4 text-xs shadow-inner">
+          <div className="flex items-start gap-3">
+            <Scroll className="mt-0.5 text-amber-400 shrink-0" size={16} />
+            <div className="space-y-1">
+              <p className="text-amber-200">
+                🕒 Último resgate efetuado em <span className="font-bold text-amber-100">{formatClaimDate(lastClaimInfo.claimed_at)}</span>.
+              </p>
+              <p className="text-stone-400">
+                {lastClaimInfo.missed_days_before > 0 ? (
+                  <span>
+                    📦 <span className="text-amber-300 font-semibold">Nota de Economia:</span> Em seu último resgate, você acumulou o bônus de <span className="font-bold text-amber-100">{lastClaimInfo.missed_days_before} dia(s) atrasado(s)</span>!
+                  </span>
+                ) : (
+                  <span>
+                    🔥 Você está com o bônus em dia! Próximo resgate disponível à meia-noite.
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-black/40 px-3 py-1 font-serif text-[10px] text-amber-300 uppercase tracking-widest self-start sm:self-center shrink-0">
+            <Hourglass size={10} className="animate-pulse" />
+            Volte amanhã
+          </div>
+        </div>
+      )}
+    </div>
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack) => {
       const canAfford = Number(coins || 0) >= Number(pack.price_coins || 0);
       const imgUrl = packImages[pack.code];
