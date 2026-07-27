@@ -194,14 +194,14 @@ BEGIN
         v_witcher_card := v_generic_card;
     END IF;
 
-    -- 1. Create the match directly 'in_progress' at turn 1, active player is the user, turn_action state
+    -- 1. Create the match directly 'in_progress' at Turno 9, active player is the user, turn_action state
     INSERT INTO public.matches(
         rule_version_id, match_type, created_by,
         requires_bans, is_private, status, current_turn, active_player_id, engine_state, state_version
     )
     VALUES (
         v_rule_id, 'training', v_user_id,
-        false, true, 'in_progress', 1, v_user_id, 'turn_action', 1
+        false, true, 'in_progress', 9, v_user_id, 'turn_action', 1
     )
     RETURNING id INTO v_match_id;
 
@@ -219,23 +219,23 @@ BEGIN
         player1_mana_available, player2_mana_available
     )
     SELECT v_match_id, p1.id, p1.username, p2.id, p2.username,
-           3, 0, 15, 15,
-           0, 0, 3, 3,
+           4, 3, 10, 12,
+           5, 0, 3, 3,
            10, 10
     FROM public.profiles p1, public.profiles p2
     WHERE p1.id = v_user_id AND p2.id = v_bot_id;
 
     -- 4. Create decks
     INSERT INTO public.match_decks(match_id, user_id, total_cards, golden_cards_count)
-    VALUES (v_match_id, v_user_id, 22, 1)
+    VALUES (v_match_id, v_user_id, 24, 1)
     RETURNING id INTO v_player_match_deck_id;
 
     INSERT INTO public.match_decks(match_id, user_id, total_cards, golden_cards_count)
     VALUES (v_match_id, v_bot_id, 20, 1)
     RETURNING id INTO v_bot_match_deck_id;
 
-    -- 5. Helper function or loop to insert match_deck_cards and match_cards
-    
+    -- 5. Player Cards Insertion
+
     -- Player Hand: Tested card
     INSERT INTO public.match_deck_cards(
         match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
@@ -247,8 +247,8 @@ BEGIN
     INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
     VALUES (v_match_id, v_user_id, v_user_id, v_mdc_id, v_test_card.id, 'hand', 1, true, v_test_card.base_power, v_test_card.base_max_life, v_test_card.base_power, v_test_card.base_power, v_test_card.base_max_life, v_test_card.base_max_life);
 
-    -- Player Hand: 2 generic cards
-    FOR i IN 1..2 LOOP
+    -- Player Hand: 3 generic cards (volume to hand)
+    FOR i IN 1..3 LOOP
         INSERT INTO public.match_deck_cards(
             match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
         ) VALUES (
@@ -271,18 +271,32 @@ BEGIN
         VALUES (v_match_id, v_user_id, v_user_id, v_mdc_id, v_generic_card.id, 'life', i, true, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
     END LOOP;
 
-    -- Player Field: 1 reinforcement card
-    INSERT INTO public.match_deck_cards(
-        match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
-    ) VALUES (
-        v_player_match_deck_id, v_generic_card.id, coalesce(v_generic_card.version, 1), v_generic_card.name, coalesce(v_generic_card.image_url, ''), coalesce(v_generic_card.element, 'Neutro'), v_generic_card.rarity, v_generic_card.card_type, v_generic_card.is_golden, coalesce(v_generic_card.base_power, 0), coalesce(v_generic_card.base_max_life, 0), coalesce(v_generic_card.effect_mana_cost, 0), 1, coalesce(v_generic_card.leader_cooldown, 0), '[]'::jsonb, 1
-    ) RETURNING id INTO v_mdc_id;
+    -- Player Field: 2 reinforcement cards (defending)
+    FOR i IN 1..2 LOOP
+        INSERT INTO public.match_deck_cards(
+            match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
+        ) VALUES (
+            v_player_match_deck_id, v_generic_card.id, coalesce(v_generic_card.version, 1), v_generic_card.name, coalesce(v_generic_card.image_url, ''), coalesce(v_generic_card.element, 'Neutro'), v_generic_card.rarity, v_generic_card.card_type, v_generic_card.is_golden, coalesce(v_generic_card.base_power, 0), coalesce(v_generic_card.base_max_life, 0), coalesce(v_generic_card.effect_mana_cost, 0), 1, coalesce(v_generic_card.leader_cooldown, 0), '[]'::jsonb, 1
+        ) RETURNING id INTO v_mdc_id;
 
-    INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
-    VALUES (v_match_id, v_user_id, v_user_id, v_mdc_id, v_generic_card.id, 'reinforcement', 1, true, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
+        INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
+        VALUES (v_match_id, v_user_id, v_user_id, v_mdc_id, v_generic_card.id, 'reinforcement', i, true, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
+    END LOOP;
 
-    -- Player Deck: 15 cards
-    FOR i IN 1..15 LOOP
+    -- Player Graveyard: 5 cards (for Dijkistra or revive effects)
+    FOR i IN 1..5 LOOP
+        INSERT INTO public.match_deck_cards(
+            match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
+        ) VALUES (
+            v_player_match_deck_id, v_generic_card.id, coalesce(v_generic_card.version, 1), v_generic_card.name, coalesce(v_generic_card.image_url, ''), coalesce(v_generic_card.element, 'Neutro'), v_generic_card.rarity, v_generic_card.card_type, v_generic_card.is_golden, coalesce(v_generic_card.base_power, 0), coalesce(v_generic_card.base_max_life, 0), coalesce(v_generic_card.effect_mana_cost, 0), 1, coalesce(v_generic_card.leader_cooldown, 0), '[]'::jsonb, 1
+        ) RETURNING id INTO v_mdc_id;
+
+        INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
+        VALUES (v_match_id, v_user_id, v_user_id, v_mdc_id, v_generic_card.id, 'graveyard', i, false, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
+    END LOOP;
+
+    -- Player Deck: 10 cards
+    FOR i IN 1..10 LOOP
         INSERT INTO public.match_deck_cards(
             match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
         ) VALUES (
@@ -293,12 +307,14 @@ BEGIN
         VALUES (v_match_id, v_user_id, v_user_id, v_mdc_id, v_generic_card.id, 'deck', i, false, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
     END LOOP;
 
+    -- 6. Bot Cards Insertion
+
     -- Bot Field: 3 life cards
     FOR i IN 1..3 LOOP
         INSERT INTO public.match_deck_cards(
             match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
         ) VALUES (
-            v_bot_match_deck_id, v_generic_card.id, coalesce(v_generic_card.version, 1), v_generic_card.name, coalesce(v_generic_card.image_url, ''), coalesce(v_generic_card.element, 'Neutro'), v_bot_match_deck_id, v_generic_card.rarity, v_generic_card.card_type, v_generic_card.is_golden, coalesce(v_generic_card.base_power, 0), coalesce(v_generic_card.base_max_life, 0), coalesce(v_generic_card.effect_mana_cost, 0), 1, coalesce(v_generic_card.leader_cooldown, 0), '[]'::jsonb, 1
+            v_bot_match_deck_id, v_generic_card.id, coalesce(v_generic_card.version, 1), v_generic_card.name, coalesce(v_generic_card.image_url, ''), coalesce(v_generic_card.element, 'Neutro'), v_generic_card.rarity, v_generic_card.card_type, v_generic_card.is_golden, coalesce(v_generic_card.base_power, 0), coalesce(v_generic_card.base_max_life, 0), coalesce(v_generic_card.effect_mana_cost, 0), 1, coalesce(v_generic_card.leader_cooldown, 0), '[]'::jsonb, 1
         ) RETURNING id INTO v_mdc_id;
 
         INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
@@ -326,8 +342,20 @@ BEGIN
     INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
     VALUES (v_match_id, v_bot_id, v_bot_id, v_mdc_id, v_witcher_card.id, 'reinforcement', 2, true, v_witcher_card.base_power, v_witcher_card.base_max_life, v_witcher_card.base_power, v_witcher_card.base_power, v_witcher_card.base_max_life, v_witcher_card.base_max_life);
 
-    -- Bot Deck: 15 cards
-    FOR i IN 1..15 LOOP
+    -- Bot Hand: 3 cards
+    FOR i IN 1..3 LOOP
+        INSERT INTO public.match_deck_cards(
+            match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
+        ) VALUES (
+            v_bot_match_deck_id, v_generic_card.id, coalesce(v_generic_card.version, 1), v_generic_card.name, coalesce(v_generic_card.image_url, ''), coalesce(v_generic_card.element, 'Neutro'), v_generic_card.rarity, v_generic_card.card_type, v_generic_card.is_golden, coalesce(v_generic_card.base_power, 0), coalesce(v_generic_card.base_max_life, 0), coalesce(v_generic_card.effect_mana_cost, 0), 1, coalesce(v_generic_card.leader_cooldown, 0), '[]'::jsonb, 1
+        ) RETURNING id INTO v_mdc_id;
+
+        INSERT INTO public.match_cards(match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life)
+        VALUES (v_match_id, v_bot_id, v_bot_id, v_mdc_id, v_generic_card.id, 'hand', i, true, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
+    END LOOP;
+
+    -- Bot Deck: 12 cards
+    FOR i IN 1..12 LOOP
         INSERT INTO public.match_deck_cards(
             match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
         ) VALUES (
@@ -338,9 +366,9 @@ BEGIN
         VALUES (v_match_id, v_bot_id, v_bot_id, v_mdc_id, v_generic_card.id, 'deck', i, false, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_power, v_generic_card.base_power, v_generic_card.base_max_life, v_generic_card.base_max_life);
     END LOOP;
 
-    -- 6. Insert this match into training_matches so it triggers training bot logic
-    INSERT INTO public.training_matches(match_id, created_at)
-    VALUES (v_match_id, now());
+    -- 7. Insert this match into training_matches with correct human_user_id and bot_user_id
+    INSERT INTO public.training_matches(match_id, human_user_id, bot_user_id, difficulty, created_at)
+    VALUES (v_match_id, v_user_id, v_bot_id, 'normal', now());
 
     RETURN v_match_id;
 END;
