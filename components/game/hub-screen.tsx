@@ -11,7 +11,7 @@ import { GameCard } from "./game-card"
 import { PreMatchModal } from "./pre-match-modal"
 import { secureImageUrl } from "@/lib/secure-url"
 
-interface Profile { username: string; avatar_url: string | null }
+interface Profile { id: string; username: string; avatar_url: string | null }
 interface Stats { wins: number; losses: number; draws: number; ranked_rating: number; current_win_streak: number }
 
 export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
@@ -37,7 +37,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       if (!data.user) return
       setUserId(data.user.id)
       const [profileResult, statsResult, cardsResult] = await Promise.all([
-        supabase.from("profiles").select("username,avatar_url").eq("id", data.user.id).single(),
+        supabase.from("profiles").select("id,username,avatar_url").eq("id", data.user.id).single(),
         supabase.from("my_stats").select("wins,losses,draws,ranked_rating,current_win_streak").maybeSingle(),
         supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").eq("is_active", true).order("name"),
       ])
