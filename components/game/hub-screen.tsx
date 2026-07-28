@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight } from "lucide-react"
+import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
 import type { Screen } from "@/lib/types"
 import { GameCard } from "./game-card"
+import { DailyRewardWidget } from "./daily-reward-widget"
 import { PreMatchModal } from "./pre-match-modal"
 import { secureImageUrl } from "@/lib/secure-url"
 
@@ -104,6 +105,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
         {profile?.id === "b6cd0821-39ae-451f-a8ca-25694c3e553c" && <TopAction icon={Beaker} label="LABORATÓRIO OFIERI" onClick={() => onEnter("lab")} />}
         <TopAction icon={Swords} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured />
         <TopAction icon={Wallet} label="LOJA" onClick={() => onEnter("store")} />
+        <TopAction icon={ArrowRightLeft} label="TRADE MARKETING" onClick={() => onEnter("trade")} />
         <TopAction icon={Layers} label="MINHAS CARTAS" onClick={() => onEnter("decks")} />
         <TopAction icon={Users} label="DUELISTAS" onClick={() => onEnter("friends")} />
         <TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} />
@@ -111,6 +113,9 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     </header>
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
     {trainingStep && <div className="mb-4 rounded border border-blue-500/40 bg-blue-950/50 p-3 text-sm text-blue-100">{trainingStep}</div>}
+    <div className="mb-5">
+      <DailyRewardWidget />
+    </div>
     {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
     
     {/* Card Visual Laboratório Ofieri */}

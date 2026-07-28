@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Coins, Gift, PackageOpen, Sparkles, Scroll, Hourglass } from "lucide-react"
+import { Coins, PackageOpen, Sparkles } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { GameCard as GameCardType, Rarity } from "@/lib/game-data"
 import { GachaModal } from "./gacha-modal"
 import { useWallet } from "@/components/wallet-provider"
+import { DailyRewardWidget } from "./daily-reward-widget"
 
 interface PackType { id: string; code: string; name: string; description: string | null; price_coins: number; cards_per_pack: number; is_daily: boolean }
 interface PackResult { card_id: string; name: string; image_url: string; rarity: Rarity; is_golden: boolean }
@@ -64,31 +65,6 @@ export function StoreScreen() {
     if (rpcError) { setError(rpcError.message.includes("INSUFFICIENT_COINS") ? "Moedas de Ofier insuficientes!" : rpcError.message); return } 
     await openResult(data) 
   }
-  const daily = async () => { setBusy("daily"); setError(null); const user = (await supabase.auth.getUser()).data.user; if (!user) return; const { data, error: rpcError } = await supabase.rpc("claim_daily_login_reward", { p_user_id: user.id }); setBusy(null); if (rpcError) { setError(rpcError.message); return } if (data && !data.success) { setError(data.error || "Já resgatado hoje"); return } if (data && data.cards && data.cards.length > 0) { await openResult(data) } else { await refresh() } }
-
-  const canClaimDaily = () => {
-    if (!lastClaimDate) return true;
-    const last = new Date(lastClaimDate);
-    const now = new Date();
-    // Compare if it's a different calendar day
-    return last.getFullYear() !== now.getFullYear() || last.getMonth() !== now.getMonth() || last.getDate() !== now.getDate();
-  };
-  const isDailyAvailable = canClaimDaily();
-
-  const formatClaimDate = (dateStr: string) => {
-    try {
-      const d = new Date(dateStr)
-      const pad = (n: number) => String(n).padStart(2, "0")
-      const day = pad(d.getDate())
-      const month = pad(d.getMonth() + 1)
-      const year = d.getFullYear()
-      const hours = pad(d.getHours())
-      const minutes = pad(d.getMinutes())
-      return `${day}/${month}/${year} às ${hours}:${minutes}`
-    } catch {
-      return dateStr
-    }
-  }
 
   const packImages: Record<string, string> = {
     ofieri_pack: "/images/cards01.png",
@@ -100,32 +76,7 @@ export function StoreScreen() {
     <header className="mb-6 flex items-center justify-between rounded-xl border border-amber-600/40 bg-zinc-950/75 p-5"><div><h1 className="font-serif text-3xl font-black text-amber-200">Mercado de Ofier</h1><p className="text-sm text-zinc-400">Relíquias, grimórios e cartas escolhidas pelo destino.</p></div><div className="flex items-center gap-3 rounded-full border border-amber-400/60 bg-black/70 px-5 py-2 shadow-[0_0_20px_rgba(245,158,11,.3)]"><Coins className="text-amber-300" /><strong className="text-xl text-amber-100">{coins.toLocaleString("pt-BR")}</strong></div></header>
     {error && <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 rounded-lg border border-red-500 bg-red-950/80 p-3 text-center font-bold text-red-200">{error}</motion.div>}
     <div className="mb-7">
-      <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale">
-        <span className="flex items-center gap-4">
-          <Gift className="text-amber-300" size={35} />
-          <span className="flex flex-col gap-1">
-            <b className="block font-serif text-xl text-amber-100">Resgate Diário</b>
-            <span className="text-sm text-stone-400">
-              {isDailyAvailable 
-                ? (lastClaimDate && (Math.floor((new Date().setHours(0,0,0,0) - new Date(lastClaimDate).setHours(0,0,0,0)) / 86400000) - 1) > 0 
-                    ? `Reivindique sua recompensa gratuita! Você está há ${Math.floor((new Date().setHours(0,0,0,0) - new Date(lastClaimDate).setHours(0,0,0,0)) / 86400000) - 1} dia(s) sem resgatar seus resgates diários.` 
-                    : "Reivindique sua recompensa gratuita nas Areias.") 
-                : (lastClaimInfo 
-                    ? `Você já resgatou sua recompensa hoje às ${new Date(lastClaimInfo.claimed_at).getHours().toString().padStart(2, "0")}:${new Date(lastClaimInfo.claimed_at).getMinutes().toString().padStart(2, "0")} e poderá resgatar novamente às 00:01 do dia seguinte.` 
-                    : "Você já resgatou sua recompensa de hoje. Volte amanhã!")}
-            </span>
-            {!isDailyAvailable && lastClaimInfo && (
-              <span className="text-xs text-amber-300/80 mt-1 block font-bold">
-                🕒 Último resgate efetuado em {formatClaimDate(lastClaimInfo.claimed_at)}
-                {lastClaimInfo.missed_days_before > 0 ? ` — (Bônus resgatado: ${lastClaimInfo.missed_days_before} dia(s) de atraso)` : ""}
-              </span>
-            )}
-          </span>
-        </span>
-        <span className="rounded bg-amber-700 px-5 py-2 text-xs font-black shrink-0">
-          {busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}
-        </span>
-      </button>
+      <DailyRewardWidget onClaimSuccess={async (data) => { if (data && data.cards && data.cards.length > 0) { await openResult(data) } else { await refresh() } }} />
     </div>
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack) => {
       const canAfford = Number(coins || 0) >= Number(pack.price_coins || 0);

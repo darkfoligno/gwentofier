@@ -12,6 +12,7 @@ import { FriendsScreen } from "@/components/game/friends-screen"
 import { PatchNotesScreen } from "@/components/game/patch-notes-screen"
 import { DecksScreen } from "@/components/game/decks-screen"
 import { LabScreen } from "@/components/game/lab-screen"
+import { TradeScreen } from "@/components/game/trade-screen"
 import { ProfileModal, type ProfileSummary } from "@/components/game/profile-modal"
 import { useWallet } from "@/components/wallet-provider"
 import { Coins, LogOut, UserRound } from "lucide-react"
@@ -21,7 +22,7 @@ import { supabase } from "@/lib/supabase"
 const debugItems: { key: Screen; label: string }[] = [
   { key: "hub", label: "Hub" },
   { key: "store", label: "Loja" },
-
+  { key: "trade", label: "Trade" },
   { key: "arena", label: "Arena" },
 ]
 
@@ -99,6 +100,7 @@ export default function Page() {
           {activeScreen === "auth" && <AuthScreen onEnter={setActiveScreen} />}
           {activeScreen === "hub" && <HubScreen onEnter={setActiveScreen} />}
           {activeScreen === "store" && <StoreScreen />}
+          {activeScreen === "trade" && <TradeScreen onEnter={setActiveScreen} />}
 
           {activeScreen === "arena" && <ArenaScreen />}
           {activeScreen === "friends" && <FriendsScreen />}
