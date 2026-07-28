@@ -21,6 +21,11 @@ DECLARE
     v_anabelle_id uuid := 'd021ec8f-eeae-4aa4-90ec-e8099a4c15d6';
     v_geralt_id uuid := '9f37cb0e-09a0-4117-a258-4a49f6d2540a';
     v_arnaghad_id uuid := 'ad411a4a-f9e4-43d1-8177-78285b08fa75';
+
+    -- Sandbox properties
+    v_objective text;
+    v_turn_owner text := 'player';
+    v_card_code text;
 BEGIN
     SELECT id INTO v_rule_id FROM public.game_rule_versions WHERE is_active = true LIMIT 1;
     IF NOT EXISTS(SELECT 1 FROM public.cards WHERE id = p_test_card_id) THEN
@@ -38,8 +43,30 @@ BEGIN
     )
     RETURNING id INTO v_match_id;
 
-    -- Register match in sandbox_matches
-    INSERT INTO public.sandbox_matches (match_id) VALUES (v_match_id);
+    -- Determine sandbox attributes
+    SELECT code INTO v_card_code FROM public.cards WHERE id = p_test_card_id;
+
+    IF p_test_card_id = '66d0f400-141a-4591-9c1a-f4400be91bc9'::uuid THEN
+        v_objective := 'Tomira (Custo 4) - Cura a carta de vida aliada danificada ao máximo.';
+        v_turn_owner := 'opponent';
+    ELSIF p_test_card_id = 'cc6cc445-8484-470f-a71e-3e63dbf0008d'::uuid THEN
+        v_objective := 'Pantera (Custo 4) - Ataque direto a uma carta de vida inimiga com vantagem de cartas na mão.';
+    ELSIF p_test_card_id = '1c224f7d-52e8-4793-8a38-fe9f30d8bb3b'::uuid THEN
+        v_objective := 'Dijkstra (Custo 0) - Troll descarta e Dijkstra compra 3 cartas comuns + 2 do Troll.';
+    ELSIF p_test_card_id = 'e0ea21e2-0922-4632-951e-b8c67d950087'::uuid THEN
+        v_objective := 'Alpor (Custo 3) - Roubo de vida no ataque curando 10% do dano.';
+    ELSIF p_test_card_id = 'cb068893-6065-4437-9cdc-0a23dba9d833'::uuid THEN
+        v_objective := 'Barão Sanguinário (Custo 4) - Reduz poder de feras no deck do oponente.';
+    ELSE
+        v_objective := 'Laboratório - Teste da carta ' || COALESCE(v_card_code, p_test_card_id::text);
+    END IF;
+
+    -- Register in sandbox_matches with all required columns
+    INSERT INTO public.sandbox_matches (
+        match_id, owner_user_id, tested_card_id, objective, turn_owner, status, card_code, created_at
+    ) VALUES (
+        v_match_id, v_user_id, p_test_card_id, v_objective, v_turn_owner, 'waiting_action', v_card_code, now()
+    );
 
     -- 2. Players
     INSERT INTO public.match_players(match_id, user_id, player_number, passed_turn, setup_finished, mana_available, mana_snapshot)

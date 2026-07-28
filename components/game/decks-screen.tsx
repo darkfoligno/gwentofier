@@ -10,7 +10,7 @@ type DeckCard = { card_id: string; quantity: number; card: GameCardType }
 type Deck = { id: string; name: string; is_valid: boolean; updated_at: string; is_active: boolean; deck_cards: DeckCard[] }
 
 export function DecksScreen() {
-  const [inventory, setInventory] = useState<(GameCardType & { quantity: number })[]>([])
+  const [inventory, setInventory] = useState<(GameCardType & { quantity: number; last_obtained_at?: string })[]>([])
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [effectFilter, setEffectFilter] = useState("")
@@ -18,6 +18,7 @@ export function DecksScreen() {
   const [elementFilter, setElementFilter] = useState<OfficialCardType | null>(null)
   const [manaFilter, setManaFilter] = useState<number | null>(null)
   const [inspectedCard, setInspectedCard] = useState<GameCardType | null>(null)
+  const [sortBy, setSortBy] = useState<"name" | "recent">("name")
   
   // Decks States
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null)
@@ -83,7 +84,7 @@ export function DecksScreen() {
 
     const { data: userCards, error: invError } = await supabase
       .from("user_cards")
-      .select("quantity, cards(id,name,image_url,element,rarity,card_type,base_power,base_max_life,effect_mana_cost,effect_text)")
+      .select("quantity, last_obtained_at, cards(id,name,image_url,element,rarity,card_type,base_power,base_max_life,effect_mana_cost,effect_text)")
       .eq("user_id", user.id)
       .gt("quantity", 0)
     
@@ -100,7 +101,8 @@ export function DecksScreen() {
       ataque: row.cards.base_power,
       vida: row.cards.base_max_life,
       efeito: row.cards.effect_text,
-      quantity: row.quantity
+      quantity: row.quantity,
+      last_obtained_at: row.last_obtained_at
     }))
     setInventory(mapped)
   }
@@ -123,6 +125,20 @@ export function DecksScreen() {
       return true
     })
   }, [inventory, search, effectFilter, rarityFilter, elementFilter, manaFilter])
+
+  const sorted = useMemo(() => {
+    const list = [...filtered]
+    if (sortBy === "name") {
+      list.sort((a, b) => a.nome.localeCompare(b.nome))
+    } else if (sortBy === "recent") {
+      list.sort((a, b) => {
+        const timeA = a.last_obtained_at ? new Date(a.last_obtained_at).getTime() : 0
+        const timeB = b.last_obtained_at ? new Date(b.last_obtained_at).getTime() : 0
+        return timeB - timeA
+      })
+    }
+    return list
+  }, [filtered, sortBy])
 
   const totalCards = deckCards.reduce((sum, c) => sum + c.quantity, 0)
   
@@ -414,13 +430,23 @@ export function DecksScreen() {
             <h1 className="font-serif text-3xl font-black text-amber-400">Minhas Cartas</h1>
             <p className="mb-4 text-sm text-zinc-400">Monte decks com as cartas que você tem disponível</p>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative flex-1 min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar por nome..." className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-amber-500" />
               </div>
-              <div className="relative flex-1 min-w-[200px]">
+              <div className="relative flex-1 min-w-[180px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
                 <input value={effectFilter} onChange={e => setEffectFilter(e.target.value)} placeholder="Filtrar por efeito..." className="w-full rounded border border-amber-800/40 bg-black py-2 pl-9 pr-3 text-sm text-zinc-200 outline-none focus:border-amber-500" />
+              </div>
+              <div className="relative min-w-[150px]">
+                <select 
+                  value={sortBy} 
+                  onChange={e => setSortBy(e.target.value as any)} 
+                  className="w-full rounded border border-amber-800/40 bg-black py-2 px-3 text-sm text-zinc-200 outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="name">Ordenar: Nome (A-Z)</option>
+                  <option value="recent">Ordenar: Mais Recentes</option>
+                </select>
               </div>
               <div className="flex gap-1">
                 {[0,1,2,3,4,5,6].map(m => (
@@ -437,7 +463,7 @@ export function DecksScreen() {
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-7">
-              {filtered.map(card => {
+              {sorted.map(card => {
                 const countInDeck = deckCards.find(dc => dc.card_id === card.id)?.quantity || 0
                 const inTrash = trash[card.id] || 0
                 const available = card.quantity - inTrash

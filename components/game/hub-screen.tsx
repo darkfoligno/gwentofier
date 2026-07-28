@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { motion } from "framer-motion"
+import { AnimatePresence, motion } from "framer-motion"
 import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
@@ -11,6 +11,7 @@ import { GameCard } from "./game-card"
 import { DailyRewardWidget } from "./daily-reward-widget"
 import { PreMatchModal } from "./pre-match-modal"
 import { secureImageUrl } from "@/lib/secure-url"
+import { GachaModal } from "./gacha-modal"
 
 interface Profile { id: string; username: string; avatar_url: string | null }
 interface Stats { wins: number; losses: number; draws: number; ranked_rating: number; current_win_streak: number }
@@ -30,8 +31,24 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [preMatchMode, setPreMatchMode] = useState<"pvp" | "training" | null>(null)
   const [matchmaking, setMatchmaking] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [gachaCards, setGachaCards] = useState<GameCardType[] | null>(null)
 
-  const { coins } = useWallet()
+  const { coins, refresh: refreshWallet } = useWallet()
+
+  const hydrateGacha = async (results: any[]) => {
+    const ids = results.map(card => card.card_id)
+    const { data } = await supabase.from("cards").select("id,name,image_url,element,rarity,card_type,is_original_rpg,base_power,base_max_life,effect_mana_cost,effect_text,card_effects(effect_code)").in("id", ids)
+    const byId = new Map((data ?? []).map((card: any) => [card.id, card]))
+    return results.map(result => { const card: any = byId.get(result.card_id); return { id: result.card_id, nome: result.name, image_url: result.image_url, elemento: (["Bestiário", "M&F", "Witcher", "Elfica", "Cívil", "Vampiro"].includes(card?.element) ? card.element : "Bestiário") as GameCardType["elemento"], raridade: result.rarity, tipo: card?.element ?? "Bestiário", mana: card?.effect_mana_cost ?? 0, ataque: card?.base_power ?? 0, vida: card?.base_max_life ?? 1, efeito: card?.effect_text ?? "", effect_definition: card?.card_effects ?? [], is_original_rpg: card?.is_original_rpg ?? false } })
+  }
+
+  const handleDailyRewardClaimSuccess = async (data: any) => {
+    if (data && data.cards && data.cards.length > 0) {
+      const hydrated = await hydrateGacha(data.cards)
+      setGachaCards(hydrated)
+    }
+    await refreshWallet()
+  }
 
   useEffect(() => {
     void supabase.auth.getUser().then(async ({ data }) => {
@@ -114,7 +131,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
     {trainingStep && <div className="mb-4 rounded border border-blue-500/40 bg-blue-950/50 p-3 text-sm text-blue-100">{trainingStep}</div>}
     <div className="mb-5">
-      <DailyRewardWidget />
+      <DailyRewardWidget onClaimSuccess={handleDailyRewardClaimSuccess} />
     </div>
     {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
     
@@ -200,6 +217,17 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     )}
     
     <PreMatchModal mode={preMatchMode} onCancel={() => setPreMatchMode(null)} onConfirm={handlePreMatchConfirm} />
+    <AnimatePresence>
+      {gachaCards && (
+        <GachaModal 
+          cards={gachaCards} 
+          onCollect={() => { 
+            setGachaCards(null)
+            void refreshWallet() 
+          }} 
+        />
+      )}
+    </AnimatePresence>
   </div></main>
 }
 
