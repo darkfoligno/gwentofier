@@ -1,135 +1,9 @@
--- Migration to implement the Laboratório Ofieri card testing tables and RPC functions
-CREATE TABLE IF NOT EXISTS public.user_card_lab_rewards (
-    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    card_id uuid NOT NULL REFERENCES public.cards(id) ON DELETE CASCADE,
-    claimed_at timestamp with time zone DEFAULT now() NOT NULL,
-    PRIMARY KEY (user_id, card_id)
-);
+const fs = require('fs');
+let content = fs.readFileSync('D:/card-game-ui/supabase/migrations/202608030140_laboratorio_ofieri.sql', 'utf8');
 
-ALTER TABLE public.user_card_lab_rewards ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Allow users to read their own lab rewards"
-    ON public.user_card_lab_rewards
-    FOR SELECT
-    TO authenticated
-    USING (auth.uid() = user_id);
-
-CREATE OR REPLACE FUNCTION public.claim_lab_reward(p_card_id uuid)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_user_id uuid;
-    v_already_claimed boolean := false;
-BEGIN
-    v_user_id := auth.uid();
-    IF v_user_id IS NULL THEN
-        RAISE EXCEPTION 'User not authenticated';
-    END IF;
-
-    IF NOT EXISTS(SELECT 1 FROM public.cards WHERE id = p_card_id) THEN
-        RAISE EXCEPTION 'Card does not exist';
-    END IF;
-
-    SELECT EXISTS(
-        SELECT 1 FROM public.user_card_lab_rewards 
-        WHERE user_id = v_user_id AND card_id = p_card_id
-    ) INTO v_already_claimed;
-
-    IF v_already_claimed THEN
-        RETURN jsonb_build_object(
-            'success', true,
-            'reward', 0,
-            'first_time', false
-        );
-    ELSE
-        INSERT INTO public.user_card_lab_rewards(user_id, card_id, claimed_at)
-        VALUES(v_user_id, p_card_id, now());
-
-        INSERT INTO public.player_wallets (user_id, coins, updated_at)
-        VALUES (v_user_id, 25, now())
-        ON CONFLICT (user_id) 
-        DO UPDATE SET coins = public.player_wallets.coins + EXCLUDED.coins, updated_at = now();
-
-        RETURN jsonb_build_object(
-            'success', true,
-            'reward', 25,
-            'first_time', true
-        );
-    END IF;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.get_user_claimed_lab_cards()
-RETURNS uuid[]
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_user_id uuid;
-    v_res uuid[];
-BEGIN
-    v_user_id := auth.uid();
-    IF v_user_id IS NULL THEN
-        RETURN '{}'::uuid[];
-    END IF;
-
-    SELECT array_agg(card_id) INTO v_res
-    FROM public.user_card_lab_rewards
-    WHERE user_id = v_user_id;
-
-    RETURN coalesce(v_res, '{}'::uuid[]);
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION game_private.add_sandbox_card(
-    p_match_id uuid,
-    p_match_deck_id uuid,
-    p_owner_id uuid,
-    p_card_id uuid,
-    p_zone text,
-    p_pos integer,
-    p_face_up boolean,
-    p_custom_power integer DEFAULT NULL,
-    p_custom_max_life integer DEFAULT NULL,
-    p_custom_current_life integer DEFAULT NULL
-)
-RETURNS uuid
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_mdc_id uuid;
-BEGIN
-    INSERT INTO public.match_deck_cards(
-        match_deck_id, source_card_id, card_version, card_name, image_url, element, rarity, card_type, is_golden, base_power, base_max_life, effect_mana_cost, tier, leader_cooldown, effect_definition, copy_number
-    ) 
-    SELECT
-        p_match_deck_id, c.id, coalesce(c.version, 1), c.name, coalesce(c.image_url, ''), coalesce(c.element, 'Neutro'), c.rarity, c.card_type, c.is_golden, 
-        coalesce(p_custom_power, c.base_power, 0), coalesce(p_custom_max_life, c.base_max_life, 0), coalesce(c.effect_mana_cost, 0), 1, 0,
-        coalesce((select jsonb_agg(jsonb_build_object('effect_order', ce.effect_order, 'trigger_type', ce.trigger_type, 'effect_code', ce.effect_code, 'target_mode', ce.target_mode, 'parameters', ce.parameters, 'priority', ce.priority, 'is_reaction', ce.is_reaction, 'once_per_turn', ce.once_per_turn) order by ce.effect_order) from public.card_effects ce where ce.card_id = c.id and ce.is_active = true), '[]'::jsonb), 1
-    FROM public.cards c
-    WHERE c.id = p_card_id
-    RETURNING id INTO v_mdc_id;
-
-    INSERT INTO public.match_cards(
-        match_id, owner_user_id, controller_user_id, match_deck_card_id, source_card_id, zone, zone_position, is_face_up, base_power, base_max_life, current_power, maximum_power, current_life, maximum_life
-    )
-    SELECT
-        p_match_id, p_owner_id, p_owner_id, v_mdc_id, c.id, p_zone, p_pos, p_face_up, 
-        coalesce(p_custom_power, c.base_power, 0), coalesce(p_custom_max_life, c.base_max_life, 0), 
-        coalesce(p_custom_power, c.base_power, 0), coalesce(p_custom_power, c.base_power, 0), 
-        coalesce(p_custom_current_life, coalesce(p_custom_max_life, c.base_max_life, 0)), 
-        coalesce(p_custom_max_life, c.base_max_life, 0)
-    FROM public.cards c
-    WHERE c.id = p_card_id;
-
-    RETURN v_mdc_id;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.start_lab_sandbox(p_test_card_id uuid)
+const startIndex = content.indexOf('CREATE OR REPLACE FUNCTION public.start_lab_sandbox');
+if (startIndex !== -1) {
+    const newFunction = `CREATE OR REPLACE FUNCTION public.start_lab_sandbox(p_test_card_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -253,4 +127,9 @@ BEGIN
 
     RETURN v_match_id;
 END;
-$$;
+$$;`;
+
+    content = content.substring(0, startIndex) + newFunction + '\n';
+    fs.writeFileSync('D:/card-game-ui/supabase/migrations/202608030140_laboratorio_ofieri.sql', content);
+    console.log('Success');
+}
