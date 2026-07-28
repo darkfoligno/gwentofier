@@ -324,10 +324,10 @@ export function TradeScreen({ onEnter }: { onEnter: (screen: Screen) => void }) 
                         />
                       </span>
                       <span className="absolute right-2 top-2 z-10 rounded bg-amber-950/80 border border-amber-500/50 px-1.5 py-0.5 text-[9px] font-black text-amber-300">
-                        +{uc.quantity - 1} sobressalentes
+                        {uc.quantity} unidades
                       </span>
                       <div className="aspect-[2/3]">
-                        <GameCard card={card} enableZoom={false} />
+                        <GameCard card={card} enableZoom={true} />
                       </div>
                       <div className="mt-2 text-center text-[10px] font-bold text-stone-300 truncate">{card.nome}</div>
                     </div>
@@ -352,100 +352,84 @@ export function TradeScreen({ onEnter }: { onEnter: (screen: Screen) => void }) 
           )}
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          {/* SECTION 2: OTHER PLAYER ACTIVE LISTINGS */}
+        <div className="w-full">
+          {/* COMBINED SECTION: MERCADO GERAL */}
           <section className="rounded-xl border border-amber-800/35 bg-black/60 p-5">
             <h2 className="font-serif text-lg font-black text-amber-200 uppercase tracking-widest mb-4">Mercado Geral</h2>
             
-            {listings.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-                {listings.map(item => {
-                  const card = mapToGameCard(item.cards)
-                  const ownIt = hasCardInCollection(card.id)
-                  return (
-                    <article 
-                      key={item.id}
-                      className="rounded-xl border border-stone-800 bg-stone-950/60 p-3 flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="mb-2 flex items-center justify-between">
-                          {ownIt ? (
-                            <span className="rounded bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
-                              🟢 Você já possui
-                            </span>
-                          ) : (
-                            <span className="rounded bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 text-[9px] font-bold text-amber-300">
-                              🟡 Nova!
-                            </span>
-                          )}
-                        </div>
-                        <div className="aspect-[2/3] w-full mb-3">
-                          <GameCard card={card} interactive />
-                        </div>
-                        <div className="text-xs font-bold text-stone-200 truncate">{card.nome}</div>
-                        <div className="text-[10px] text-stone-400 mt-1 flex items-center gap-1.5 border-t border-stone-800/60 pt-2">
-                          <span className="text-amber-500/80">Vendedor:</span>
-                          <span className="truncate max-w-[100px] text-stone-300 font-medium">{item.profiles?.username || "Duelista"}</span>
-                        </div>
-                      </div>
+            {(() => {
+              const allListings = [
+                ...myListings.map(l => ({ ...l, isMine: true })),
+                ...listings.map(l => ({ ...l, isMine: false }))
+              ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-                      <button
-                        onClick={() => setActiveTradeListing(item)}
-                        className="mt-3 w-full rounded border border-amber-500 bg-amber-950/40 py-2 text-[10px] font-black uppercase text-amber-200 tracking-wider hover:bg-amber-900/60 transition-colors"
+              return allListings.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                  {allListings.map(item => {
+                    const card = mapToGameCard(item.cards)
+                    const ownIt = item.isMine || hasCardInCollection(card.id)
+                    return (
+                      <article 
+                        key={item.id}
+                        className="rounded-xl border border-stone-800 bg-stone-950/60 p-3 flex flex-col justify-between"
                       >
-                        Fazer Troca
-                      </button>
-                    </article>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="flex h-64 items-center justify-center border border-dashed border-stone-800 rounded-lg text-sm text-stone-500 font-serif">
-                Nenhum anúncio de outros jogadores ativo no momento.
-              </div>
-            )}
-          </section>
-
-          {/* SECTION 3: MY LISTINGS LIST */}
-          <aside className="rounded-xl border border-amber-800/35 bg-black/60 p-5 h-fit">
-            <h2 className="font-serif text-sm font-black text-amber-200 uppercase tracking-wider mb-4">Meus Anúncios Ativos</h2>
-            
-            {myListings.length > 0 ? (
-              <div className="flex flex-col gap-3">
-                {myListings.map(item => {
-                  const card = mapToGameCard(item.cards)
-                  return (
-                    <div 
-                      key={item.id}
-                      className="rounded-lg border border-stone-800 bg-stone-900/40 p-3 flex items-center gap-3 justify-between"
-                    >
-                      <div className="min-w-0 flex-1 flex items-center gap-2">
-                        <div className="aspect-[2/3] w-10 shrink-0">
-                          <GameCard card={card} enableZoom={false} />
-                        </div>
-                        <div className="min-w-0">
+                        <div>
+                          <div className="mb-2 flex items-center justify-between">
+                            {item.isMine ? (
+                              <span className="rounded bg-amber-950/80 border border-amber-500/40 px-2 py-0.5 text-[9px] font-bold text-amber-300">
+                                Você anunciou
+                              </span>
+                            ) : ownIt ? (
+                              <span className="rounded bg-emerald-950/80 border border-emerald-500/40 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+                                🟢 Você já possui
+                              </span>
+                            ) : (
+                              <span className="rounded bg-blue-950/80 border border-blue-500/40 px-2 py-0.5 text-[9px] font-bold text-blue-400">
+                                🟡 Nova!
+                              </span>
+                            )}
+                          </div>
+                          <div className="aspect-[2/3] w-full mb-3">
+                            <GameCard card={card} interactive enableZoom={true} />
+                          </div>
                           <div className="text-xs font-bold text-stone-200 truncate">{card.nome}</div>
-                          <div className="text-[9px] text-stone-400 capitalize mt-0.5">{card.raridade}</div>
+                          <div className="text-[10px] text-stone-400 mt-1 flex flex-col gap-1 border-t border-stone-800/60 pt-2">
+                            <div>
+                              <span className="text-amber-500/80 font-bold">Anunciado por:</span>{' '}
+                              <span className="truncate max-w-[120px] text-stone-300 font-medium">
+                                {item.isMine ? (profile?.username ? `${profile.username} (Você)` : "Você") : (item.profiles?.username || "Duelista")}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <button
-                        disabled={busy !== null}
-                        onClick={() => void handleCancelListing(item.id)}
-                        className="rounded border border-red-500 bg-red-950/40 p-2 text-xs font-bold text-red-200 hover:bg-red-900/40 transition-colors"
-                        title="Cancelar anúncio"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="py-8 text-center text-xs text-stone-500 font-serif">
-                Você não possui anúncios ativos no momento.
-              </div>
-            )}
-          </aside>
+
+                        {item.isMine ? (
+                          <button
+                            disabled={busy !== null}
+                            onClick={() => void handleCancelListing(item.id)}
+                            className="mt-3 w-full rounded border border-red-500 bg-red-950/40 py-2 text-[10px] font-black uppercase text-red-200 tracking-wider hover:bg-red-900/60 transition-colors disabled:opacity-40"
+                          >
+                            {busy === "cancel" ? "Cancelando..." : "Cancelar Anúncio"}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setActiveTradeListing(item)}
+                            className="mt-3 w-full rounded border border-amber-500 bg-amber-950/40 py-2 text-[10px] font-black uppercase text-amber-200 tracking-wider hover:bg-amber-900/60 transition-colors"
+                          >
+                            Fazer Troca
+                          </button>
+                        )}
+                      </article>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="flex h-64 items-center justify-center border border-dashed border-stone-800 rounded-lg text-sm text-stone-500 font-serif">
+                  Nenhum anúncio ativo no mercado de trocas no momento.
+                </div>
+              );
+            })()}
+          </section>
         </div>
       </div>
 

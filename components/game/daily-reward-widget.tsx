@@ -40,9 +40,48 @@ export function DailyRewardWidget({ onClaimSuccess }: { onClaimSuccess?: (data: 
 
   const canClaimDaily = () => {
     if (!lastClaimDate) return true
-    const last = new Date(lastClaimDate)
-    const now = new Date()
-    return last.getFullYear() !== now.getFullYear() || last.getMonth() !== now.getMonth() || last.getDate() !== now.getDate()
+    
+    // Get date parts in America/Sao_Paulo timezone
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false
+    })
+    
+    try {
+      const partsNow = formatter.formatToParts(new Date())
+      const partsLast = formatter.formatToParts(new Date(lastClaimDate))
+      
+      const getPart = (parts: Intl.DateTimeFormatPart[], type: string) => 
+        Number(parts.find(p => p.type === type)?.value)
+        
+      const nowYear = getPart(partsNow, "year")
+      const nowMonth = getPart(partsNow, "month")
+      const nowDay = getPart(partsNow, "day")
+      const nowHour = getPart(partsNow, "hour")
+      const nowMinute = getPart(partsNow, "minute")
+      
+      const lastYear = getPart(partsLast, "year")
+      const lastMonth = getPart(partsLast, "month")
+      const lastDay = getPart(partsLast, "day")
+      
+      const isDifferentDay = nowYear !== lastYear || nowMonth !== lastMonth || nowDay !== lastDay
+      
+      if (!isDifferentDay) return false
+      
+      // If it's a different day, check if it's at least 00:01 (meia-noite e um)
+      return nowHour > 0 || nowMinute >= 1
+    } catch (e) {
+      console.error("Erro na validação do fuso do resgate diário:", e)
+      // Fallback
+      const last = new Date(lastClaimDate)
+      const now = new Date()
+      return last.getFullYear() !== now.getFullYear() || last.getMonth() !== now.getMonth() || last.getDate() !== now.getDate()
+    }
   }
 
   const isDailyAvailable = canClaimDaily()

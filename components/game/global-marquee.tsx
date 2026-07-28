@@ -63,7 +63,8 @@ export function GlobalMarquee() {
         </motion.div>
       </AnimatePresence>
       <button 
-        onClick={() => setVisible(false)} 
+        type="button"
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setVisible(false); }} 
         className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-amber-400 hover:text-amber-200 transition-colors"
         aria-label="Fechar anúncio"
       >

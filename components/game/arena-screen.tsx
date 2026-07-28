@@ -595,7 +595,7 @@ export function ArenaScreen() {
     if (["selected", "ally", "enemy", "deck", "hand", "graveyard"].includes(mode)) {
       const zone = ["deck", "hand", "graveyard"].includes(mode) ? mode as MatchCardZone : undefined
       const valid=boardCards.filter(target=>{
-        if(code==="common_endriuga_scaled_damage"||code==="common_cleaver_discard_for_direct")return target.owner_id===opponentId&&target.zone==="life"&&(target.current_life??0)>0
+        if(code==="common_endriuga_scaled_damage"||code==="common_cleaver_discard_for_direct"||code==="common_panther_direct_life")return target.owner_id===opponentId&&target.zone==="life"&&(target.current_life??0)>0
         if(zone)return target.owner_id===userId&&target.zone===zone
         if(mode==="enemy")return target.owner_id===opponentId&&fieldZones.includes(target.zone)
         if(mode==="ally")return target.owner_id===userId&&fieldZones.includes(target.zone)
