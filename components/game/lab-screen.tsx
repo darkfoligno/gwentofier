@@ -15,6 +15,13 @@ export function LabScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
 
   const loadLabData = async () => {
     setLoading(true)
+    
+    const { data: authData } = await supabase.auth.getUser()
+    if (authData.user?.id !== "b6cd0821-39ae-451f-a8ca-25694c3e553c") {
+      onEnter("hub")
+      return
+    }
+
     const ids = [
       "66d0f400-141a-4591-9c1a-f4400be91bc9", // Tomira
       "cc6cc445-8484-470f-a71e-3e63dbf0008d", // Pantera

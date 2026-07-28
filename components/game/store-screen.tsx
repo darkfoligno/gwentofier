@@ -100,42 +100,32 @@ export function StoreScreen() {
     <header className="mb-6 flex items-center justify-between rounded-xl border border-amber-600/40 bg-zinc-950/75 p-5"><div><h1 className="font-serif text-3xl font-black text-amber-200">Mercado de Ofier</h1><p className="text-sm text-zinc-400">Relíquias, grimórios e cartas escolhidas pelo destino.</p></div><div className="flex items-center gap-3 rounded-full border border-amber-400/60 bg-black/70 px-5 py-2 shadow-[0_0_20px_rgba(245,158,11,.3)]"><Coins className="text-amber-300" /><strong className="text-xl text-amber-100">{coins.toLocaleString("pt-BR")}</strong></div></header>
     {error && <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mb-5 rounded-lg border border-red-500 bg-red-950/80 p-3 text-center font-bold text-red-200">{error}</motion.div>}
     <div className="mb-7">
-      <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale"><span className="flex items-center gap-4"><Gift className="text-amber-300" size={35} /><span><b className="block font-serif text-xl text-amber-100">Resgate Diário</b><span className="text-sm text-stone-400">
-        {isDailyAvailable 
-          ? (lastClaimDate && (Math.floor((new Date().setHours(0,0,0,0) - new Date(lastClaimDate).setHours(0,0,0,0)) / 86400000) - 1) > 0 
-              ? `Reivindique sua recompensa gratuita! Você está há ${Math.floor((new Date().setHours(0,0,0,0) - new Date(lastClaimDate).setHours(0,0,0,0)) / 86400000) - 1} dia(s) sem resgatar seus resgates diários.` 
-              : "Reivindique sua recompensa gratuita nas Areias.") 
-          : (lastClaimInfo 
-              ? `Você já resgatou sua recompensa hoje às ${new Date(lastClaimInfo.claimed_at).getHours().toString().padStart(2, "0")}:${new Date(lastClaimInfo.claimed_at).getMinutes().toString().padStart(2, "0")} e poderá resgatar novamente às 00:01 do dia seguinte.` 
-              : "Você já resgatou sua recompensa de hoje. Volte amanhã!")}
-      </span></span></span><span className="rounded bg-amber-700 px-5 py-2 text-xs font-black">{busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}</span></button>
-      {!isDailyAvailable && lastClaimInfo && (
-        <div className="mt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-lg border border-amber-500/20 bg-amber-950/40 p-4 text-xs shadow-inner">
-          <div className="flex items-start gap-3">
-            <Scroll className="mt-0.5 text-amber-400 shrink-0" size={16} />
-            <div className="space-y-1">
-              <p className="text-amber-200">
-                🕒 Último resgate efetuado em <span className="font-bold text-amber-100">{formatClaimDate(lastClaimInfo.claimed_at)}</span>.
-              </p>
-              <p className="text-stone-400">
-                {lastClaimInfo.missed_days_before > 0 ? (
-                  <span>
-                    📦 <span className="text-amber-300 font-semibold">Nota de Economia:</span> Em seu último resgate, você acumulou o bônus de <span className="font-bold text-amber-100">{lastClaimInfo.missed_days_before} dia(s) atrasado(s)</span>!
-                  </span>
-                ) : (
-                  <span>
-                    🔥 Você está com o bônus em dia! Próximo resgate disponível à meia-noite.
-                  </span>
-                )}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-black/40 px-3 py-1 font-serif text-[10px] text-amber-300 uppercase tracking-widest self-start sm:self-center shrink-0">
-            <Hourglass size={10} className="animate-pulse" />
-            Volte amanhã
-          </div>
-        </div>
-      )}
+      <button onClick={() => void daily()} disabled={Boolean(busy) || !isDailyAvailable} className="flex w-full items-center justify-between rounded-xl border border-amber-400 bg-gradient-to-r from-amber-950 via-stone-950 to-amber-950 p-5 text-left shadow-[0_0_30px_rgba(245,158,11,.22)] disabled:opacity-50 disabled:grayscale">
+        <span className="flex items-center gap-4">
+          <Gift className="text-amber-300" size={35} />
+          <span className="flex flex-col gap-1">
+            <b className="block font-serif text-xl text-amber-100">Resgate Diário</b>
+            <span className="text-sm text-stone-400">
+              {isDailyAvailable 
+                ? (lastClaimDate && (Math.floor((new Date().setHours(0,0,0,0) - new Date(lastClaimDate).setHours(0,0,0,0)) / 86400000) - 1) > 0 
+                    ? `Reivindique sua recompensa gratuita! Você está há ${Math.floor((new Date().setHours(0,0,0,0) - new Date(lastClaimDate).setHours(0,0,0,0)) / 86400000) - 1} dia(s) sem resgatar seus resgates diários.` 
+                    : "Reivindique sua recompensa gratuita nas Areias.") 
+                : (lastClaimInfo 
+                    ? `Você já resgatou sua recompensa hoje às ${new Date(lastClaimInfo.claimed_at).getHours().toString().padStart(2, "0")}:${new Date(lastClaimInfo.claimed_at).getMinutes().toString().padStart(2, "0")} e poderá resgatar novamente às 00:01 do dia seguinte.` 
+                    : "Você já resgatou sua recompensa de hoje. Volte amanhã!")}
+            </span>
+            {!isDailyAvailable && lastClaimInfo && (
+              <span className="text-xs text-amber-300/80 mt-1 block font-bold">
+                🕒 Último resgate efetuado em {formatClaimDate(lastClaimInfo.claimed_at)}
+                {lastClaimInfo.missed_days_before > 0 ? ` — (Bônus resgatado: ${lastClaimInfo.missed_days_before} dia(s) de atraso)` : ""}
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="rounded bg-amber-700 px-5 py-2 text-xs font-black shrink-0">
+          {busy === "daily" ? "INVOCANDO..." : isDailyAvailable ? "RESGATAR" : "INDISPONÍVEL"}
+        </span>
+      </button>
     </div>
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">{packs.map((pack) => {
       const canAfford = Number(coins || 0) >= Number(pack.price_coins || 0);
