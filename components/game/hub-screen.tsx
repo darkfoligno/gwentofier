@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet } from "lucide-react"
+import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
