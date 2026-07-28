@@ -38,6 +38,9 @@ BEGIN
     )
     RETURNING id INTO v_match_id;
 
+    -- Register match in sandbox_matches
+    INSERT INTO public.sandbox_matches (match_id) VALUES (v_match_id);
+
     -- 2. Players
     INSERT INTO public.match_players(match_id, user_id, player_number, passed_turn, setup_finished, mana_available, mana_snapshot)
     VALUES 
