@@ -1,0 +1,101 @@
+id,nome_carta,raridade,mana,ataque,vida,codigo_efeito,descricao,elemento
+32fd7f68-994b-44b8-8551-c664dad9e531,Afogador,common,0,350,0,COMMON_027,Sem descrição,Bestiario
+d021ec8f-eeae-4aa4-90ec-e8099a4c15d6,Anabelle,common,0,2000,0,COMMON_052,Sem descrição,Civil
+75f4768e-f534-4d33-bd51-377eef503310,Anna Strenger,common,0,800,0,COMMON_065,Sem descrição,Cívil
+0717c4bc-24e5-4852-8fea-9502ce19d70a,Aparição Diurna,common,0,1950,0,COMMON_007,Sem descrição,Bestiario
+06fa0fe8-eabb-4c46-92b9-2a17479a34b4,Aparição Noturna,common,0,1500,0,COMMON_008,Sem descrição,Bestiario
+468273d5-a91a-4401-ad34-9e1ed222a63e,Baltazar,common,0,0,0,COMMON_031,Sem descrição,M&F
+a121e8d5-1d1a-44d6-b828-a1ad18c30ac1,Barghest,common,0,2000,0,COMMON_019,Sem descrição,Bestiario
+49ec623c-387c-48d7-bdfe-ecd83eb363e9,Barnabas o Mordomo,common,0,50,0,COMMON_060,Sem descrição,Cívil
+c8f31e9d-0931-454a-b025-d3a9e076e04b,Barroso,common,0,900,0,COMMON_020,Sem descrição,Bestiario
+d2a5ff96-13e0-435c-bc6e-d367ca076a70,Berseker,common,0,1,0,COMMON_013,Sem descrição,Bestiario
+3054c628-1292-4d3c-9baa-59e8e5e42696,Cão Selvagem,common,0,1300,0,COMMON_056,Sem descrição,Bestiario
+6eb7d8c6-2ee8-4fe5-b27a-d032b6c61d22,Carniçal,common,0,800,0,COMMON_010,Sem descrição,Bestiario
+efe518ae-3a33-405f-ab72-a5c12e4dbbe3,Carniçal Atroz,common,0,1200,0,COMMON_021,Sem descrição,Bestiario
+7ace7082-f707-4611-999b-636792b9f89a,Carpeado,common,0,1000,0,COMMON_063,Sem descrição,Bestiario
+ae14f1d7-c39f-4291-9716-917c8f074968,Casimir Bassi,common,0,1800,0,COMMON_042,Sem descrição,Anao
+744e489a-55a0-41cc-9345-3551935978d0,Ciri criança,common,0,1500,0,COMMON_059,Sem descrição,Elfica
+a951bc8b-a584-4b68-9efa-fb05fd96670a,Corine,common,0,700,0,COMMON_050,Sem descrição,M&F
+e1f3727a-c9ae-46ef-accd-d30bab2e39a3,Cutelo,common,0,2200,0,COMMON_024,Sem descrição,Anao
+1c224f7d-52e8-4793-8a38-fe9f30d8bb3b,Dijkistra,common,0,1600,0,COMMON_001,Sem descrição,Cívil
+49bc6888-9f0d-43ec-a723-ae21b2d34044,Dilion Vorgues,common,0,1500,0,COMMON_034,Sem descrição,Cívil
+d841cb7e-1a87-4d00-bdc6-1e0259fcd4e3,Dudu Biberveld,common,0,1000,0,COMMON_039,Sem descrição,Bestiario
+a30c204e-96ca-4a99-99d0-79026e95eaa9,Duny,common,0,1600,0,COMMON_002,Sem descrição,Cívil
+8657fa82-7225-4cca-86d6-86ec59abbf47,Elemental,common,0,500,0,COMMON_011,Sem descrição,Bestiario
+d3dfc41b-6a9d-4e48-9efc-ce68eb21fd58,Endriuga,common,0,600,0,COMMON_005,Sem descrição,Bestiario
+a0a82d31-2094-4256-92b9-8bc58c9ba311,Erinia,common,0,600,0,COMMON_004,Sem descrição,Bestiario
+7f581583-b477-4677-b897-045ad8a67f9b,Eveline Gallo,common,0,1400,0,COMMON_061,Sem descrição,Cívil
+e51e89af-88f2-4202-81b3-b43fa95e90b0,Fada,common,0,500,0,COMMON_017,Sem descrição,Bestiario
+052a7d48-49ae-42b1-8b9e-44ddd883c5be,Feiticeira Mabel,common,0,1800,0,COMMON_071,Sem descrição,M&F
+cc998bd0-2723-4967-95a1-c3648f9f346f,Filho da Puta Junior,common,0,0,0,COMMON_000,Sem descrição,Cívil
+be345ece-e5f6-44da-8bd2-9382744fc868,Gaetan,common,0,1700,0,COMMON_046,Sem descrição,Witcher
+0b75b24c-138d-4b76-8596-638f5a534946,Gargula,common,0,200,0,COMMON_014,Sem descrição,Bestiario
+d6de7590-2a41-4f95-b744-a4ae627b11f4,General da Ordem,common,0,1700,0,COMMON_032,Sem descrição,Cívil
+faf99423-79bf-4df4-9f1d-02246b288516,Gerd da Escola do Urso,common,0,1600,0,COMMON_055,Sem descrição,Witcher
+88ae13ea-0bc8-4402-b3d3-c1e35d1aa43b,Guillaume,common,0,1800,0,COMMON_051,Sem descrição,Cívil
+9dca32b8-4950-452e-954d-d3aaee087241,Halmar de Skellige,common,0,1700,0,COMMON_038,Sem descrição,Cívil
+0cb72709-5ff3-47e5-a0cc-be1246fdeaa1,Harpia,common,0,200,0,COMMON_057,Sem descrição,Bestiario
+126a4c87-38ba-4727-b031-3949d49205cf,Hattori o Elfo Ferreiro,common,0,1700,0,COMMON_043,Sem descrição,Elfica
+df14d4b8-12e4-4f8f-9b07-dbacbb379ad1,Ida Emean,common,0,1300,0,COMMON_069,Sem descrição,M&F
+de8a6984-e1c7-4d4f-bf50-5760156d6bd2,Jarl de An Skellige,common,0,2000,0,COMMON_037,Sem descrição,Cívil
+f4c2ee2a-a83f-408d-b369-4d54384a712d,Javali,common,0,3600,0,COMMON_003,Sem descrição,Bestiario
+b73066fc-1cfc-4c09-ab03-45ea8c9855e3,Joachim von Gratz-Vampiro,common,0,1900,0,COMMON_054,Sem descrição,Vampiro
+4b829aa3-eda3-4585-b33e-f3580a9807ec,Keira Metz,common,0,1200,0,COMMON_009,Sem descrição,M&F
+43f24138-c822-46e1-8486-514132f584e3,Kiyan – Bruxo da Escola do Gato,common,0,1400,0,COMMON_049,Sem descrição,Witcher
+c820fad3-30c4-4b32-9fd5-d13a092e2abc,Lobo,common,0,1000,0,COMMON_028,Sem descrição,Bestiario
+5eabc8db-4160-4681-9d4e-1bec9b224f02,Lugos Todo Roxo,common,0,500,0,COMMON_025,Sem descrição,Cívil
+96eb30b7-9e96-4773-9bee-b54792d536d0,Marlene de Trastamara,common,0,0,0,COMMON_064,Sem descrição,M&F
+a1611f4b-b7b4-434c-9764-2250f9879e59,Mestre da Arena,common,0,2300,0,COMMON_070,Sem descrição,Bestiario
+b9c5de35-976a-4033-ad25-443528169caf,Milton de Peyrac-Peyran,common,0,1500,0,COMMON_044,Sem descrição,Cívil
+3c0b027d-908a-40b7-9418-20a8d99abaa0,Morkvarg,common,0,0,0,COMMON_067,Sem descrição,Cívil
+eff0ac44-a3e4-467f-bfdc-2042c4523701,Necroso,common,0,0,0,COMMON_016,Sem descrição,Bestiario
+82277f4a-492c-4496-a0d8-e2516abbc64e,Nekker,common,0,1000,0,COMMON_026,Sem descrição,Bestiario
+86a2283c-4514-409c-b582-a1653e48ea70,Nenneke Sacerdotisa de Melitele,common,0,1000,0,COMMON_062,Sem descrição,M&F
+cc6cc445-8484-470f-a71e-3e63dbf0008d,Pantera,common,0,1300,0,COMMON_022,Sem descrição,Bestiario
+652bd87d-facb-4dbc-b956-490444cdd1df,Principe Adrian de Kaedwen,common,0,1600,0,EXTRA_COM_01,Sem descrição,Civil
+249fba9e-4b5b-4550-b2aa-7a1c09a962bb,Puero,common,0,200,0,COMMON_015,Sem descrição,Bestiario
+a5dcdb5a-92d9-42ef-89ef-1ccbbecada40,Rei dos Mendigos,common,0,1450,0,COMMON_023,Sem descrição,Cívil
+2f6fbc9a-ff32-4c18-98f6-b8f6599aa06e,Rei Henselt,common,0,2500,0,COMMON_006,Sem descrição,Cívil
+4cc39837-6f12-4125-83e2-8a4e267223e5,Reynold Longmes,common,0,0,0,COMMON_035,Sem descrição,Witcher
+43f3a065-700b-42df-ab98-c40002b93930,Shani,common,0,50,0,COMMON_018,Sem descrição,Cívil
+78a12f3f-43d6-462a-82c7-43df0149a806,Síle de Tansarville,common,0,0,0,COMMON_045,Sem descrição,M&F
+1d95d0fa-0d89-4b21-b614-2bbac32e2d02,Skjall,common,0,2000,0,COMMON_066,Sem descrição,Cívil
+98438929-4dc8-48cd-a827-02704962f6d2,Tamara Stranger,common,0,500,0,COMMON_036,Sem descrição,M&F
+9299adfb-97db-46d8-94da-a982cf3f5639,Thaler,common,0,1600,0,COMMON_040,Sem descrição,Cívil
+66d0f400-141a-4591-9c1a-f4400be91bc9,Tomira,common,0,0,0,COMMON_047,Sem descrição,Cívil
+f6bcd9d7-ec02-406d-93d4-cc283493594b,Totem,common,0,0,0,COMMON_033,Sem descrição,Bestiario
+396784cd-e61b-4f7e-8fba-3757eaca72a4,Troll,common,0,500,0,COMMON_012,Sem descrição,Bestiario
+58f04ead-dfa9-4fba-b155-76d336beb0d1,Udalryk o Atormentado,common,0,1700,0,COMMON_068,Sem descrição,Cívil
+692bdbfb-1cf3-4e49-ba84-2f307abee4db,Urso,common,0,0,0,COMMON_029,Sem descrição,Bestiario
+bcc35118-de4e-4454-99ef-c7adb9a351dc,Vaca,common,0,100,0,COMMON_058,Sem descrição,Bestiario
+eb3a66bd-b41a-44b0-a2e4-3205da3a88c8,Ves,common,0,2000,0,COMMON_048,Sem descrição,Cívil
+de13b29b-13b9-4def-b426-7d1c9da0f31a,Vimme Vivaldi,common,0,1200,0,COMMON_041,Sem descrição,Anao
+7be9edc0-7bc8-407b-874e-cc9949af3249,Vlodimir von Everec,common,0,1000,0,COMMON_053,Sem descrição,Cívil
+408f39c5-6af2-4bac-956a-7bd8a44eebf4,Winkler Vosgad,common,0,1700,0,COMMON_030,Sem descrição,Witcher
+e0ea21e2-0922-4632-951e-b8c67d950087,Alpor,rare,0,2000,0,EXTRA_RARE_04,Sem descrição,Vampiro
+a3e98443-4292-4744-ab5b-f5b0803da629,Altair da Escola do Lobo,rare,0,1800,0,EXTRA_RARE_01,Sem descrição,Witcher
+8d7e94d0-d8c9-4677-93eb-d8da80ed1b2e,Amduat o Elfo,rare,0,2200,0,RARE_042,Sem descrição,Elfica
+327b4510-c2e7-4c04-806e-4a11bce1c427,Aracnomorfo,rare,0,3100,0,RARE_015,Sem descrição,Bestiario
+57c3d013-dc85-4e09-b39b-bcde48d25a64,Arella da Escola do Grifo,rare,0,1200,0,EXTRA_RARE_03,Sem descrição,Witcher
+335646dc-6b0d-4f87-bb2e-f44ce9b675c2,ArqueGriffo,rare,0,4000,0,RARE_045,Sem descrição,Bestiario
+f75a5c39-7ff0-4582-b0ac-2da3db50d240,Arquespora,rare,0,600,0,RARE_008,Sem descrição,Bestiario
+cb068893-6065-4437-9cdc-0a23dba9d833,Barão Sanguinário,rare,0,2600,0,RARE_005,Sem descrição,Civil
+6fbf1647-cb10-4377-8ecf-53e1ddcd721a,Bruxa Áquatica,rare,0,2300,0,RARE_011,Sem descrição,Bestiario
+dea23a53-7bb3-4882-afa6-e99407fa6f58,Canoleta,rare,0,1000,0,RARE_036,Sem descrição,Civil
+6e95b40e-e28f-4669-b202-22ca72cb5791,Casa das Lágrimas,rare,0,2800,0,RARE_030,Sem descrição,Bestiario
+65c75b95-f0d6-4e59-8c99-ed628653d45e,Centopéia Gigante,rare,0,1800,0,RARE_017,Sem descrição,Bestiario
+179e60f0-be17-4930-b884-341182fc1833,Cérbero da Caçada Selvagem,rare,0,2900,0,RARE_012,Sem descrição,Bestiario
+6ff7b791-60f2-4787-9aa0-bc179ee40a37,Cerlinna a Alpor,rare,0,1800,0,RARE_050,Sem descrição,Vampiro
+e93c8483-00d5-4b23-92ce-5ac15e1cc345,Cerys,rare,0,3000,0,RARE_003,Sem descrição,Civil
+e3e7209a-485b-43c8-a4ce-47053e4f41e0,Ciclope,rare,0,1500,0,RARE_020,Sem descrição,Bestiario
+11fd40fa-587d-4d7f-aa69-934dce00ca5e,Dama da Peste,rare,0,2500,0,RARE_059,Sem descrição,Bestiario
+ae2fc8d1-6390-453f-b984-e324fbed6ac9,Dama de Ferro,rare,0,2500,0,RARE_043,Sem descrição,Civil
+431c3cda-33cf-4860-9892-c2f274cb39d9,Danvis Vampiro Coveiro,rare,0,2500,0,RARE_038,Sem descrição,Vampiro
+772fdd16-861f-4b8f-8974-69b00e0c3e66,Darion da Escola do Gato,rare,0,2000,0,EXTRA_RARE_07,Sem descrição,Witcher
+117be7df-2666-4eb2-85fe-498b97a9378a,Demônio,rare,0,2000,0,RARE_023,Sem descrição,Bestiario
+4f17311a-ad66-4e16-a12d-c887070b6b05,Diana de Tauren,rare,0,2750,0,RARE_027,Sem descrição,Civil
+c8f62192-19c2-46cf-a819-772a0fc1cc74,Dismas da Escola da Manticora,rare,0,1500,0,EXTRA_RARE_08,Sem descrição,Witcher
+007fca25-b793-43d4-81ad-c96126adfc5e,DROGODAR,rare,0,2600,0,RARE_002,Sem descrição,Civil
+71a5cf75-093b-4333-873b-3d9f6463321c,Enel Ducat - Agente de Inteligencia,rare,0,700,0,RARE_055,Sem descrição,Civil
+951c0b8e-a3de-4d52-9afd-8659459dfbd5,Etéreo,rare,0,2000,0,RARE_035,Sem descrição,Bestiario
+23fadb63-8245-4893-abcd-12a1a26ac92a,Feitiçeira Jhenny,rare,0,2800,0,RARE_021,Sem descrição,M&F
