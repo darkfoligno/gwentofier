@@ -257,7 +257,7 @@ BEGIN
     )
     VALUES (
         v_rule_id, 'campaign', v_user_id,
-        true, true, 'ban_phase', 0, v_user_id
+        true, true, 'setup', 0, v_user_id
     )
     RETURNING id INTO v_match_id;
 
@@ -266,7 +266,7 @@ BEGIN
         (v_match_id, v_user_id, 1, CASE WHEN p_deck_id = '00000000-0000-0000-0000-000000000000'::uuid OR p_deck_id = '00000000-0000-0000-0000-000000000072'::uuid THEN NULL ELSE p_deck_id END),
         (v_match_id, v_bot_id, 2, NULL);
 
-    IF p_deck_id = '00000000-0000-0000-0000-000000000000'::uuid OR p_deck_id IS NULL THEN
+    IF p_deck_id = '00000000-0000-0000-0000-000000000000'::uuid OR p_deck_id = '00000000-0000-0000-0000-000000000072'::uuid OR p_deck_id IS NULL THEN
         PERFORM game_private.snapshot_deck(v_match_id, v_user_id, '00000000-0000-0000-0000-000000000000'::uuid);
     ELSE
         PERFORM game_private.snapshot_deck(v_match_id, v_user_id, p_deck_id);
@@ -298,10 +298,16 @@ BEGIN
     INSERT INTO public.training_matches(match_id, human_user_id, bot_user_id)
     VALUES (v_match_id, v_user_id, v_bot_id);
 
+    -- Draw initial hands of 7 cards for both players
+    PERFORM game_private.draw_internal(v_match_id, v_user_id, 7);
+    PERFORM game_private.draw_internal(v_match_id, v_bot_id, 7);
+
     INSERT INTO public.match_public_states(match_id, player1_user_id, player1_username, player2_user_id, player2_username)
     SELECT v_match_id, p1.id, p1.username, p2.id, 'Rei dos Mendigos (Chefe)'
     FROM public.profiles p1, public.profiles p2
     WHERE p1.id = v_user_id AND p2.id = v_bot_id;
+
+    PERFORM game_private.recalculate_match_public_state(v_match_id);
 
     RETURN v_match_id;
 END;
