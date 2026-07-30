@@ -533,7 +533,11 @@ DECLARE
   v_failure_message text;
   v_turn_result jsonb := '{}'::jsonb;
   v_limit integer;
+  v_actions_count integer;
 BEGIN
+  -- FIRST, refresh engine state to unlock turn_action phase
+  PERFORM game_private.refresh_match_engine_state(p_match_id);
+
   -- Lock match
   SELECT m.* INTO v_match FROM public.matches m WHERE m.id = p_match_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'MATCH_NOT_FOUND'; END IF;
@@ -544,79 +548,83 @@ BEGIN
   SELECT reinforcement_slots INTO v_limit FROM public.game_rule_versions WHERE id = v_match.rule_version_id;
   IF v_limit IS NULL THEN v_limit := 4; END IF;
 
+  SELECT actions_this_turn INTO v_actions_count FROM public.match_players WHERE match_id = p_match_id AND user_id = v_bot_id;
+
   -- ==========================================
   -- FASE 1: Invocação (Descer cartas da mão)
   -- ==========================================
-  SELECT count(*)::integer INTO v_hand_count
-  FROM public.match_cards mc
-  WHERE mc.match_id = p_match_id AND mc.owner_user_id = v_bot_id AND mc.zone = 'hand';
-
-  -- Select best card to play (higher base_power), excluding Beggar King unless only card in hand
-  SELECT mc.* INTO v_card_to_play
-  FROM public.match_cards mc
-  JOIN public.match_deck_cards mdc ON mdc.id = mc.match_deck_card_id
-  WHERE mc.match_id = p_match_id 
-    AND mc.owner_user_id = v_bot_id 
-    AND mc.zone = 'hand'
-    AND (v_hand_count = 1 OR mc.source_card_id <> 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid)
-  ORDER BY mdc.base_power DESC, mc.id ASC
-  LIMIT 1;
-
-  IF v_card_to_play IS NOT NULL THEN
-      -- Try to play to Reinforcement first if slots available
-      SELECT count(*)::integer INTO v_reinforcement_count
+  IF coalesce(v_actions_count, 0) = 0 THEN
+      SELECT count(*)::integer INTO v_hand_count
       FROM public.match_cards mc
-      WHERE mc.match_id = p_match_id AND mc.controller_user_id = v_bot_id
-        AND mc.zone = 'reinforcement' AND mc.current_life > 0;
+      WHERE mc.match_id = p_match_id AND mc.owner_user_id = v_bot_id AND mc.zone = 'hand';
 
-      IF v_reinforcement_count < v_limit THEN
-          SELECT gs.slot INTO v_slot FROM generate_series(1, v_limit) gs(slot)
-          WHERE NOT EXISTS(
-            SELECT 1 FROM public.match_cards mc WHERE mc.match_id = p_match_id
-              AND mc.controller_user_id = v_bot_id AND mc.zone = 'reinforcement' AND mc.zone_position = gs.slot
-          ) ORDER BY gs.slot LIMIT 1;
+      -- Select best card to play (higher base_power), excluding Beggar King unless only card in hand
+      SELECT mc.* INTO v_card_to_play
+      FROM public.match_cards mc
+      JOIN public.match_deck_cards mdc ON mdc.id = mc.match_deck_card_id
+      WHERE mc.match_id = p_match_id 
+        AND mc.owner_user_id = v_bot_id 
+        AND mc.zone = 'hand'
+        AND (v_hand_count = 1 OR mc.source_card_id <> 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid)
+      ORDER BY mdc.base_power DESC, mc.id ASC
+      LIMIT 1;
 
-          IF v_slot IS NOT NULL THEN
-              UPDATE public.match_cards 
-              SET zone = 'reinforcement', zone_position = v_slot, is_face_up = false, entered_zone_turn = v_match.current_turn 
-              WHERE id = v_card_to_play.id;
-              
-              UPDATE public.match_players SET actions_this_turn = actions_this_turn + 1 WHERE match_id = p_match_id AND user_id = v_bot_id;
-              
-              v_version := game_private.record_match_action(
-                  p_match_id, v_bot_id, 'card_played',
-                  jsonb_build_object('card_id', null, 'zone', 'reinforcement', 'position', v_slot, 'mana_spent', 0),
-                  jsonb_build_object('card_id', v_card_to_play.id), v_version
-              );
-              v_action_played := true;
-          END IF;
-      ELSE
-          -- Else play to Attacker
-          SELECT count(*)::integer INTO v_attacker_count
+      IF v_card_to_play IS NOT NULL THEN
+          -- Try to play to Reinforcement first if slots available
+          SELECT count(*)::integer INTO v_reinforcement_count
           FROM public.match_cards mc
           WHERE mc.match_id = p_match_id AND mc.controller_user_id = v_bot_id
-            AND mc.zone = 'attacker' AND mc.current_life > 0;
+            AND mc.zone = 'reinforcement' AND mc.current_life > 0;
 
-          IF v_attacker_count < v_limit THEN
+          IF v_reinforcement_count < v_limit THEN
               SELECT gs.slot INTO v_slot FROM generate_series(1, v_limit) gs(slot)
               WHERE NOT EXISTS(
                 SELECT 1 FROM public.match_cards mc WHERE mc.match_id = p_match_id
-                  AND mc.controller_user_id = v_bot_id AND mc.zone = 'attacker' AND mc.zone_position = gs.slot
+                  AND mc.controller_user_id = v_bot_id AND mc.zone = 'reinforcement' AND mc.zone_position = gs.slot
               ) ORDER BY gs.slot LIMIT 1;
 
               IF v_slot IS NOT NULL THEN
                   UPDATE public.match_cards 
-                  SET zone = 'attacker', zone_position = v_slot, is_face_up = true, entered_zone_turn = v_match.current_turn 
+                  SET zone = 'reinforcement', zone_position = v_slot, is_face_up = false, entered_zone_turn = v_match.current_turn 
                   WHERE id = v_card_to_play.id;
                   
                   UPDATE public.match_players SET actions_this_turn = actions_this_turn + 1 WHERE match_id = p_match_id AND user_id = v_bot_id;
                   
                   v_version := game_private.record_match_action(
                       p_match_id, v_bot_id, 'card_played',
-                      jsonb_build_object('card_id', v_card_to_play.id, 'zone', 'attacker', 'position', v_slot, 'mana_spent', 0),
+                      jsonb_build_object('card_id', null, 'zone', 'reinforcement', 'position', v_slot, 'mana_spent', 0),
                       jsonb_build_object('card_id', v_card_to_play.id), v_version
                   );
                   v_action_played := true;
+              END IF;
+          ELSE
+              -- Else play to Attacker
+              SELECT count(*)::integer INTO v_attacker_count
+              FROM public.match_cards mc
+              WHERE mc.match_id = p_match_id AND mc.controller_user_id = v_bot_id
+                AND mc.zone = 'attacker' AND mc.current_life > 0;
+
+              IF v_attacker_count < v_limit THEN
+                  SELECT gs.slot INTO v_slot FROM generate_series(1, v_limit) gs(slot)
+                  WHERE NOT EXISTS(
+                    SELECT 1 FROM public.match_cards mc WHERE mc.match_id = p_match_id
+                      AND mc.controller_user_id = v_bot_id AND mc.zone = 'attacker' AND mc.zone_position = gs.slot
+                  ) ORDER BY gs.slot LIMIT 1;
+
+                  IF v_slot IS NOT NULL THEN
+                      UPDATE public.match_cards 
+                      SET zone = 'attacker', zone_position = v_slot, is_face_up = true, entered_zone_turn = v_match.current_turn 
+                      WHERE id = v_card_to_play.id;
+                      
+                      UPDATE public.match_players SET actions_this_turn = actions_this_turn + 1 WHERE match_id = p_match_id AND user_id = v_bot_id;
+                      
+                      v_version := game_private.record_match_action(
+                          p_match_id, v_bot_id, 'card_played',
+                          jsonb_build_object('card_id', v_card_to_play.id, 'zone', 'attacker', 'position', v_slot, 'mana_spent', 0),
+                          jsonb_build_object('card_id', v_card_to_play.id), v_version
+                      );
+                      v_action_played := true;
+                  END IF;
               END IF;
           END IF;
       END IF;
@@ -707,6 +715,9 @@ BEGIN
       );
       
       UPDATE public.pending_attacks pa set declared_state_version = v_version where pa.id = v_pending_attack_id;
+      
+      PERFORM game_private.refresh_match_engine_state(p_match_id);
+      
       RETURN jsonb_build_object('action', 'attack_declared', 'state_version', v_version, 'pending_attack_id', v_pending_attack_id);
   END IF;
 
@@ -714,6 +725,7 @@ BEGIN
   -- FASE 4: Encerramento do Turno (Fim da Linha)
   -- ==========================================
   v_turn_result := game_private.change_active_turn(p_match_id, v_bot_id, false, v_version);
+  PERFORM game_private.refresh_match_engine_state(p_match_id);
   RETURN v_turn_result || jsonb_build_object('action', 'end_turn', 'hand_retained', v_hand_count);
 
 EXCEPTION WHEN OTHERS THEN
@@ -749,7 +761,7 @@ DECLARE
   v_effect_result jsonb;
 BEGIN
   SELECT bot_user_id INTO bot FROM public.training_matches WHERE match_id=p_match_id and human_user_id=human;
-  IF bot IS NULL THEN RAISE EXCEPTION 'NOT_YOUR_TRAINING_MATCH'; END IF;
+  IF bot IS NULL THEN bot := '00000000-0000-4000-8000-000000000071'::uuid; END IF;
 
   SELECT * INTO pa FROM public.pending_attacks 
   WHERE match_id=p_match_id and attacker_user_id=human and defender_user_id=bot and status='awaiting_reaction' 
@@ -782,9 +794,9 @@ BEGIN
                       SELECT count(*) FROM public.match_cards WHERE match_id = p_match_id AND owner_user_id = bot AND zone = 'hand'
                   ) >= 1 THEN
                       SELECT id INTO v_discard_card_id
-                      FROM public.match_cards
-                      WHERE match_id = p_match_id AND owner_user_id = bot AND zone = 'hand'
-                      ORDER BY CASE WHEN source_card_id = 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid THEN 1 ELSE 0 END, random()
+                      FROM public.match_cards mc
+                      WHERE mc.match_id = p_match_id AND mc.owner_user_id = bot AND mc.zone = 'hand'
+                      ORDER BY CASE WHEN mc.source_card_id = 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid THEN 1 ELSE 0 END, random()
                       LIMIT 1;
 
                       IF v_discard_card_id IS NOT NULL THEN
@@ -803,6 +815,7 @@ BEGIN
                           version := game_private.record_match_action(p_match_id, bot, 'reaction_used', jsonb_build_object('pending_attack_id', pa.id, 'campaign_bot', true, 'baltazar_reaction', true, 'discarded_card_id', v_discard_card_id), '{}', p_expected_version);
                           turn_result := game_private.change_active_turn(p_match_id, human, false, version);
                           
+                          PERFORM game_private.refresh_match_engine_state(p_match_id);
                           RETURN jsonb_build_object('success', true, 'match_finished', false, 'state_version', version, 'turn', turn_result, 'message', 'Baltazar cancelou o ataque.');
                       END IF;
                   END IF;
@@ -832,6 +845,8 @@ BEGIN
       IF NOT coalesce((resolved->>'match_finished')::boolean, false) THEN 
           turn_result := game_private.change_active_turn(p_match_id, human, false, version); 
       END IF;
+      
+      PERFORM game_private.refresh_match_engine_state(p_match_id);
       RETURN resolved || jsonb_build_object('turn', turn_result);
 
   EXCEPTION WHEN OTHERS THEN
@@ -842,6 +857,8 @@ BEGIN
       IF NOT coalesce((resolved->>'match_finished')::boolean, false) THEN 
           turn_result := game_private.change_active_turn(p_match_id, human, false, version); 
       END IF;
+      
+      PERFORM game_private.refresh_match_engine_state(p_match_id);
       RETURN resolved || jsonb_build_object('turn', turn_result);
   END;
 END $function$;
