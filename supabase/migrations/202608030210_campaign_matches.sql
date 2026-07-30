@@ -263,7 +263,7 @@ BEGIN
 
     INSERT INTO public.match_players(match_id, user_id, player_number, original_deck_id)
     VALUES 
-        (v_match_id, v_user_id, 1, p_deck_id),
+        (v_match_id, v_user_id, 1, CASE WHEN p_deck_id = '00000000-0000-0000-0000-000000000000'::uuid OR p_deck_id = '00000000-0000-0000-0000-000000000072'::uuid THEN NULL ELSE p_deck_id END),
         (v_match_id, v_bot_id, 2, NULL);
 
     IF p_deck_id = '00000000-0000-0000-0000-000000000000'::uuid OR p_deck_id IS NULL THEN
