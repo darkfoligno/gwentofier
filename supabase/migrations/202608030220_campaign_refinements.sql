@@ -190,7 +190,7 @@ BEGIN
                     );
                     v_result := jsonb_set(v_result, '{actions}', (v_result->'actions') || v_action);
                 END LOOP;
-                v_discarded_count := array_length(v_discard_ids, 1);
+                v_discarded_count := array_length(v_discarded_count, 1);
                 v_action := jsonb_build_object(
                     'type', 'modify_stats',
                     'target_id', p_source,
@@ -504,7 +504,7 @@ END;
 $function$;
 
 
--- 4. Update run_campaign_bot_turn to never pass the round voluntarily (always p_passed := false)
+-- 4. Update run_campaign_bot_turn to run the Loop of Actions in Phases (State Machine)
 CREATE OR REPLACE FUNCTION public.run_campaign_bot_turn(p_match_id uuid, p_expected_version bigint)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -515,130 +515,220 @@ DECLARE
   v_human_id uuid := game_private.require_authenticated();
   v_bot_id uuid := '00000000-0000-4000-8000-000000000071'::uuid;
   v_match public.matches;
-  v_chosen_card_id uuid;
-  v_slot integer;
   v_version bigint := p_expected_version;
-  v_pending_attack_id uuid;
-  v_total_power integer;
-  v_attacker_ids uuid[];
-  v_reinforcement_count integer;
   v_hand_count integer;
-  v_human_reinforcements integer;
-  v_human_life_count integer;
-  v_last_life_hp integer;
-  v_existing_attack_power integer;
-  v_best_hand_power integer;
-  v_lethal_opportunity boolean := false;
+  v_card_to_play record;
+  v_reinforcement_count integer;
+  v_attacker_count integer;
+  v_slot integer;
+  v_mana_avail integer;
+  v_card_rec record;
+  v_target_id uuid;
+  v_effect_result jsonb;
+  v_attacker_ids uuid[];
+  v_total_power integer;
+  v_pending_attack_id uuid;
+  v_action_played boolean := false;
   v_failure_state text;
   v_failure_message text;
-  v_card_to_play record;
-  v_mana_avail integer;
+  v_turn_result jsonb := '{}'::jsonb;
+  v_limit integer;
 BEGIN
+  -- Lock match
   SELECT m.* INTO v_match FROM public.matches m WHERE m.id = p_match_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'MATCH_NOT_FOUND'; END IF;
   IF v_match.state_version <> p_expected_version THEN RAISE EXCEPTION 'STALE_MATCH_VERSION'; END IF;
   IF v_match.status <> 'in_progress' OR v_match.engine_state <> 'turn_action' THEN RAISE EXCEPTION 'MATCH_FLOW_IS_BLOCKED'; END IF;
   IF v_match.active_player_id <> v_bot_id THEN RAISE EXCEPTION 'BOT_IS_NOT_ACTIVE_PLAYER'; END IF;
 
+  SELECT reinforcement_slots INTO v_limit FROM public.game_rule_versions WHERE id = v_match.rule_version_id;
+  IF v_limit IS NULL THEN v_limit := 4; END IF;
+
+  -- ==========================================
+  -- FASE 1: Invocação (Descer cartas da mão)
+  -- ==========================================
   SELECT count(*)::integer INTO v_hand_count
   FROM public.match_cards mc
   WHERE mc.match_id = p_match_id AND mc.owner_user_id = v_bot_id AND mc.zone = 'hand';
 
-  SELECT mana_available INTO v_mana_avail FROM public.match_players WHERE match_id = p_match_id AND user_id = v_bot_id;
-
-  -- Regra A & D: Play cards from hand
-  -- We exclude "Rei dos Mendigos" (a5dcdb5a-92d9-42ef-89ef-1ccbbecada40) unless it is the last card in hand
+  -- Select best card to play (higher base_power), excluding Beggar King unless only card in hand
   SELECT mc.* INTO v_card_to_play
   FROM public.match_cards mc
+  JOIN public.match_deck_cards mdc ON mdc.id = mc.match_deck_card_id
   WHERE mc.match_id = p_match_id 
     AND mc.owner_user_id = v_bot_id 
     AND mc.zone = 'hand'
     AND (v_hand_count = 1 OR mc.source_card_id <> 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid)
-  ORDER BY mc.current_power DESC, mc.id ASC
+  ORDER BY mdc.base_power DESC, mc.id ASC
   LIMIT 1;
 
   IF v_card_to_play IS NOT NULL THEN
+      -- Try to play to Reinforcement first if slots available
       SELECT count(*)::integer INTO v_reinforcement_count
       FROM public.match_cards mc
       WHERE mc.match_id = p_match_id AND mc.controller_user_id = v_bot_id
         AND mc.zone = 'reinforcement' AND mc.current_life > 0;
 
-      IF v_reinforcement_count < 4 THEN
-          SELECT gs.slot INTO v_slot FROM generate_series(1,4) gs(slot)
+      IF v_reinforcement_count < v_limit THEN
+          SELECT gs.slot INTO v_slot FROM generate_series(1, v_limit) gs(slot)
           WHERE NOT EXISTS(
             SELECT 1 FROM public.match_cards mc WHERE mc.match_id = p_match_id
               AND mc.controller_user_id = v_bot_id AND mc.zone = 'reinforcement' AND mc.zone_position = gs.slot
           ) ORDER BY gs.slot LIMIT 1;
 
           IF v_slot IS NOT NULL THEN
-              UPDATE public.match_cards SET zone='reinforcement', zone_position=v_slot, is_face_up=false, entered_zone_turn=v_match.current_turn WHERE id=v_card_to_play.id;
-              UPDATE public.match_players SET actions_this_turn=actions_this_turn+1 WHERE match_id=p_match_id AND user_id=v_bot_id;
-              v_version := game_private.record_match_action(p_match_id,v_bot_id,'card_played',jsonb_build_object('match_card_id',v_card_to_play.id,'destination_zone','reinforcement','destination_position',v_slot,'campaign_bot',true,'hand_retained',v_hand_count-1),'{}'::jsonb,v_version);
-              RETURN jsonb_build_object('action','reinforcement_played','state_version',v_version,'hand_retained',v_hand_count-1);
+              UPDATE public.match_cards 
+              SET zone = 'reinforcement', zone_position = v_slot, is_face_up = false, entered_zone_turn = v_match.current_turn 
+              WHERE id = v_card_to_play.id;
+              
+              UPDATE public.match_players SET actions_this_turn = actions_this_turn + 1 WHERE match_id = p_match_id AND user_id = v_bot_id;
+              
+              v_version := game_private.record_match_action(
+                  p_match_id, v_bot_id, 'card_played',
+                  jsonb_build_object('card_id', null, 'zone', 'reinforcement', 'position', v_slot, 'mana_spent', 0),
+                  jsonb_build_object('card_id', v_card_to_play.id), v_version
+              );
+              v_action_played := true;
           END IF;
       ELSE
-          SELECT gs.slot INTO v_slot FROM generate_series(1,4) gs(slot)
-          WHERE NOT EXISTS(
-            SELECT 1 FROM public.match_cards mc WHERE mc.match_id = p_match_id
-              AND mc.controller_user_id = v_bot_id AND mc.zone = 'attacker' AND mc.zone_position = gs.slot
-          ) ORDER BY gs.slot LIMIT 1;
+          -- Else play to Attacker
+          SELECT count(*)::integer INTO v_attacker_count
+          FROM public.match_cards mc
+          WHERE mc.match_id = p_match_id AND mc.controller_user_id = v_bot_id
+            AND mc.zone = 'attacker' AND mc.current_life > 0;
 
-          IF v_slot IS NOT NULL THEN
-              UPDATE public.match_cards SET zone='attacker', zone_position=v_slot, is_face_up=true, entered_zone_turn=v_match.current_turn WHERE id=v_card_to_play.id;
-              UPDATE public.match_players SET actions_this_turn=actions_this_turn+1 WHERE match_id=p_match_id AND user_id=v_bot_id;
-              v_version := game_private.record_match_action(p_match_id,v_bot_id,'card_played',jsonb_build_object('match_card_id',v_card_to_play.id,'destination_zone','attacker','destination_position',v_slot,'campaign_bot',true,'hand_retained',v_hand_count-1),'{}'::jsonb,v_version);
-              RETURN jsonb_build_object('action','attacker_played','state_version',v_version,'hand_retained',v_hand_count-1);
+          IF v_attacker_count < v_limit THEN
+              SELECT gs.slot INTO v_slot FROM generate_series(1, v_limit) gs(slot)
+              WHERE NOT EXISTS(
+                SELECT 1 FROM public.match_cards mc WHERE mc.match_id = p_match_id
+                  AND mc.controller_user_id = v_bot_id AND mc.zone = 'attacker' AND mc.zone_position = gs.slot
+              ) ORDER BY gs.slot LIMIT 1;
+
+              IF v_slot IS NOT NULL THEN
+                  UPDATE public.match_cards 
+                  SET zone = 'attacker', zone_position = v_slot, is_face_up = true, entered_zone_turn = v_match.current_turn 
+                  WHERE id = v_card_to_play.id;
+                  
+                  UPDATE public.match_players SET actions_this_turn = actions_this_turn + 1 WHERE match_id = p_match_id AND user_id = v_bot_id;
+                  
+                  v_version := game_private.record_match_action(
+                      p_match_id, v_bot_id, 'card_played',
+                      jsonb_build_object('card_id', v_card_to_play.id, 'zone', 'attacker', 'position', v_slot, 'mana_spent', 0),
+                      jsonb_build_object('card_id', v_card_to_play.id), v_version
+                  );
+                  v_action_played := true;
+              END IF;
           END IF;
       END IF;
   END IF;
 
-  -- Attack logic
+  -- ==========================================
+  -- FASE 2: Ativação de Efeitos (Gastar Mana)
+  -- ==========================================
+  FOR v_card_rec IN
+      SELECT mc.id, mc.zone, c.name, ce.effect_code, ce.effect_order,
+             coalesce((ce.parameters->>'mana_cost')::integer, 0) as mana_cost,
+             ce.parameters
+      FROM public.match_cards mc
+      JOIN public.cards c ON c.id = mc.source_card_id
+      JOIN public.card_effects ce ON ce.card_id = c.id
+      WHERE mc.match_id = p_match_id AND mc.owner_user_id = v_bot_id AND ce.trigger_type = 'manual' AND ce.is_active = true
+        AND mc.zone IN ('hand', 'life', 'reinforcement', 'attacker')
+        AND NOT EXISTS (
+            SELECT 1 FROM public.match_effect_uses meu
+            WHERE meu.match_id = p_match_id AND meu.match_card_id = mc.id AND meu.effect_order = ce.effect_order AND meu.turn_number = v_match.current_turn
+        )
+      ORDER BY mana_cost DESC, mc.id ASC
+  LOOP
+      SELECT mana_available INTO v_mana_avail FROM public.match_players WHERE match_id = p_match_id AND user_id = v_bot_id;
+      IF v_mana_avail >= v_card_rec.mana_cost THEN
+          -- Select high threat human life target
+          SELECT mc_opp.id INTO v_target_id
+          FROM public.match_cards mc_opp
+          WHERE mc_opp.match_id = p_match_id AND mc_opp.owner_user_id = v_human_id AND mc_opp.zone = 'life' AND mc_opp.current_life > 0
+          ORDER BY mc_opp.current_power DESC, mc_opp.id ASC LIMIT 1;
+
+          -- Deduct mana cost
+          UPDATE public.match_players 
+          SET mana_available = mana_available - v_card_rec.mana_cost,
+              mana_spent_this_turn = mana_spent_this_turn + v_card_rec.mana_cost
+          WHERE match_id = p_match_id AND user_id = v_bot_id;
+
+          -- Execute effect
+          v_effect_result := game_private.execute_common_effect_internal(p_match_id, v_bot_id, v_card_rec.id, v_card_rec.effect_code, v_card_rec.parameters, v_target_id, '{}'::jsonb);
+
+          -- Log usage
+          INSERT INTO public.match_effect_uses(match_id, match_card_id, actor_user_id, effect_order, turn_number, is_reaction, mana_spent)
+          VALUES (p_match_id, v_card_rec.id, v_bot_id, v_card_rec.effect_order, v_match.current_turn, false, v_card_rec.mana_cost);
+
+          -- Record action
+          v_version := game_private.record_match_action(
+              p_match_id, v_bot_id, 'effect_activated',
+              jsonb_build_object(
+                  'source_card_id', v_card_rec.id,
+                  'effect_order', v_card_rec.effect_order,
+                  'effect_code', v_card_rec.effect_code,
+                  'target_card_id', v_target_id,
+                  'mana_spent', v_card_rec.mana_cost,
+                  'is_reaction', false,
+                  'result', v_effect_result
+              ), '{}'::jsonb, v_version
+          );
+          v_action_played := true;
+      END IF;
+  END LOOP;
+
+  -- ==========================================
+  -- FASE 3: Fase de Combate (Declarar Ataque)
+  -- ==========================================
   SELECT array_agg(mc.id ORDER BY mc.zone_position), sum(mc.current_power)::integer
   INTO v_attacker_ids, v_total_power
   from public.match_cards mc
-  where mc.match_id=p_match_id and mc.controller_user_id=v_bot_id and mc.zone='attacker'
-    and mc.current_life>0 and mc.can_attack and not mc.has_attacked_this_turn;
+  where mc.match_id = p_match_id and mc.controller_user_id = v_bot_id and mc.zone = 'attacker'
+    and mc.current_life > 0 and mc.can_attack and not mc.has_attacked_this_turn;
 
-  IF coalesce(cardinality(v_attacker_ids),0)>0 THEN
-    SELECT count(*)::integer, max(mc.current_life)::integer
-    INTO v_human_life_count, v_last_life_hp
-    FROM public.match_cards mc
-    WHERE mc.match_id = p_match_id AND mc.controller_user_id = v_human_id
-      AND mc.zone = 'life' AND mc.current_life > 0;
-
-    INSERT INTO public.pending_attacks(match_id,attacker_user_id,defender_user_id,status,is_direct,declared_power,reaction_deadline,declared_state_version)
-    VALUES (p_match_id,v_bot_id,v_human_id,'awaiting_reaction',false,v_total_power,clock_timestamp()+interval '45 seconds',v_version)
-    RETURNING id INTO v_pending_attack_id;
-    
-    INSERT INTO public.pending_attack_cards(pending_attack_id,match_card_id,attack_position,power_when_declared)
-    SELECT v_pending_attack_id, attack_card.id, attack_card.ordinality::integer,
-      (select mc.current_power from public.match_cards mc where mc.id=attack_card.id)
-    from unnest(v_attacker_ids) with ordinality attack_card(id,ordinality);
-    
-    UPDATE public.match_cards mc set metadata=mc.metadata||jsonb_build_object('locked_for_pending_attack',v_pending_attack_id) where mc.id=any(v_attacker_ids);
-    UPDATE public.match_players mp set actions_this_turn=mp.actions_this_turn+1 where mp.match_id=p_match_id and mp.user_id=v_bot_id;
-    v_version := game_private.record_match_action(p_match_id,v_bot_id,'attack_declared',jsonb_build_object('pending_attack_id',v_pending_attack_id,'attacker_user_id',v_bot_id,'defender_user_id',v_human_id,'attacker_card_ids',to_jsonb(v_attacker_ids),'total_power',v_total_power,'is_direct',false,'campaign_bot',true),'{}'::jsonb,v_version);
-    UPDATE public.pending_attacks pa set declared_state_version=v_version where pa.id=v_pending_attack_id;
-    RETURN jsonb_build_object('action','attack_declared','state_version',v_version,'pending_attack_id',v_pending_attack_id);
+  IF coalesce(cardinality(v_attacker_ids), 0) > 0 THEN
+      INSERT INTO public.pending_attacks(match_id, attacker_user_id, defender_user_id, status, is_direct, declared_power, reaction_deadline, declared_state_version)
+      VALUES (p_match_id, v_bot_id, v_human_id, 'awaiting_reaction', false, v_total_power, clock_timestamp() + interval '45 seconds', v_version)
+      RETURNING id INTO v_pending_attack_id;
+      
+      INSERT INTO public.pending_attack_cards(pending_attack_id, match_card_id, attack_position, power_when_declared)
+      SELECT v_pending_attack_id, attack_card.id, attack_card.ordinality::integer,
+        (select mc.current_power from public.match_cards mc where mc.id = attack_card.id)
+      from unnest(v_attacker_ids) with ordinality attack_card(id, ordinality);
+      
+      UPDATE public.match_cards mc set metadata = mc.metadata || jsonb_build_object('locked_for_pending_attack', v_pending_attack_id) where mc.id = any(v_attacker_ids);
+      UPDATE public.match_players mp set actions_this_turn = mp.actions_this_turn + 1 where mp.match_id = p_match_id and mp.user_id = v_bot_id;
+      
+      v_version := game_private.record_match_action(
+          p_match_id, v_bot_id, 'attack_declared',
+          jsonb_build_object('pending_attack_id', v_pending_attack_id, 'attacker_user_id', v_bot_id, 'defender_user_id', v_human_id, 'attacker_card_ids', to_jsonb(v_attacker_ids), 'total_power', v_total_power, 'is_direct', false, 'campaign_bot', true),
+          '{}'::jsonb, v_version
+      );
+      
+      UPDATE public.pending_attacks pa set declared_state_version = v_version where pa.id = v_pending_attack_id;
+      RETURN jsonb_build_object('action', 'attack_declared', 'state_version', v_version, 'pending_attack_id', v_pending_attack_id);
   END IF;
 
-  -- Regra D: Never pass round (p_passed = false)
-  RETURN game_private.change_active_turn(p_match_id,v_bot_id,false,v_version)
-    ||jsonb_build_object('action','mana_preserved','hand_retained',v_hand_count);
+  -- ==========================================
+  -- FASE 4: Encerramento do Turno (Fim da Linha)
+  -- ==========================================
+  v_turn_result := game_private.change_active_turn(p_match_id, v_bot_id, false, v_version);
+  RETURN v_turn_result || jsonb_build_object('action', 'end_turn', 'hand_retained', v_hand_count);
 
 EXCEPTION WHEN OTHERS THEN
-  GET STACKED DIAGNOSTICS v_failure_state=returned_sqlstate, v_failure_message=message_text;
-  SELECT m.* INTO v_match from public.matches m where m.id=p_match_id for update;
-  IF v_match.active_player_id=v_bot_id and v_match.state_version=p_expected_version THEN
-    return game_private.change_active_turn(p_match_id,v_bot_id,false,p_expected_version)
-      ||jsonb_build_object('action','safe_fallback_end_turn','bot_error_code',v_failure_state,'bot_error_message',v_failure_message);
+  GET STACKED DIAGNOSTICS v_failure_state = returned_sqlstate, v_failure_message = message_text;
+  SELECT m.* INTO v_match from public.matches m where m.id = p_match_id for update;
+  IF v_match.active_player_id = v_bot_id and v_match.state_version = p_expected_version THEN
+    return game_private.change_active_turn(p_match_id, v_bot_id, false, p_expected_version)
+      || jsonb_build_object('action', 'safe_fallback_end_turn', 'bot_error_code', v_failure_state, 'bot_error_message', v_failure_message);
   END IF;
   RAISE;
 END;
 $function$;
 
 
--- 5. Update auto_resolve_campaign_attack with robust exception handling fallback
+-- 5. Update auto_resolve_campaign_attack with robust defensive reaction checking and decline fallback
 CREATE OR REPLACE FUNCTION public.auto_resolve_campaign_attack(p_match_id uuid, p_expected_version bigint)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -652,8 +742,11 @@ DECLARE
   version bigint;
   resolved jsonb;
   turn_result jsonb;
-  v_has_baltazar boolean;
+  v_card_rec record;
+  v_reaction_triggered boolean := false;
+  v_mana_avail integer;
   v_discard_card_id uuid;
+  v_effect_result jsonb;
 BEGIN
   SELECT bot_user_id INTO bot FROM public.training_matches WHERE match_id=p_match_id and human_user_id=human;
   IF bot IS NULL THEN RAISE EXCEPTION 'NOT_YOUR_TRAINING_MATCH'; END IF;
@@ -665,54 +758,90 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'TRAINING_PENDING_ATTACK_NOT_FOUND'; END IF;
 
   BEGIN
-      -- Regra C: Check if direct attack and bot has Baltazar (468273d5-a91a-4401-ad34-9e1ed222a63e)
-      SELECT EXISTS(
-          SELECT 1 FROM public.match_cards 
-          WHERE match_id = p_match_id AND owner_user_id = bot AND source_card_id = '468273d5-a91a-4401-ad34-9e1ed222a63e'::uuid AND zone IN ('hand', 'reinforcement', 'attacker')
-      ) INTO v_has_baltazar;
+      -- Loop through bot's cards with reaction manual effects
+      FOR v_card_rec IN
+          SELECT mc.id, mc.zone, c.name, ce.effect_code, ce.effect_order,
+                 coalesce((ce.parameters->>'mana_cost')::integer, 0) as mana_cost,
+                 ce.parameters
+          FROM public.match_cards mc
+          JOIN public.cards c ON c.id = mc.source_card_id
+          JOIN public.card_effects ce ON ce.card_id = c.id
+          WHERE mc.match_id = p_match_id AND mc.owner_user_id = bot AND ce.trigger_type = 'reaction' AND ce.is_active = true
+            AND mc.zone IN ('hand', 'life', 'reinforcement', 'attacker')
+            AND NOT EXISTS (
+                SELECT 1 FROM public.match_effect_uses meu
+                WHERE meu.match_id = p_match_id AND meu.match_card_id = mc.id AND meu.effect_order = ce.effect_order AND meu.turn_number = (SELECT current_turn FROM public.matches WHERE id = p_match_id)
+            )
+          ORDER BY mana_cost DESC, mc.id ASC
+      LOOP
+          SELECT mana_available INTO v_mana_avail FROM public.match_players WHERE match_id = p_match_id and user_id = bot;
+          IF v_mana_avail >= v_card_rec.mana_cost THEN
+              -- If card is Baltazar, enforce direct attack condition
+              IF v_card_rec.effect_code = 'common_baltazar_cancel_direct' THEN
+                  IF pa.is_direct = true AND (
+                      SELECT count(*) FROM public.match_cards WHERE match_id = p_match_id AND owner_user_id = bot AND zone = 'hand'
+                  ) >= 1 THEN
+                      SELECT id INTO v_discard_card_id
+                      FROM public.match_cards
+                      WHERE match_id = p_match_id AND owner_user_id = bot AND zone = 'hand'
+                      ORDER BY CASE WHEN source_card_id = 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid THEN 1 ELSE 0 END, random()
+                      LIMIT 1;
 
-      IF pa.is_direct = true AND v_has_baltazar = true AND (
-          SELECT count(*) FROM public.match_cards WHERE match_id = p_match_id AND owner_user_id = bot AND zone = 'hand'
-      ) >= 1 THEN
-          SELECT id INTO v_discard_card_id
-          FROM public.match_cards
-          WHERE match_id = p_match_id AND owner_user_id = bot AND zone = 'hand'
-          ORDER BY CASE WHEN source_card_id = 'a5dcdb5a-92d9-42ef-89ef-1ccbbecada40'::uuid THEN 1 ELSE 0 END, random()
-          LIMIT 1;
+                      IF v_discard_card_id IS NOT NULL THEN
+                          UPDATE public.match_cards SET zone = 'graveyard' WHERE id = v_discard_card_id;
+                          UPDATE public.pending_attacks SET status = 'cancelled', reaction_completed_at = now() WHERE id = pa.id;
+                          UPDATE public.match_cards SET metadata = metadata - 'locked_for_pending_attack' WHERE match_id = p_match_id AND (metadata->>'locked_for_pending_attack')::uuid = pa.id;
+                          
+                          UPDATE public.match_players 
+                          SET mana_available = mana_available - v_card_rec.mana_cost,
+                              mana_spent_this_turn = mana_spent_this_turn + v_card_rec.mana_cost
+                          WHERE match_id = p_match_id AND user_id = bot;
 
-          IF v_discard_card_id IS NOT NULL THEN
-              UPDATE public.match_cards SET zone = 'graveyard' WHERE id = v_discard_card_id;
+                          INSERT INTO public.match_effect_uses(match_id, match_card_id, actor_user_id, effect_order, turn_number, is_reaction, mana_spent)
+                          VALUES (p_match_id, v_card_rec.id, bot, v_card_rec.effect_order, (SELECT current_turn FROM public.matches WHERE id = p_match_id), true, v_card_rec.mana_cost);
 
-              UPDATE public.pending_attacks SET status='cancelled', reaction_completed_at=now() WHERE id=pa.id;
-              
-              UPDATE public.match_cards 
-              SET metadata = metadata - 'locked_for_pending_attack'
-              WHERE match_id = p_match_id AND (metadata->>'locked_for_pending_attack')::uuid = pa.id;
+                          version := game_private.record_match_action(p_match_id, bot, 'reaction_used', jsonb_build_object('pending_attack_id', pa.id, 'campaign_bot', true, 'baltazar_reaction', true, 'discarded_card_id', v_discard_card_id), '{}', p_expected_version);
+                          turn_result := game_private.change_active_turn(p_match_id, human, false, version);
+                          
+                          RETURN jsonb_build_object('success', true, 'match_finished', false, 'state_version', version, 'turn', turn_result, 'message', 'Baltazar cancelou o ataque.');
+                      END IF;
+                  END IF;
+              ELSE
+                  -- Generic reaction activation
+                  UPDATE public.match_players 
+                  SET mana_available = mana_available - v_card_rec.mana_cost,
+                      mana_spent_this_turn = mana_spent_this_turn + v_card_rec.mana_cost
+                  WHERE match_id = p_match_id AND user_id = bot;
 
-              version:=game_private.record_match_action(p_match_id,bot,'reaction_used',jsonb_build_object('pending_attack_id',pa.id,'campaign_bot',true,'baltazar_reaction',true,'discarded_card_id',v_discard_card_id),'{}',p_expected_version);
-              
-              turn_result:=game_private.change_active_turn(p_match_id,human,false,version);
-              RETURN jsonb_build_object('success', true, 'match_finished', false, 'state_version', version, 'turn', turn_result, 'message', 'Baltazar cancelou o ataque.');
+                  v_effect_result := game_private.execute_common_effect_internal(p_match_id, bot, v_card_rec.id, v_card_rec.effect_code, v_card_rec.parameters, null, '{}'::jsonb);
+
+                  INSERT INTO public.match_effect_uses(match_id, match_card_id, actor_user_id, effect_order, turn_number, is_reaction, mana_spent)
+                  VALUES (p_match_id, v_card_rec.id, bot, v_card_rec.effect_order, (SELECT current_turn FROM public.matches WHERE id = p_match_id), true, v_card_rec.mana_cost);
+
+                  version := game_private.record_match_action(p_match_id, bot, 'reaction_used', jsonb_build_object('pending_attack_id', pa.id, 'campaign_bot', true, 'effect_code', v_card_rec.effect_code, 'result', v_effect_result), '{}', p_expected_version);
+                  v_reaction_triggered := true;
+              END IF;
           END IF;
-      END IF;
+      END LOOP;
 
-      -- Default reaction decline and resolve attack
-      UPDATE public.pending_attacks SET status='reaction_declined',reaction_completed_at=now() WHERE id=pa.id;
-      version:=game_private.record_match_action(p_match_id,bot,'reaction_declined',jsonb_build_object('pending_attack_id',pa.id,'campaign_bot',true),'{}',p_expected_version);
-      resolved:=game_private.resolve_pending_attack_internal(pa.id,bot,version);
-      version:=(resolved->>'state_version')::bigint;
-      IF NOT coalesce((resolved->>'match_finished')::boolean,false) THEN turn_result:=game_private.change_active_turn(p_match_id,human,false,version); END IF;
-      RETURN resolved||jsonb_build_object('turn',turn_result);
+      -- If any other reaction happened, we still resolve the attack since it wasn't cancelled by Baltazar
+      UPDATE public.pending_attacks SET status='reaction_declined', reaction_completed_at=now() WHERE id=pa.id;
+      version := game_private.record_match_action(p_match_id, bot, 'reaction_declined', jsonb_build_object('pending_attack_id', pa.id, 'campaign_bot', true), '{}', COALESCE(version, p_expected_version));
+      resolved := game_private.resolve_pending_attack_internal(pa.id, bot, version);
+      version := (resolved->>'state_version')::bigint;
+      IF NOT coalesce((resolved->>'match_finished')::boolean, false) THEN 
+          turn_result := game_private.change_active_turn(p_match_id, human, false, version); 
+      END IF;
+      RETURN resolved || jsonb_build_object('turn', turn_result);
 
   EXCEPTION WHEN OTHERS THEN
-      -- Fallback to decline reaction on failure to prevent freezing
       UPDATE public.pending_attacks SET status='reaction_declined', reaction_completed_at=now() WHERE id=pa.id;
-      version:=game_private.record_match_action(p_match_id, bot, 'reaction_declined', jsonb_build_object('pending_attack_id', pa.id, 'campaign_bot', true, 'reaction_error', true), '{}', p_expected_version);
-      resolved:=game_private.resolve_pending_attack_internal(pa.id, bot, version);
-      version:=(resolved->>'state_version')::bigint;
+      version := game_private.record_match_action(p_match_id, bot, 'reaction_declined', jsonb_build_object('pending_attack_id', pa.id, 'campaign_bot', true, 'reaction_error', true), '{}', p_expected_version);
+      resolved := game_private.resolve_pending_attack_internal(pa.id, bot, version);
+      version := (resolved->>'state_version')::bigint;
       IF NOT coalesce((resolved->>'match_finished')::boolean, false) THEN 
-          turn_result:=game_private.change_active_turn(p_match_id, human, false, version); 
+          turn_result := game_private.change_active_turn(p_match_id, human, false, version); 
       END IF;
-      RETURN resolved||jsonb_build_object('turn', turn_result);
+      RETURN resolved || jsonb_build_object('turn', turn_result);
   END;
 END $function$;
