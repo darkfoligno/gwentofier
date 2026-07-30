@@ -19,19 +19,36 @@ export function FriendsScreen() {
     const { data: profs } = await supabase.from("profiles").select("id, username, avatar_url, last_seen")
     if (profs && user) setAllProfiles(profs.filter(p => p.id !== user.id))
   }, [])
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { 
+    void load()
+    const interval = setInterval(() => {
+      void load()
+    }, 10000)
+    return () => clearInterval(interval)
+  }, [load])
   const send = async () => { if (!username.trim()) return; setBusy(true); setMessage(""); const { error } = await supabase.rpc("send_friend_request", { p_username: username.trim() }); setBusy(false); if (error) setMessage(readError(error)); else { setUsername(""); setMessage("Convite enviado."); void load() } }
   const respond = async (id: string, accept: boolean) => { setBusy(true); const { error } = await supabase.rpc("respond_friend_request", { p_request_id: id, p_accept: accept }); setBusy(false); if (error) setMessage(readError(error)); else void load() }
   const contactNames = new Set(contacts.map(c => c.username))
   const suggestions = allProfiles.filter(p => !contactNames.has(p.username))
 
+  const parseDate = (dateStr: string | undefined | null) => {
+    if (!dateStr) return null
+    const normalized = dateStr.includes(" ") && !dateStr.includes("T") 
+      ? dateStr.replace(" ", "T") 
+      : dateStr
+    const d = new Date(normalized)
+    return isNaN(d.getTime()) ? null : d
+  }
+
   const isOnline = (lastSeen: string | undefined | null) => {
-    if (!lastSeen) return false
-    return new Date(lastSeen).getTime() > Date.now() - 5 * 60000
+    const d = parseDate(lastSeen)
+    if (!d) return false
+    return d.getTime() > Date.now() - 5 * 60000
   }
 
   const formatLastSeen = (lastSeen: string) => {
-    const d = new Date(lastSeen)
+    const d = parseDate(lastSeen)
+    if (!d) return "data inválida"
     const pad = (n: number) => n.toString().padStart(2, "0")
     return `${pad(d.getDate())}/${pad(d.getMonth()+1)} às ${pad(d.getHours())}:${pad(d.getMinutes())}`
   }

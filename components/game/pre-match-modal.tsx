@@ -101,8 +101,8 @@ export function PreMatchModal({
                 </div>
               )}
 
-              <div className="pt-4">
-                {decks.length > 0 ? (
+              <div className="pt-4 flex flex-col gap-3">
+                {decks.length > 0 && (
                   <button
                     onClick={handleConfirmDeck}
                     disabled={!selectedDeck || busy}
@@ -110,16 +110,15 @@ export function PreMatchModal({
                   >
                     Confirmar Grimório
                   </button>
-                ) : (
-                  <button
-                    onClick={() => void handleGenerateDeck()}
-                    disabled={busy}
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-900 py-4 font-black uppercase tracking-wider text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-transform active:scale-95 disabled:opacity-50"
-                  >
-                    {busy ? <Loader2 className="animate-spin" /> : <Bot />}
-                    Jogar com Deck Gerado Pelo Sistema
-                  </button>
                 )}
+                <button
+                  onClick={() => void handleGenerateDeck()}
+                  disabled={busy}
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-900 py-4 font-black uppercase tracking-wider text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-transform active:scale-95 disabled:opacity-50"
+                >
+                  {busy ? <Loader2 className="animate-spin" /> : <Bot />}
+                  Entrar com Deck Genérico
+                </button>
               </div>
             </div>
           )}

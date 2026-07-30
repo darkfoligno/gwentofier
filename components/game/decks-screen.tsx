@@ -141,6 +141,7 @@ export function DecksScreen() {
   }, [filtered, sortBy])
 
   const totalCards = deckCards.reduce((sum, c) => sum + c.quantity, 0)
+  const legendaryCardsCount = deckCards.reduce((sum, c) => c.card.raridade === "legendary" ? sum + c.quantity : sum, 0)
   
   const addCard = (card: GameCardType) => {
     const invItem = inventory.find(i => i.id === card.id)
@@ -277,6 +278,15 @@ export function DecksScreen() {
     if (!user) return
     
     const total = deckCards.reduce((sum, c) => sum + c.quantity, 0)
+    const legendary = deckCards.reduce((sum, c) => c.card.raridade === "legendary" ? sum + c.quantity : sum, 0)
+    if (total < 40 || total > 80) {
+      alert("O deck deve conter entre 40 e 80 cartas.")
+      return
+    }
+    if (legendary > 5) {
+      alert("O deck só pode conter no máximo 5 cartas lendárias.")
+      return
+    }
     
     try {
       let deckId = activeDeck?.id;
@@ -535,7 +545,10 @@ export function DecksScreen() {
               </button>
             </div>
             
-            <p className="text-sm text-zinc-400">Cartas no deck: <span className={`font-bold ${totalCards < 40 ? 'text-red-400' : 'text-amber-400'}`}>{totalCards}/40</span></p>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm text-zinc-400">Cartas no deck: <span className={`font-bold ${(totalCards < 40 || totalCards > 80) ? 'text-red-400' : 'text-amber-400'}`}>{totalCards} (min 40, max 80)</span></p>
+              <p className="text-xs text-zinc-500">Cartas lendárias: <span className={`font-bold ${legendaryCardsCount > 5 ? 'text-red-400' : 'text-zinc-450'}`}>{legendaryCardsCount}/5</span></p>
+            </div>
 
             <div className="mt-4 flex h-16 items-end gap-1 rounded bg-black/40 p-2">
               {manaCurve.map((count, i) => (
@@ -569,15 +582,21 @@ export function DecksScreen() {
             {/* Montar Deck Button */}
             <div className="mt-5 pt-3 border-t border-amber-500/10">
               <button 
-                disabled={totalCards < 40} 
+                disabled={totalCards < 40 || totalCards > 80 || legendaryCardsCount > 5} 
                 onClick={() => { setNewDeckName(deckName); setShowSaveModal(true); }}
                 className={`w-full flex items-center justify-center gap-2 rounded-lg border py-3 font-serif font-black text-xs tracking-widest uppercase transition-all duration-300 ${
-                  totalCards < 40 
+                  (totalCards < 40 || totalCards > 80 || legendaryCardsCount > 5) 
                     ? 'border-stone-850 bg-stone-900/30 text-stone-600 cursor-not-allowed opacity-50' 
                     : 'border-amber-500 bg-gradient-to-b from-amber-700 to-amber-900 text-amber-100 hover:shadow-[0_0_15px_rgba(245,158,11,0.3)] shadow-[0_4px_12px_rgba(0,0,0,0.5)]'
                 }`}
               >
-                {totalCards < 40 ? `Faltam ${40 - totalCards} cartas` : "Montar Deck"}
+                {totalCards < 40 
+                  ? `Faltam ${40 - totalCards} cartas` 
+                  : totalCards > 80 
+                  ? `Excesso de ${totalCards - 80} cartas` 
+                  : legendaryCardsCount > 5 
+                  ? `Limite lendárias excedido (${legendaryCardsCount}/5)` 
+                  : "Montar Deck"}
               </button>
             </div>
           </div>
@@ -691,7 +710,7 @@ export function DecksScreen() {
           <div className="w-[450px] max-w-[90vw] rounded-xl border border-amber-500/50 bg-stone-900 p-6 shadow-2xl text-stone-100" onClick={e => e.stopPropagation()}>
             <h2 className="mb-4 text-center font-serif text-xl font-black tracking-widest text-amber-500">SALVAR E MONTAR DECK</h2>
             <p className="mb-4 text-center text-xs text-stone-400 leading-relaxed">
-              O seu deck contem exatamente {totalCards} cartas e atende aos requisitos mínimos de combate. Digite um nome para salvar no seu Grimório.
+              O seu deck contem {totalCards} cartas (sendo {legendaryCardsCount} lendárias) e atende aos requisitos de combate (40-80 cartas, max 5 lendárias). Digite um nome para salvar no seu Grimório.
             </p>
             <div className="mb-6">
               <label className="block text-[10px] font-serif text-amber-500 uppercase tracking-widest mb-1.5">Nome do Deck</label>

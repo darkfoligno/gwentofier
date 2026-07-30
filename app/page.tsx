@@ -11,7 +11,6 @@ import { StoreScreen } from "@/components/game/store-screen"
 import { FriendsScreen } from "@/components/game/friends-screen"
 import { PatchNotesScreen } from "@/components/game/patch-notes-screen"
 import { DecksScreen } from "@/components/game/decks-screen"
-import { LabScreen } from "@/components/game/lab-screen"
 import { TradeScreen } from "@/components/game/trade-screen"
 import { ProfileModal, type ProfileSummary } from "@/components/game/profile-modal"
 import { useWallet } from "@/components/wallet-provider"
@@ -63,6 +62,20 @@ export default function Page() {
     void Promise.all([supabase.from("profiles").select("username,avatar_url").eq("id", session.user.id).single()]).then(([profileResult]) => { if (profileResult.data) setProfile(profileResult.data); })
   }, [session])
 
+  useEffect(() => {
+    if (!session) return
+
+    // Update status on load
+    void supabase.rpc("update_last_seen")
+
+    // Keep updating status every 30 seconds
+    const interval = setInterval(() => {
+      void supabase.rpc("update_last_seen")
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [session])
+
   if (checkingSession) return <main className="flex min-h-screen items-center justify-center bg-stone-950 font-serif text-amber-200">Verificando sessão...</main>
   if (!session) return <main className="min-h-screen"><AuthScreen onEnter={() => undefined} /></main>
 
@@ -106,7 +119,6 @@ export default function Page() {
           {activeScreen === "friends" && <FriendsScreen />}
           {activeScreen === "patch-notes" && <PatchNotesScreen />}
           {activeScreen === "decks" && <DecksScreen />}
-          {activeScreen === "lab" && <LabScreen onEnter={setActiveScreen} />}
         </motion.div>
       </AnimatePresence>
       <AnimatePresence>{profileOpen && profile && <ProfileModal profile={profile} email={session.user.email ?? ""} onClose={() => setProfileOpen(false)} onSaved={setProfile} />}</AnimatePresence>

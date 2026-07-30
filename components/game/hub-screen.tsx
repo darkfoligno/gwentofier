@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Beaker, Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft } from "lucide-react"
+import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
@@ -119,7 +119,6 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
           featured={isTestUser} 
           locked={!isTestUser}
         />
-        {profile?.id === "b6cd0821-39ae-451f-a8ca-25694c3e553c" && <TopAction icon={Beaker} label="LABORATÓRIO OFIERI" onClick={() => onEnter("lab")} />}
         <TopAction icon={Swords} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured />
         <TopAction icon={Wallet} label="LOJA" onClick={() => onEnter("store")} />
         <TopAction icon={ArrowRightLeft} label="TRADE MARKETING" onClick={() => onEnter("trade")} />
@@ -134,30 +133,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       <DailyRewardWidget onClaimSuccess={handleDailyRewardClaimSuccess} />
     </div>
     {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
-    
-    {/* Card Visual Laboratório Ofieri */}
-    {profile?.id === "b6cd0821-39ae-451f-a8ca-25694c3e553c" && (
-      <div className="mb-6 overflow-hidden rounded-xl border border-emerald-500/30 bg-gradient-to-r from-stone-950 via-emerald-950/20 to-stone-950 p-5 shadow-[0_0_20px_rgba(16,185,129,0.15)] flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500 bg-emerald-950/50 text-emerald-300">
-            <Beaker size={24} />
-          </div>
-          <div>
-            <h3 className="font-serif text-lg font-black text-emerald-200 tracking-widest uppercase">Laboratório Ofieri</h3>
-            <p className="text-xs text-stone-300 leading-relaxed max-w-2xl mt-1">
-              Ambiente de simulação controlada. Teste o feitiço e o comportamento das cartas em combate e receba +25 moedas pela primeira análise de cada artefato.
-            </p>
-          </div>
-        </div>
-        <button 
-          onClick={() => onEnter("lab")}
-          className="shrink-0 flex items-center gap-2 rounded bg-emerald-700 px-5 py-2.5 font-black text-emerald-50 transition-colors hover:bg-emerald-600 focus:outline-none focus:ring focus:ring-emerald-500/50"
-        >
-          ACESSAR LAB
-          <ChevronRight size={18} />
-        </button>
-      </div>
-    )}
+
 
     <section className="rounded-xl border border-amber-800/30 bg-black/35 p-4">
       <div className="mb-4 flex flex-wrap items-center gap-2">
