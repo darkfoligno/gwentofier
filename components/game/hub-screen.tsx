@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft } from "lucide-react"
+import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft, Gamepad2 } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
@@ -119,6 +119,14 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
           featured={isTestUser} 
           locked={!isTestUser}
         />
+        {isTestUser && (
+          <TopAction 
+            icon={Gamepad2} 
+            label="MODO CAMPANHA" 
+            onClick={() => onEnter("campaign")} 
+            featured 
+          />
+        )}
         <TopAction icon={Swords} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured />
         <TopAction icon={Wallet} label="LOJA" onClick={() => onEnter("store")} />
         <TopAction icon={ArrowRightLeft} label="TRADE MARKETING" onClick={() => onEnter("trade")} />

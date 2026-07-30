@@ -17,7 +17,7 @@ export function PreMatchModal({
   onCancel,
   onConfirm
 }: {
-  mode: "pvp" | "training" | null
+  mode: "pvp" | "training" | "campaign" | null
   onCancel: () => void
   onConfirm: (deckId: string, isMobile: boolean) => void
 }) {
