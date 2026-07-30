@@ -1,6 +1,6 @@
 "use client"
 import { useEffect, useState, useMemo } from "react"
-import { Layers, Search, Settings, Save, Swords, Trash2, Plus, Minus, X, Info } from "lucide-react"
+import { Layers, Search, Settings, Save, Swords, Trash2, Plus, Minus, X, Info, Copy, Check } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { GameCard as GameCardType, Rarity, OfficialCardType } from "@/lib/game-data"
 import { secureImageUrl } from "@/lib/secure-url"
@@ -36,6 +36,17 @@ export function DecksScreen() {
   const [comparingCard, setComparingCard] = useState<GameCardType | null>(null)
   const [cardOwners, setCardOwners] = useState<{ username: string; quantity: number }[]>([])
   const [loadingOwners, setLoadingOwners] = useState(false)
+  const [copied, setCopied] = useState(false)
+  
+  const handleCopyId = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Erro ao copiar ID", err)
+    }
+  }
 
   const loadDecks = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -660,7 +671,21 @@ export function DecksScreen() {
                   <span className="text-[11px] font-serif font-bold tracking-widest uppercase text-stone-400">{inspectedCard.elemento}</span>
                 </div>
                 
-                <h2 className="font-serif text-2xl font-black text-amber-200 mb-4 tracking-wider">{inspectedCard.nome}</h2>
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <h2 className="font-serif text-2xl font-black text-amber-200 tracking-wider m-0">{inspectedCard.nome}</h2>
+                  <button 
+                    onClick={() => handleCopyId(inspectedCard.id)}
+                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-serif text-[10px] font-black uppercase transition-all duration-200 ${
+                      copied 
+                        ? "border-emerald-500 bg-emerald-950/40 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                        : "border-stone-700 bg-black/40 text-stone-400 hover:border-amber-500/50 hover:text-amber-200"
+                    }`}
+                    title="Copiar ID da Carta"
+                  >
+                    {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                    {copied ? "Copiado!" : "Copiar ID"}
+                  </button>
+                </div>
                 
                 {/* Atributos / Stats Grid */}
                 <div className="grid grid-cols-3 gap-3 mb-5">

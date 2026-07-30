@@ -65,7 +65,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     })
   }, [])
 
-  const filtered = useMemo(() => cards.filter(card => (!rarity || card.raridade === rarity) && (!cardType || card.elemento === cardType) && (!query || card.nome.toLowerCase().includes(query.toLowerCase()))), [cardType, cards, query, rarity])
+  const filtered = useMemo(() => cards.filter(card => (!rarity || card.raridade === rarity) && (!cardType || card.elemento === cardType) && (!query || card.nome.toLowerCase().includes(query.toLowerCase()) || (card.efeito || "").toLowerCase().includes(query.toLowerCase()))), [cardType, cards, query, rarity])
   
   const searchOpponent = async (deckId: string, isMobile: boolean) => {
     setMatchmaking(true); setError(null)
