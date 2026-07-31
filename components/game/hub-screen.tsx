@@ -185,7 +185,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
         <TopAction 
           icon={isTestUser ? Swords : Lock} 
           label={training ? "CRIANDO…" : "MODO TREINO"} 
-          onClick={() => { if (isTestUser) setShowAlphaWarning(true) }} 
+          onClick={() => { if (isTestUser) setPreMatchMode("training") }} 
           disabled={training || !isTestUser} 
           featured={isTestUser} 
           locked={!isTestUser}
