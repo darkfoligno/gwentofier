@@ -30,6 +30,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [trainingStep, setTrainingStep] = useState<string | null>(null)
   const [preMatchMode, setPreMatchMode] = useState<"pvp" | "training" | null>(null)
   const [matchmaking, setMatchmaking] = useState(false)
+  const [inQueue, setInQueue] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [gachaCards, setGachaCards] = useState<GameCardType[] | null>(null)
   const [inspectedCard, setInspectedCard] = useState<GameCardType | null>(null)
@@ -77,6 +78,63 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     })
   }, [])
 
+  useEffect(() => {
+    if (!inQueue || !userId) return
+
+    console.log("[MATCHMAKING] Iniciando escuta realtime para o canal de fila do usuário:", userId)
+    const channel = supabase.channel(`matchmaking:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "matchmaking_queue",
+          filter: `user_id=eq.${userId}`
+        },
+        async (payload) => {
+          console.log("[MATCHMAKING] Mudança na fila detectada:", payload)
+          if (payload.new.status === "matched") {
+            setError("Partida encontrada! Redirecionando para a Arena...")
+            setInQueue(false)
+            
+            // Consultar a partida ativa correspondente do jogador para obter o match_id
+            const { data, error: matchError } = await supabase
+              .from("match_players")
+              .select("match_id, matches!inner(status)")
+              .eq("user_id", userId)
+              .in("matches.status", ["ban_phase", "setup", "initiative", "in_progress"])
+              .order("joined_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            if (matchError) {
+              console.error("Erro ao buscar match_id:", matchError)
+              setError("Pareamento concluído, mas houve erro ao obter ID da sala.")
+              return
+            }
+
+            const activeMatchId = data?.match_id
+            if (activeMatchId) {
+              const url = new URL(window.location.href)
+              url.searchParams.set("screen", "arena")
+              url.searchParams.set("matchId", activeMatchId)
+              url.searchParams.delete("preview")
+              window.history.pushState({}, "", url)
+              onEnter("arena")
+            } else {
+              setError("Pareamento concluído, mas nenhuma sala ativa foi localizada.")
+            }
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log("[MATCHMAKING] Desinscrevendo canal realtime de matchmaking.")
+      void supabase.removeChannel(channel)
+    }
+  }, [inQueue, userId, onEnter])
+
   const filtered = useMemo(() => cards.filter(card => (!rarity || card.raridade === rarity) && (!cardType || card.elemento === cardType) && (!query || card.nome.toLowerCase().includes(query.toLowerCase()) || (card.efeito || "").toLowerCase().includes(query.toLowerCase()))), [cardType, cards, query, rarity])
   
   const searchOpponent = async (deckId: string, isMobile: boolean) => {
@@ -85,7 +143,8 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       const cleanDeckId = deckId === "SYSTEM_GENERATED" ? "00000000-0000-0000-0000-000000000000" : deckId
       const { data: queueId, error: queueError } = await supabase.rpc("enqueue_matchmaking", { p_deck_id: cleanDeckId, p_match_type: "friendly" })
       if (queueError) throw queueError
-      setError(`Busca iniciada com sucesso. Fila: ${queueId}. (Mobile: ${isMobile})`)
+      setError(`Busca iniciada com sucesso. Fila ativa. Aguardando oponente...`)
+      setInQueue(true)
       if (isMobile) window.localStorage.setItem('arena_mobile', 'true');
       else window.localStorage.removeItem('arena_mobile');
     } catch (cause) { setError(describeError(cause)) } finally { setMatchmaking(false) }
@@ -139,7 +198,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
             featured 
           />
         )}
-        <TopAction icon={Swords} label={matchmaking ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking} featured />
+        <TopAction icon={Swords} label={matchmaking || inQueue ? "BUSCANDO…" : "BUSCAR OPONENTE"} onClick={() => setPreMatchMode("pvp")} disabled={matchmaking || inQueue} featured />
         <TopAction icon={Wallet} label="LOJA" onClick={() => onEnter("store")} />
         <TopAction icon={ArrowRightLeft} label="TRADE MARKETING" onClick={() => onEnter("trade")} />
         <TopAction icon={Layers} label="MINHAS CARTAS" onClick={() => onEnter("decks")} />

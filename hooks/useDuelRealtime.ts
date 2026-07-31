@@ -31,7 +31,9 @@ function requiredVersion(value: unknown) {
 }
 
 function isStaleVersion(error: PostgrestError | Error | null) {
-  return Boolean(error && (error.message.includes("STALE_MATCH_VERSION") || ("details" in error && error.details?.includes("STALE_MATCH_VERSION"))))
+  if (!error) return false
+  const raw = [error.message, "details" in error ? error.details : null].filter(Boolean).join(" ").toLowerCase()
+  return raw.includes("stale_match_version") || raw.includes("version") || raw.includes("lock")
 }
 function readableRpcError(error: PostgrestError) {
   const raw=[error.message,error.details,error.hint].filter(Boolean).join(" ")
@@ -191,7 +193,18 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       if (name === "activate_card_effect_v2") {
         console.error("[ENGINE-EFEITO] ❌ ERRO AO ATIVAR EFEITO:", error.message, error.details);
       }
-      if (isStaleVersion(error)) await refresh()
+      if (isStaleVersion(error)) {
+        console.warn("[Duel RPC] Concorrência detectada. Sincronizando estado...", error);
+        if (typeof window !== "undefined") {
+          const toast = document.createElement("div");
+          toast.className = "fixed bottom-5 right-5 z-[9999] rounded-lg border border-amber-600 bg-amber-950 px-4 py-3 text-xs text-amber-200 shadow-lg animate-pulse";
+          toast.innerText = "🔄 Sincronizando estado do combate...";
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 2500);
+        }
+        await refresh();
+        return { success: false, stale: true } as any;
+      }
       void reportDuelError(matchId, name, error)
       throw readableRpcError(error)
     }
@@ -259,7 +272,25 @@ export function useDuelRealtime(matchId: string, currentUserId: string) {
       void supabase.removeChannel(channel)
       void supabase.removeChannel(actionChannel)
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectExecutionLogs, matchId, refresh, validMatch, isTraining])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs, matchId, refresh, validMatch, isTraining])
+
+  useEffect(() => {
+    if (!validMatch || isTraining) return
+    const interval = setInterval(async () => {
+      if (pendingAttack && pendingAttack.status === "awaiting_reaction") {
+        const deadline = new Date(pendingAttack.reaction_deadline).getTime()
+        if (Date.now() > deadline) {
+          console.log("[CRON-FALLBACK] Pendendo ataque expirado. Forçando resolução de tempo...")
+          try {
+            await supabase.rpc("resolve_expired_pending_attacks")
+          } catch (e) {
+            console.error("[CRON-FALLBACK] Erro ao tentar expirar ataque:", e)
+          }
+        }
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [pendingAttack, validMatch, isTraining])
 
   const isPlayer1 = matchState?.player1_id === currentUserId
   const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
