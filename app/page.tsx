@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { AuthScreen } from "@/components/game/auth-screen"
 import { HubScreen } from "@/components/game/hub-screen"
 import { ArenaScreen } from "@/components/game/arena-screen"
+import { TrainingScreen } from "@/components/game/training-screen"
 import { StoreScreen } from "@/components/game/store-screen"
 
 import { FriendsScreen } from "@/components/game/friends-screen"
@@ -82,7 +83,7 @@ export default function Page() {
 
   return (
     <main className="relative min-h-screen">
-      {activeScreen !== "arena" && (
+      {activeScreen !== "arena" && activeScreen !== "training" && (
         <div className="fixed right-3 top-3 z-[100] flex items-center gap-1 rounded-lg border border-gold/40 bg-wood-darkest/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.8)] backdrop-blur-md">
         {debugItems.map((item) => (
           <button
@@ -110,7 +111,7 @@ export default function Page() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.35 }}
-          className={activeScreen !== "arena" && activeScreen !== "auth" ? "pt-24 sm:pt-20" : ""}
+          className={activeScreen !== "arena" && activeScreen !== "training" && activeScreen !== "auth" ? "pt-24 sm:pt-20" : ""}
         >
           {activeScreen === "auth" && <AuthScreen onEnter={setActiveScreen} />}
           {activeScreen === "hub" && <HubScreen onEnter={setActiveScreen} />}
@@ -118,6 +119,7 @@ export default function Page() {
           {activeScreen === "trade" && <TradeScreen onEnter={setActiveScreen} />}
 
           {activeScreen === "arena" && <ArenaScreen />}
+          {activeScreen === "training" && <TrainingScreen />}
           {activeScreen === "friends" && <FriendsScreen />}
           {activeScreen === "patch-notes" && <PatchNotesScreen />}
           {activeScreen === "decks" && <DecksScreen />}

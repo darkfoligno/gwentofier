@@ -1,4 +1,4 @@
-export type Screen = "auth" | "hub" | "store" | "spectator" | "arena" | "friends" | "patch-notes" | "collection" | "decks" | "trade" | "campaign"
+export type Screen = "auth" | "hub" | "store" | "spectator" | "arena" | "friends" | "patch-notes" | "collection" | "decks" | "trade" | "campaign" | "training"
 
 export type MatchStatus = "waiting" | "ban_phase" | "setup" | "initiative" | "in_progress" | "finished" | "cancelled" | "expired"
 export type MatchCardZone = "deck" | "hand" | "life" | "reinforcement" | "attacker" | "leader" | "graveyard" | "banished" | "temporary"

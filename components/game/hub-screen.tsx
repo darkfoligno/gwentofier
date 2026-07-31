@@ -159,11 +159,11 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       if (isMobile) window.localStorage.setItem('arena_mobile', 'true');
       else window.localStorage.removeItem('arena_mobile');
       await new Promise(r => setTimeout(r, 600))
-      const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("matchId", queueId); url.searchParams.delete("preview"); window.history.pushState({}, "", url); onEnter("arena")
+      const url = new URL(window.location.href); url.searchParams.set("screen", "training"); url.searchParams.set("matchId", queueId); url.searchParams.delete("preview"); window.history.pushState({}, "", url); onEnter("training")
     } catch (cause) {
       const issue = cause as { message?: string }
       if (issue?.message?.includes("CARD_CATALOG_EMPTY")) {
-        const url = new URL(window.location.href); url.searchParams.set("screen", "arena"); url.searchParams.set("preview", "1"); url.searchParams.delete("matchId"); window.history.pushState({}, "", url); onEnter("arena")
+        const url = new URL(window.location.href); url.searchParams.set("screen", "training"); url.searchParams.set("preview", "1"); url.searchParams.delete("matchId"); window.history.pushState({}, "", url); onEnter("training")
       } else setError(describeError(cause))
     } finally { setTraining(false); setTrainingStep(null) }
   }
