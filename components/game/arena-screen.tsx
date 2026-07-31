@@ -581,7 +581,33 @@ export function ArenaScreen() {
     setEffectMessage(`Movendo carta para ${zone === "attacker" ? "o Campo de Ataque" : "o Campo de Defesa"}…`)
     void duel.playCard(cardId, zone, position).then(() => { setSelectedHand(null); setEffectMessage("Carta posicionada. A ação foi registrada no servidor."); void duel.refresh() }).catch(error => setEffectMessage(error?.message ?? "Jogada recusada pelo servidor."))
   }
-  const toggleAttacker = (card: VisibleMatchCard) => setSelectedAttackers(previous => { const next = new Set(previous); next.has(card.id) ? next.delete(card.id) : next.add(card.id); return next })
+  
+  // Helper premium para exibição de toasts flutuantes nativos
+  const showToast = useCallback((message: string, type: "success" | "error" | "warning" = "success") => {
+    if (typeof window === "undefined") return;
+    const containerId = "custom-toast-container";
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement("div");
+      container.id = containerId;
+      container.className = "fixed bottom-5 right-5 z-[99999] flex flex-col gap-2 pointer-events-none";
+      document.body.appendChild(container);
+    }
+    const toast = document.createElement("div");
+    const colors = {
+      success: "border-emerald-700 bg-emerald-950/95 text-emerald-200",
+      error: "border-rose-700 bg-rose-950/95 text-rose-200",
+      warning: "border-amber-700 bg-amber-950/95 text-amber-200"
+    };
+    toast.className = `px-4 py-3 rounded-lg border shadow-lg text-xs font-semibold pointer-events-auto transition-opacity duration-300 ${colors[type]}`;
+    toast.innerText = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = "0";
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }, []);
+
   const activateEffect = (card:VisibleMatchCard,afterResolve?:(version:number)=>void,expectedVersion?:number) => {
     if (isBoardFrozen) return;
     const effect = card.card_data?.effect_definition?.find(item => item.trigger_type === "manual")
@@ -596,17 +622,26 @@ export function ArenaScreen() {
       const zone = ["deck", "hand", "graveyard"].includes(mode) ? mode as MatchCardZone : undefined
       const valid=boardCards.filter(target=>{
         if(code==="common_endriuga_scaled_damage"||code==="common_cleaver_discard_for_direct"||code==="common_panther_direct_life")return target.owner_id===opponentId&&target.zone==="life"&&(target.current_life??0)>0
-        if(zone)return target.owner_id===userId&&target.zone===zone
-        if(mode==="enemy")return target.owner_id===opponentId&&fieldZones.includes(target.zone)
-        if(mode==="ally")return target.owner_id===userId&&fieldZones.includes(target.zone)
+        if(mode==="enemy")return target.owner_id===opponentId&&["attacker","reinforcement","life"].includes(target.zone)
+        if(mode==="ally")return target.owner_id===userId&&["attacker","reinforcement","life"].includes(target.zone)
+        if(mode==="hand")return target.owner_id===userId&&target.zone==="hand"
+        if(mode==="deck")return target.owner_id===userId&&target.zone==="deck"
+        if(mode==="graveyard")return target.owner_id===userId&&target.zone==="graveyard"
         return Boolean(target.card_data&&fieldZones.includes(target.zone))
       })
+      if (valid.length === 0) {
+        showToast("⚠️ Nenhum alvo válido disponível para este efeito.", "warning");
+        setEffectMessage("⚠️ Nenhum alvo válido disponível para este efeito.");
+        return;
+      }
       setEffectSelection({sourceId:card.id,order,zone,validIds:new Set(valid.map(target=>target.id)),expectedVersion,afterResolve});setEffectMessage(zone?`🎯 Selecione o alvo em ${zone}. Pressione ESC para cancelar.`:"🎯 SELECIONE O ALVO DO EFEITO · Pressione ESC para cancelar");return
     }
-    void duel.activateMatchEffect(card.id,order,undefined,expectedVersion).then(result=>{const payload=result as {state_version?:number;choice_pending?:boolean};const version=Number(payload.state_version??expectedVersion??matchState?.match_version??0);if(payload.choice_pending){setEffectMessage("🎯 O efeito aguarda sua escolha obrigatória antes do combate.");void duel.refresh();return}setEffectMessage("✨ Efeito confirmado pelo servidor.");afterResolve?.(version);void duel.refresh()}).catch(error=>setEffectMessage(error?.message??"Falha ao ativar efeito."))
+    void duel.activateMatchEffect(card.id,order,undefined,expectedVersion).then(result=>{const payload=result as {state_version?:number;choice_pending?:boolean};const version=Number(payload.state_version??expectedVersion??matchState?.match_version??0);if(payload.choice_pending){setEffectMessage("🎯 O efeito aguarda sua escolha obrigatória antes do combate.");void duel.refresh();return}setEffectMessage("✨ Efeito confirmado pelo servidor.");showToast("✨ Efeito ativado com sucesso!", "success");afterResolve?.(version);void duel.refresh()}).catch(error=>{const msg=error?.message??"Falha ao ativar efeito.";setEffectMessage(`❌ Erro: ${msg}`);showToast(`❌ Falha ao ativar efeito: ${msg}`, "error")})
   }
-  const chooseEffectTarget=(card:VisibleMatchCard)=>{if(!effectSelection)return false;if(!effectSelection.validIds.has(card.id)){setEffectMessage("Esta ficha não é um alvo válido para o efeito.");return true}const selection=effectSelection;setEffectSelection(null);void duel.activateMatchEffect(selection.sourceId,selection.order,card.id,selection.expectedVersion).then(result=>{const payload=result as {state_version?:number;choice_pending?:boolean};const version=Number(payload.state_version??selection.expectedVersion??matchState?.match_version??0);if(payload.choice_pending){setEffectMessage("🎯 Alvo confirmado. Escolha agora exatamente três cartas da mão para o Cutelo.");void duel.refresh();return}setEffectMessage("✨ Efeito resolvido com sucesso.");selection.afterResolve?.(version);void duel.refresh()}).catch(error=>setEffectMessage(error?.message??"Alvo inválido."));return true}
+  const chooseEffectTarget=(card:VisibleMatchCard)=>{if(!effectSelection)return false;if(!effectSelection.validIds.has(card.id)){setEffectMessage("Esta ficha não é um alvo válido para o efeito.");showToast("Esta ficha não é um alvo válido.", "warning");return true}const selection=effectSelection;setEffectSelection(null);void duel.activateMatchEffect(selection.sourceId,selection.order,card.id,selection.expectedVersion).then(result=>{const payload=result as {state_version?:number;choice_pending?:boolean};const version=Number(payload.state_version??selection.expectedVersion??matchState?.match_version??0);if(payload.choice_pending){setEffectMessage("🎯 Alvo verificado. Escolha as cartas exigidas pelo efeito.");void duel.refresh();return}setEffectMessage("✨ Efeito resolvido com sucesso.");showToast("✨ Efeito resolvido com sucesso!", "success");selection.afterResolve?.(version);void duel.refresh()}).catch(error=>{const msg=error?.message??"Alvo inválido.";setEffectMessage(`❌ Erro: ${msg}`);showToast(`❌ Alvo inválido: ${msg}`, "error")});return true}
   useEffect(()=>{const cancel=(event:KeyboardEvent)=>{if(event.key==="Escape"){setEffectSelection(null);setEffectMessage(null)}};window.addEventListener("keydown",cancel);return()=>window.removeEventListener("keydown",cancel)},[])
+
+  const toggleAttacker = (card: VisibleMatchCard) => setSelectedAttackers(previous => { const next = new Set(previous); next.has(card.id) ? next.delete(card.id) : next.add(card.id); return next })
   const reactions = boardCards.filter(card => card.owner_user_id === userId && ["hand", "life", "reinforcement"].includes(card.zone) && (card.zone === "hand" || (card.current_life ?? 0) > 0) && card.card_data?.effect_definition?.some(effect => ["reaction","on_reaction","on_attacked","on_damage_received"].includes(effect.trigger_type??"") || effect.is_reaction))
   const toggleSetup = (id: string) => setSetupCards(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else if (!setupReinforcements.has(id) && next.size < 3) next.add(id); return next })
   const toggleSetupReinforcement = (id: string) => setSetupReinforcements(previous => { const next = new Set(previous); if (next.has(id)) next.delete(id); else if (!setupCards.has(id) && next.size < 4) next.add(id); return next })
