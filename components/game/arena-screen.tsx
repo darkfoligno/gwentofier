@@ -618,8 +618,8 @@ export function ArenaScreen() {
     const payload = { p_match_card_id: card.id, p_order: order, p_expected_version: expectedVersion };
     console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço! Carta:", cardName, "Custo:", manaCost, "Payload:", JSON.stringify(payload));
     const mode=effect.target_mode??"none"; const fieldZones=["life","reinforcement","attacker","leader"]
-    if (["selected", "ally", "enemy", "deck", "hand", "graveyard"].includes(mode)) {
-      const zone = ["deck", "hand", "graveyard"].includes(mode) ? mode as MatchCardZone : undefined
+    if (["selected", "ally", "enemy", "deck", "hand", "graveyard", "enemy_graveyard"].includes(mode)) {
+      const zone = ["deck", "hand", "graveyard", "enemy_graveyard"].includes(mode) ? (mode === "enemy_graveyard" ? "graveyard" : mode) as MatchCardZone : undefined
       const valid=boardCards.filter(target=>{
         if(code==="common_endriuga_scaled_damage"||code==="common_cleaver_discard_for_direct"||code==="common_panther_direct_life")return target.owner_id===opponentId&&target.zone==="life"&&(target.current_life??0)>0
         if(mode==="enemy")return target.owner_id===opponentId&&["attacker","reinforcement","life"].includes(target.zone)
@@ -627,6 +627,7 @@ export function ArenaScreen() {
         if(mode==="hand")return target.owner_id===userId&&target.zone==="hand"
         if(mode==="deck")return target.owner_id===userId&&target.zone==="deck"
         if(mode==="graveyard")return target.owner_id===userId&&target.zone==="graveyard"
+        if(mode==="enemy_graveyard")return target.owner_id===opponentId&&target.zone==="graveyard"
         return Boolean(target.card_data&&fieldZones.includes(target.zone))
       })
       if (valid.length === 0) {
