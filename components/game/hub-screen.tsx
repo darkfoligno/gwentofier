@@ -155,7 +155,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
     {stats && <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4"><Stat icon={Trophy} label="Vitórias" value={stats.wins} /><Stat icon={Shield} label="Derrotas" value={stats.losses} /><Stat icon={Swords} label="Empates" value={stats.draws} /><Stat icon={Trophy} label="Sequência atual" value={stats.current_win_streak} /></div>}
 
 
-    <section className="rounded-xl border border-amber-800/30 bg-black/35 p-4">
+    <section className="w-full h-full overflow-y-auto pb-32 rounded-xl border border-amber-800/30 bg-black/35 p-4">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="relative min-w-60 flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" size={16} />

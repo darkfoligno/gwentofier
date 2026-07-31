@@ -434,7 +434,7 @@ export function DecksScreen() {
         </section>
 
         {/* Painel Central - Acervo Pessoal (lg:col-span-6) */}
-        <section className="lg:col-span-6">
+        <section className="lg:col-span-6 w-full h-full overflow-y-auto pb-32">
           <header className="mb-6 rounded-xl border border-amber-600/30 bg-zinc-950/85 p-5 shadow-xl">
             <h1 className="font-serif text-3xl font-black text-amber-400">Minhas Cartas</h1>
             <p className="mb-4 text-sm text-zinc-400">Monte decks com as cartas que você tem disponível</p>
