@@ -36,18 +36,6 @@ export function DecksScreen() {
   const [comparingCard, setComparingCard] = useState<GameCardType | null>(null)
   const [cardOwners, setCardOwners] = useState<{ username: string; quantity: number }[]>([])
   const [loadingOwners, setLoadingOwners] = useState(false)
-  const [copied, setCopied] = useState(false)
-  
-  const handleCopyId = async (id: string) => {
-    try {
-      await navigator.clipboard.writeText(id)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error("Erro ao copiar ID", err)
-    }
-  }
-
   const loadDecks = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -361,7 +349,7 @@ export function DecksScreen() {
   const maxMana = Math.max(...manaCurve, 1)
 
   return (
-    <main className="min-h-screen bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-fixed bg-center p-6 pt-20 text-stone-100">
+    <main className="min-h-screen bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-fixed bg-center p-6 text-stone-100">
       <div className="absolute inset-0 bg-black/85 backdrop-blur-[4px]" />
       <div className="relative mx-auto grid max-w-[1800px] grid-cols-1 gap-6 lg:grid-cols-12">
         
@@ -461,6 +449,19 @@ export function DecksScreen() {
               </div>
               <div className="relative min-w-[150px]">
                 <select 
+                  value={rarityFilter || ""} 
+                  onChange={e => setRarityFilter(e.target.value ? e.target.value as Rarity : null)} 
+                  className="w-full rounded border border-amber-800/40 bg-black py-2 px-3 text-sm text-zinc-200 outline-none focus:border-amber-500 cursor-pointer"
+                >
+                  <option value="">Raridade: Todas</option>
+                  <option value="common">Comum</option>
+                  <option value="rare">Rara</option>
+                  <option value="epic">Épica</option>
+                  <option value="legendary">Lendária</option>
+                </select>
+              </div>
+              <div className="relative min-w-[150px]">
+                <select 
                   value={sortBy} 
                   onChange={e => setSortBy(e.target.value as any)} 
                   className="w-full rounded border border-amber-800/40 bg-black py-2 px-3 text-sm text-zinc-200 outline-none focus:border-amber-500 cursor-pointer"
@@ -500,7 +501,7 @@ export function DecksScreen() {
                     {/* Compare Button Top-Left */}
                     <button 
                       onClick={(e) => { e.stopPropagation(); void handleCompare(card); }} 
-                      className="absolute top-2 left-2 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-blue-500 bg-blue-950/90 text-blue-200 hover:bg-blue-800 hover:text-white transition-all shadow-md opacity-0 group-hover:opacity-100"
+                      className="absolute top-2 left-2 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-blue-500 bg-blue-950/90 text-blue-200 hover:bg-blue-800 hover:text-white transition-all shadow-md opacity-100 md:opacity-0 md:group-hover:opacity-100"
                       title="Comparar Duelistas"
                     >
                       <Search size={10} />
@@ -673,18 +674,6 @@ export function DecksScreen() {
                 
                 <div className="flex items-center justify-between gap-4 mb-4">
                   <h2 className="font-serif text-2xl font-black text-amber-200 tracking-wider m-0">{inspectedCard.nome}</h2>
-                  <button 
-                    onClick={() => handleCopyId(inspectedCard.id)}
-                    className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-serif text-[10px] font-black uppercase transition-all duration-200 ${
-                      copied 
-                        ? "border-emerald-500 bg-emerald-950/40 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-                        : "border-stone-700 bg-black/40 text-stone-400 hover:border-amber-500/50 hover:text-amber-200"
-                    }`}
-                    title="Copiar ID da Carta"
-                  >
-                    {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                    {copied ? "Copiado!" : "Copiar ID"}
-                  </button>
                 </div>
                 
                 {/* Atributos / Stats Grid */}
@@ -710,18 +699,24 @@ export function DecksScreen() {
               </div>
 
               {/* Action buttons inside zoom modal */}
-              <div className="flex gap-3 mt-auto">
+              <div className="flex flex-col sm:flex-row gap-3 mt-auto w-full">
                 <button 
                   onClick={() => addCard(inspectedCard)}
-                  className="flex-1 rounded-lg border border-emerald-500 bg-emerald-950/80 hover:bg-emerald-900 py-3 text-xs font-serif font-black uppercase text-emerald-100 shadow-[0_4px_12px_rgba(16,185,129,0.15)] flex items-center justify-center gap-1.5 transition-colors"
+                  className="flex-1 rounded-lg border border-emerald-500 bg-emerald-950/80 hover:bg-emerald-900 py-2.5 text-xs font-serif font-black uppercase text-emerald-100 flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Plus size={14} /> Adicionar
                 </button>
                 <button 
                   onClick={() => removeCard(inspectedCard.id)}
-                  className="flex-1 rounded-lg border border-red-500 bg-red-950/80 hover:bg-red-900 py-3 text-xs font-serif font-black uppercase text-red-100 flex items-center justify-center gap-1.5 transition-colors"
+                  className="flex-1 rounded-lg border border-red-500 bg-red-950/80 hover:bg-red-900 py-2.5 text-xs font-serif font-black uppercase text-red-100 flex items-center justify-center gap-1.5 transition-colors"
                 >
                   <Minus size={14} /> Remover
+                </button>
+                <button 
+                  onClick={() => { void handleCompare(inspectedCard); }}
+                  className="flex-1 rounded-lg border border-blue-500 bg-blue-950/80 hover:bg-blue-900 py-2.5 text-xs font-serif font-black uppercase text-blue-100 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Search size={14} /> Comparar
                 </button>
               </div>
             </div>

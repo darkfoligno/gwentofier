@@ -83,7 +83,7 @@ export default function Page() {
   return (
     <main className="relative min-h-screen">
       {activeScreen !== "arena" && (
-        <div className="fixed right-3 top-3 z-[200] flex items-center gap-1 rounded-lg border border-gold/40 bg-wood-darkest/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.8)] backdrop-blur-md">
+        <div className="fixed right-3 top-3 z-[100] flex items-center gap-1 rounded-lg border border-gold/40 bg-wood-darkest/90 p-1 shadow-[0_6px_18px_rgba(0,0,0,0.8)] backdrop-blur-md">
         {debugItems.map((item) => (
           <button
             key={item.key}
@@ -110,6 +110,7 @@ export default function Page() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.35 }}
+          className={activeScreen !== "arena" && activeScreen !== "auth" ? "pt-24 sm:pt-20" : ""}
         >
           {activeScreen === "auth" && <AuthScreen onEnter={setActiveScreen} />}
           {activeScreen === "hub" && <HubScreen onEnter={setActiveScreen} />}

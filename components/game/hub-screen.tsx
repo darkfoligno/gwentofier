@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft, Gamepad2 } from "lucide-react"
+import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft, Gamepad2, Copy, Check, X } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
@@ -32,6 +32,18 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [matchmaking, setMatchmaking] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const [gachaCards, setGachaCards] = useState<GameCardType[] | null>(null)
+  const [inspectedCard, setInspectedCard] = useState<GameCardType | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyId = async (id: string) => {
+    try {
+      await navigator.clipboard.writeText(id)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (cause) {
+      console.error("Erro ao copiar ID", cause)
+    }
+  }
 
   const { coins, refresh: refreshWallet } = useWallet()
 
@@ -178,7 +190,15 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
           </button>
         ))}
       </div>
-      {filtered.length ? <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">{filtered.map(card => <GameCard key={card.id} card={card} interactive />)}</div> : <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-amber-800/40 font-serif text-amber-200/70">Nenhuma carta encontrada no grimório</div>}
+      {filtered.length ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-9">
+          {filtered.map(card => (
+            <div key={card.id} onClick={() => setInspectedCard(card)} className="cursor-pointer">
+              <GameCard card={card} interactive enableZoom={false} />
+            </div>
+          ))}
+        </div>
+      ) : <div className="flex h-48 items-center justify-center rounded-lg border border-dashed border-amber-800/40 font-serif text-amber-200/70">Nenhuma carta encontrada no grimório</div>}
     </section>
     
     {showAlphaWarning && (
@@ -200,6 +220,73 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
       </div>
     )}
     
+    {inspectedCard && (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md" onClick={() => setInspectedCard(null)}>
+        <div className="relative w-[750px] max-w-[95vw] rounded-2xl border-2 border-amber-500/60 bg-stone-900 shadow-2xl p-6 flex flex-col md:flex-row gap-6 items-center md:items-start text-stone-100" onClick={e => e.stopPropagation()}>
+          <button onClick={() => setInspectedCard(null)} className="absolute -right-3 -top-3 rounded-full border border-red-500 bg-red-950/90 hover:bg-red-900 p-2 text-red-200 hover:text-white transition-colors shadow-lg z-50">
+            <X size={16} />
+          </button>
+          
+          {/* Left side: Card Render */}
+          <div className="w-[240px] flex-shrink-0">
+            <GameCard card={inspectedCard} enableZoom={false} />
+          </div>
+
+          {/* Right side: Detailed typography and info */}
+          <div className="flex-1 flex flex-col h-full justify-between self-stretch">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className={`text-[10px] font-bold tracking-widest uppercase px-2.5 py-1 rounded border font-serif ${
+                  inspectedCard.raridade === 'legendary' ? 'border-amber-500 bg-amber-950/40 text-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.2)]' :
+                  inspectedCard.raridade === 'epic' ? 'border-purple-500 bg-purple-950/40 text-purple-200 shadow-[0_0_8px_rgba(168,85,247,0.2)]' :
+                  inspectedCard.raridade === 'rare' ? 'border-blue-500 bg-blue-950/40 text-blue-200 shadow-[0_0_8px_rgba(59,130,246,0.2)]' :
+                  'border-zinc-700 bg-zinc-950/40 text-zinc-300'
+                }`}>{inspectedCard.raridade}</span>
+                <span className="text-[11px] font-serif font-bold tracking-widest uppercase text-stone-400">{inspectedCard.elemento}</span>
+              </div>
+              
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <h2 className="font-serif text-2xl font-black text-amber-200 tracking-wider m-0">{inspectedCard.nome}</h2>
+                <button 
+                  onClick={() => handleCopyId(inspectedCard.id)}
+                  className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-serif text-[10px] font-black uppercase transition-all duration-200 ${
+                    copied 
+                      ? "border-emerald-500 bg-emerald-950/40 text-emerald-300 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                      : "border-stone-700 bg-black/40 text-stone-400 hover:border-amber-500/50 hover:text-amber-200"
+                  }`}
+                  title="Copiar ID da Carta"
+                >
+                  {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  {copied ? "Copiado!" : "Copiar ID"}
+                </button>
+              </div>
+              
+              {/* Atributos / Stats Grid */}
+              <div className="grid grid-cols-3 gap-3 mb-5">
+                <div className="rounded-lg border border-blue-500/20 bg-blue-950/20 p-2 text-center shadow-inner">
+                  <span className="block text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Mana</span>
+                  <span className="text-lg font-bold font-mono text-blue-200">{inspectedCard.mana}</span>
+                </div>
+                <div className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-2 text-center shadow-inner">
+                  <span className="block text-[9px] font-bold text-amber-400 uppercase tracking-widest mb-0.5">Poder</span>
+                  <span className="text-lg font-bold font-mono text-amber-200">{inspectedCard.ataque}</span>
+                </div>
+                <div className="rounded-lg border border-red-500/20 bg-red-950/20 p-2 text-center shadow-inner">
+                  <span className="block text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">Vida</span>
+                  <span className="text-lg font-bold font-mono text-red-200">{inspectedCard.vida}</span>
+                </div>
+              </div>
+
+              <div className="border border-amber-900/30 bg-black/60 rounded-xl p-4 mb-6 shadow-inner">
+                <h4 className="text-[10px] font-serif font-bold text-amber-500 uppercase tracking-widest mb-2">Efeito de Combate</h4>
+                <p className="text-xs text-stone-300 leading-relaxed font-sans font-medium">{inspectedCard.efeito || "Sem efeito ativo."}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
     <PreMatchModal mode={preMatchMode} onCancel={() => setPreMatchMode(null)} onConfirm={handlePreMatchConfirm} />
     <AnimatePresence>
       {gachaCards && (

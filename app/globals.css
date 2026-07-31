@@ -231,3 +231,12 @@ html {
   scrollbar-color: #c29b38 #09090b;
 }
 
+/* Smooth inertial scroll for mobile touch devices */
+.overflow-y-auto, .overflow-x-auto, .overflow-auto {
+  -webkit-overflow-scrolling: touch !important;
+}
+
+html, body {
+  -webkit-overflow-scrolling: touch;
+}
+
