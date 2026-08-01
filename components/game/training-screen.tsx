@@ -335,7 +335,7 @@ export function TrainingScreen() {
   }, [])
   useEffect(()=>()=>{if(setupTimer.current!==null)window.clearTimeout(setupTimer.current);if(rescueUnlockTimer.current!==null)window.clearTimeout(rescueUnlockTimer.current)},[])
   const duel = useTrainingDuel(matchId, userId)
-  const { matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed,usedEffectCardIds,isActionPending } = duel
+  const { matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed,usedEffectCardIds,isActionPending, runTrainingBotTurn } = duel
   const latestResolvedAction=matchActions.findLast(action=>action.action_type==="attack_resolved")
   const latestEffectAction=matchActions.findLast(action=>action.action_type==="effect_activated")
   const lastActionRef = useRef<number | null>(null)
@@ -498,7 +498,7 @@ export function TrainingScreen() {
       await sleep(1000);
       if (!active) return;
       try {
-        await duel.runTrainingBotTurn();
+        await runTrainingBotTurn();
         await duel.refresh();
       } catch (err) {
         console.error("[TREINO-BOT] ❌ Erro na ação do Bot:", err);

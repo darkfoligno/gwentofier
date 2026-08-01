@@ -15,7 +15,6 @@ export const sleep = (ms: number) => new Promise<void>(resolve => window.setTime
 
 const BOT_UUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-// Algoritmo Fisher-Yates shuffle para embaralhamento de arrays
 function shuffle<T>(array: T[]): T[] {
   let currentIndex = array.length, randomIndex;
   while (currentIndex !== 0) {
@@ -43,7 +42,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
   const connectionStatus = "connected" as const
   const validMatch = true
 
-  // PASSO 1: Decks - Carga de cartas reais do Supabase (cards + card_effects)
+  // PASSO 1: Decks
   useEffect(() => {
     let active = true
     const loadRealCards = async () => {
@@ -60,19 +59,16 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
         const legendaryCards = dbCards.filter(c => c.rarity === "legendary")
         const normalCards = dbCards.filter(c => c.rarity !== "legendary" && c.card_type === "normal")
 
-        // 5 Lendárias + 35 aleatórias não-lendárias
         const p1DeckRaw = [
           ...[...legendaryCards].sort(() => 0.5 - Math.random()).slice(0, 5),
           ...[...normalCards].sort(() => 0.5 - Math.random()).slice(0, 35)
         ]
-        // CORREÇÃO 2: Aplica Fisher-Yates shuffle
         const p1Deck = shuffle(p1DeckRaw)
 
         const botDeckRaw = [
           ...[...legendaryCards].sort(() => 0.5 - Math.random()).slice(0, 5),
           ...[...normalCards].sort(() => 0.5 - Math.random()).slice(0, 35)
         ]
-        // CORREÇÃO 2: Aplica Fisher-Yates shuffle
         const botDeck = shuffle(botDeckRaw)
 
         const generatedCards: VisibleMatchCard[] = []
@@ -101,7 +97,6 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
             owner_id: currentUserId,
             slot_index: i + 1,
             active_modifiers: [],
-            // CORREÇÃO 1 e 3: Popula o card_data completo exigido pela UI
             card_data: {
               id: cardId,
               nome: card.name,
@@ -142,7 +137,6 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
             owner_id: BOT_UUID,
             slot_index: i + 1,
             active_modifiers: [],
-            // CORREÇÃO 1 e 3: Popula o card_data completo exigido pela UI
             card_data: {
               id: cardId,
               nome: card.name,
@@ -198,7 +192,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     return () => { active = false }
   }, [matchId, currentUserId])
 
-  // PASSO 2: Tela de Banimento - candidatos do Bot ordenados por raridade
+  // PASSO 2: Tela de Banimento
   const getBanCandidates = useCallback(async () => {
     const botDeckCards = boardCards.filter(c => c.owner_id === BOT_UUID)
     const rarityWeight: Record<string, number> = { legendary: 4, epic: 3, rare: 2, common: 1 }
@@ -221,11 +215,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
   const submitBan = useCallback(async (cardId: string | null, category: string) => {
     setIsActionPending(true)
     await sleep(400)
-
-    // Remove a carta selecionada do deck do Bot
     setBoardCards(prev => prev.filter(c => c.id !== cardId))
-
-    // Escolhe aleatoriamente uma carta do deck do jogador e remove
     setBoardCards(prev => {
       const playerDeck = prev.filter(c => c.owner_id === currentUserId && c.zone === "deck")
       if (playerDeck.length > 0) {
@@ -234,14 +224,12 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       }
       return prev
     })
-
     setMatchState(prev => prev ? {
       ...prev,
       status: "setup",
       state_version: prev.state_version + 1,
       match_version: prev.match_version + 1
     } : null)
-
     setIsActionPending(false)
     return { success: true, ban_phase_complete: true }
   }, [currentUserId])
@@ -250,8 +238,6 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
   const submitSetup = useCallback(async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
     setIsActionPending(true)
     await sleep(500)
-
-    // Aloca as 3 Vidas e os Reforços do jogador humano
     setBoardCards(prev => prev.map(c => {
       if (c.owner_id === currentUserId) {
         if (lifeCardIds.includes(c.id)) {
@@ -265,15 +251,11 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       }
       return c
     }))
-
-    // Bot escolhe 3 Vidas e 1 Reforço da sua mão
     setBoardCards(prev => {
       const botHand = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
       const sortedBot = [...botHand].sort((a, b) => (b.maximum_life ?? 0) - (a.maximum_life ?? 0))
-      
       const botLifes = sortedBot.slice(0, 3).map(c => c.id)
       const botReinf = sortedBot.slice(3, 4).map(c => c.id)
-
       return prev.map(c => {
         if (c.owner_id === BOT_UUID) {
           if (botLifes.includes(c.id)) {
@@ -287,10 +269,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
         return c
       })
     })
-
-    // PASSO 4: Iniciativa (Cara ou Coroa)
     const coinFlipWinner = Math.random() < 0.5 ? currentUserId : BOT_UUID
-
     setMatchState(prev => prev ? {
       ...prev,
       status: "in_progress",
@@ -299,12 +278,10 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       state_version: prev.state_version + 1,
       match_version: prev.match_version + 1
     } : null)
-
     setIsActionPending(false)
     return { success: true }
   }, [currentUserId])
 
-  // Outras funções de Duelo simuladas localmente
   const playCard = useCallback(async (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => {
     setIsActionPending(true)
     await sleep(200)
@@ -323,17 +300,14 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     return { success: true }
   }, [])
 
-  // PASSO 5: Inteligência Artificial (Defesa do Bot no turno do Jogador)
+  // PASSO 5: Inteligência Artificial (Defesa do Bot)
   const handleBotDefenseReaction = async (attackerPower: number) => {
     const currentMana = matchState?.player2_mana ?? 0
     const botHand = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
     const reactable = botHand.filter(c => (c.card_data?.mana ?? 0) <= currentMana)
-
     if (reactable.length > 0 && Math.random() < 0.7) {
       const chosenReact = reactable[Math.floor(Math.random() * reactable.length)]
-      
       setMatchState(prev => prev ? { ...prev, player2_mana: prev.player2_mana - (chosenReact.card_data?.mana ?? 0) } : null)
-      
       setMatchActions(prev => [
         ...prev,
         {
@@ -355,15 +329,10 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
   const declareAttack = useCallback(async (attackerCardIds: string[], isDirect: boolean) => {
     setIsActionPending(true)
     await sleep(400)
-
     const attackPower = boardCards
       .filter(c => attackerCardIds.includes(c.id))
       .reduce((sum, c) => sum + (c.current_power ?? 0), 0)
-
-    // Bot reage localmente
     await handleBotDefenseReaction(attackPower)
-
-    // Aplica o dano
     setBoardCards(prev => {
       const botDefenses = prev.filter(c => c.owner_id === BOT_UUID && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
       if (botDefenses.length > 0) {
@@ -378,14 +347,12 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       }
       return prev
     })
-
     setMatchState(prev => prev ? {
       ...prev,
       current_player_id: BOT_UUID,
       state_version: prev.state_version + 1,
       match_version: prev.match_version + 1
     } : null)
-
     setIsActionPending(false)
     return { success: true }
   }, [boardCards, matchState])
@@ -403,111 +370,97 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     return { success: true }
   }, [])
 
-  // CORREÇÃO 4: O Bot Executa o Turno via useEffect com transições assíncronas do React
+  // CORREÇÃO: runTrainingBotTurn declarada como useCallback para ser retornada e importada na UI
+  const runTrainingBotTurn = useCallback(async () => {
+    setIsActionPending(true)
+    await sleep(1500)
+    setBoardCards(prev => {
+      const botHand = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
+      if (botHand.length === 0) return prev
+      const countToPlay = Math.min(botHand.length, Math.floor(Math.random() * 3) + 1)
+      const chosenToPlay = botHand.slice(0, countToPlay)
+      const chosenIds = chosenToPlay.map(c => c.id)
+      return prev.map(c => {
+        if (chosenIds.includes(c.id)) {
+          return { ...c, zone: "attacker", zone_position: 1, slot_index: 1 }
+        }
+        return c
+      })
+    })
+    await sleep(1000)
+    let attackPower = 0
+    setBoardCards(prev => {
+      const readyAttackers = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
+      attackPower = readyAttackers.reduce((sum, c) => sum + (c.current_power ?? 0), 0)
+      return prev
+    })
+    const botField = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
+    const currentMana = matchState?.player2_mana ?? 0
+    const withManaEffect = botField.filter(c => (c.card_data?.mana ?? 0) <= currentMana)
+    if (withManaEffect.length > 0 && Math.random() < 0.6) {
+      const effectCard = withManaEffect[0]
+      setMatchState(prev => prev ? { ...prev, player2_mana: Math.max(0, prev.player2_mana - (effectCard.card_data?.mana ?? 0)) } : null)
+      setMatchActions(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          match_id: matchId,
+          sequence_number: prev.length + 1,
+          actor_user_id: BOT_UUID,
+          action_type: "effect_activated",
+          payload_public: { source_card_id: effectCard.id, card_name: effectCard.card_name, mana_spent: effectCard.card_data?.mana ?? 0 },
+          state_version_before: 0,
+          state_version_after: 0,
+          created_at: new Date().toISOString()
+        } as MatchAction
+      ])
+      await sleep(1000)
+    }
+    if (attackPower > 0) {
+      setBoardCards(prev => {
+        const playerDefenses = prev.filter(c => c.owner_id === currentUserId && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
+        if (playerDefenses.length > 0) {
+          const target = playerDefenses[0]
+          return prev.map(c => {
+            if (c.id === target.id) {
+              const nextHp = Math.max(0, (c.current_life ?? 0) - attackPower)
+              return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone }
+            }
+            return c
+          })
+        }
+        return prev
+      })
+    }
+    await sleep(1000)
+    setMatchState(prev => prev ? {
+      ...prev,
+      current_player_id: currentUserId,
+      player1_mana: Math.min(prev.player1_max_mana + 1, 10),
+      player1_max_mana: Math.min(prev.player1_max_mana + 1, 10),
+      player2_mana: Math.min(prev.player2_max_mana + 1, 10),
+      player2_max_mana: Math.min(prev.player2_max_mana + 1, 10),
+      current_turn: prev.current_turn + 1,
+      state_version: prev.state_version + 1,
+      match_version: prev.match_version + 1
+    } : null)
+    setIsActionPending(false)
+  }, [boardCards, matchState, matchId, currentUserId])
+
+  // Ação silenciosa do Bot no Hook que monitora a vez do Bot
   useEffect(() => {
     if (!matchState || matchState.status !== "in_progress" || matchState.engine_state !== "turn_action") return
     if (matchState.current_player_id !== BOT_UUID) return
     if (isActionPending) return
-
     let active = true
-    const executeBotTurn = async () => {
-      setIsActionPending(true)
+    const triggerBot = async () => {
       await sleep(1500)
-      if (!active) { setIsActionPending(false); return }
-
-      // 1. Move 1, 2 ou 3 cartas da mão para o campo de ataque
-      setBoardCards(prev => {
-        const botHand = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
-        if (botHand.length === 0) return prev
-        
-        const countToPlay = Math.min(botHand.length, Math.floor(Math.random() * 3) + 1)
-        const chosenToPlay = botHand.slice(0, countToPlay)
-        const chosenIds = chosenToPlay.map(c => c.id)
-
-        return prev.map(c => {
-          if (chosenIds.includes(c.id)) {
-            return { ...c, zone: "attacker", zone_position: 1, slot_index: 1 }
-          }
-          return c
-        })
-      })
-
-      await sleep(1000)
-      if (!active) { setIsActionPending(false); return }
-
-      // 2. IA de Ataque do Bot: Ataca com as cartas no campo de ataque e gasta mana
-      let attackPower = 0
-      setBoardCards(prev => {
-        const readyAttackers = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
-        attackPower = readyAttackers.reduce((sum, c) => sum + (c.current_power ?? 0), 0)
-        return prev
-      })
-
-      const botField = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
-      const currentMana = matchState?.player2_mana ?? 0
-      const withManaEffect = botField.filter(c => (c.card_data?.mana ?? 0) <= currentMana)
-      
-      if (withManaEffect.length > 0 && Math.random() < 0.6) {
-        const effectCard = withManaEffect[0]
-        setMatchState(prev => prev ? { ...prev, player2_mana: Math.max(0, prev.player2_mana - (effectCard.card_data?.mana ?? 0)) } : null)
-        
-        setMatchActions(prev => [
-          ...prev,
-          {
-            id: Date.now(),
-            match_id: matchId,
-            sequence_number: prev.length + 1,
-            actor_user_id: BOT_UUID,
-            action_type: "effect_activated",
-            payload_public: { source_card_id: effectCard.id, card_name: effectCard.card_name, mana_spent: effectCard.card_data?.mana ?? 0 },
-            state_version_before: 0,
-            state_version_after: 0,
-            created_at: new Date().toISOString()
-          } as MatchAction
-        ])
-        await sleep(1000)
-      }
-
-      // Aplica dano nas defesas do jogador humano
-      if (attackPower > 0) {
-        setBoardCards(prev => {
-          const playerDefenses = prev.filter(c => c.owner_id === currentUserId && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
-          if (playerDefenses.length > 0) {
-            const target = playerDefenses[0]
-            return prev.map(c => {
-              if (c.id === target.id) {
-                const nextHp = Math.max(0, (c.current_life ?? 0) - attackPower)
-                return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone }
-              }
-              return c
-            })
-          }
-          return prev
-        })
-      }
-
-      await sleep(1000)
-      if (!active) { setIsActionPending(false); return }
-
-      // 3. Passa o turno de volta para o Humano e incrementa mana
-      setMatchState(prev => prev ? {
-        ...prev,
-        current_player_id: currentUserId,
-        player1_mana: Math.min(prev.player1_max_mana + 1, 10),
-        player1_max_mana: Math.min(prev.player1_max_mana + 1, 10),
-        player2_mana: Math.min(prev.player2_max_mana + 1, 10),
-        player2_max_mana: Math.min(prev.player2_max_mana + 1, 10),
-        current_turn: prev.current_turn + 1,
-        state_version: prev.state_version + 1,
-        match_version: prev.match_version + 1
-      } : null)
-
-      setIsActionPending(false)
+      if (!active) return
+      await runTrainingBotTurn()
     }
-
-    void executeBotTurn()
+    void triggerBot()
     return () => { active = false }
-  }, [matchState?.current_player_id, matchState?.engine_state, matchState?.status, isActionPending, validMatch])
+  }, [matchState?.current_player_id, matchState?.engine_state, matchState?.status, isActionPending, runTrainingBotTurn])
 
   const getCardsByZone = useCallback((zone: VisibleMatchCard["zone"], ownerId?: string) => {
     return boardCards.filter(card => card.zone === zone && (!ownerId || card.owner_id === ownerId))
