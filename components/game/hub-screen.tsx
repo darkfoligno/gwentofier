@@ -35,6 +35,24 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
   const [gachaCards, setGachaCards] = useState<GameCardType[] | null>(null)
   const [inspectedCard, setInspectedCard] = useState<GameCardType | null>(null)
   const [copied, setCopied] = useState(false)
+  const [comparingCard, setComparingCard] = useState<any>(null)
+  const [loadingOwners, setLoadingOwners] = useState(false)
+  const [cardOwners, setCardOwners] = useState<any[]>([])
+
+  const handleCompare = async (card: any) => {
+    setComparingCard(card)
+    setLoadingOwners(true)
+    setCardOwners([])
+    try {
+      const { data, error } = await supabase.rpc('get_card_owners', { p_card_id: card.id })
+      if (error) throw error
+      setCardOwners(data || [])
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoadingOwners(false)
+    }
+  }
 
   const handleCopyId = async (id: string) => {
     try {
@@ -340,12 +358,45 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
                 <h4 className="text-[10px] font-serif font-bold text-amber-500 uppercase tracking-widest mb-2">Efeito de Combate</h4>
                 <p className="text-xs text-stone-300 leading-relaxed font-sans font-medium">{inspectedCard.efeito || "Sem efeito ativo."}</p>
               </div>
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => { void handleCompare(inspectedCard); }}
+                  className="flex-1 rounded-lg border border-blue-500 bg-blue-950/80 hover:bg-blue-900 py-2.5 text-xs font-serif font-black uppercase text-blue-100 flex items-center justify-center gap-1.5 transition-colors"
+                >
+                  <Search size={14} /> Comparar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
     )}
 
+    {comparingCard && (
+      <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md" onClick={() => setComparingCard(null)}>
+        <div className="relative w-[450px] max-w-[95vw] rounded-xl border border-amber-500/40 bg-stone-900 p-6 shadow-2xl text-stone-100" onClick={e => e.stopPropagation()}>
+          <button onClick={() => setComparingCard(null)} className="absolute -right-3 -top-3 rounded-full border border-red-500 bg-red-950 p-2 text-red-200 shadow-lg hover:bg-red-900 transition-colors">
+            <X size={14} />
+          </button>
+          <h3 className="font-serif text-xl font-black text-amber-200 mb-2">Quem possui "{comparingCard.nome}"?</h3>
+          <p className="text-xs text-zinc-400 mb-4">Outros duelistas que possuem esta carta no inventário:</p>
+          {loadingOwners ? (
+            <p className="text-sm text-zinc-400 py-4 text-center">Buscando na biblioteca...</p>
+          ) : cardOwners.length === 0 ? (
+            <p className="text-sm text-zinc-400 py-4 text-center">Nenhum outro duelista possui esta carta ainda.</p>
+          ) : (
+            <div className="max-h-60 overflow-y-auto space-y-2 pr-2">
+              {cardOwners.map((owner, idx) => (
+                <div key={idx} className="flex justify-between items-center bg-black/40 border border-zinc-800 rounded p-2 text-sm">
+                  <span className="font-bold text-amber-100">{owner.username}</span>
+                  <span className="text-xs text-zinc-400 font-mono">Quantidade: x{owner.quantity}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
     <PreMatchModal mode={preMatchMode} onCancel={() => setPreMatchMode(null)} onConfirm={handlePreMatchConfirm} />
     <AnimatePresence>
       {gachaCards && (

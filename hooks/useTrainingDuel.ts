@@ -42,7 +42,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
   const connectionStatus = "connected" as const
   const validMatch = true
 
-  // PASSO 1: Decks
+  // Geração de Decks (Fisher-Yates) com card_data completo
   useEffect(() => {
     let active = true
     const loadRealCards = async () => {
@@ -185,14 +185,14 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
           player2_mana_available: 3
         })
       } catch (e) {
-        console.error("Falha ao carregar deck com cartas reais:", e)
+        console.error("Falha ao inicializar o deck:", e)
       }
     }
     void loadRealCards()
     return () => { active = false }
   }, [matchId, currentUserId])
 
-  // PASSO 2: Tela de Banimento
+  // PASSO 2: Tela de Banimento - candidatos com card_data completo
   const getBanCandidates = useCallback(async () => {
     const botDeckCards = boardCards.filter(c => c.owner_id === BOT_UUID)
     const rarityWeight: Record<string, number> = { legendary: 4, epic: 3, rare: 2, common: 1 }
@@ -208,7 +208,12 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       image_url: c.image_url ?? "",
       rarity: c.rarity ?? "common",
       raridade: c.rarity ?? "common",
-      copy_count: 1
+      copy_count: 1,
+      base_power: c.current_power,
+      base_max_life: c.maximum_life,
+      effect_text: c.effect_text,
+      effect_mana_cost: c.card_data?.mana ?? 1,
+      categories: [c.rarity ?? "rare"]
     }))
   }, [boardCards])
 
@@ -300,7 +305,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     return { success: true }
   }, [])
 
-  // PASSO 5: Inteligência Artificial (Defesa do Bot)
+  // Defesa do Bot durante a colisão de ataque do jogador
   const handleBotDefenseReaction = async (attackerPower: number) => {
     const currentMana = matchState?.player2_mana ?? 0
     const botHand = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
@@ -326,13 +331,18 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     }
   }
 
+  // Resolução de ataque rígida similar ao PvP (os atacantes permanecem em campo e defesas são danificadas)
   const declareAttack = useCallback(async (attackerCardIds: string[], isDirect: boolean) => {
     setIsActionPending(true)
     await sleep(400)
     const attackPower = boardCards
       .filter(c => attackerCardIds.includes(c.id))
       .reduce((sum, c) => sum + (c.current_power ?? 0), 0)
+
+    // Bot reage localmente
     await handleBotDefenseReaction(attackPower)
+
+    // Aplica o dano nas defesas
     setBoardCards(prev => {
       const botDefenses = prev.filter(c => c.owner_id === BOT_UUID && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
       if (botDefenses.length > 0) {
@@ -340,60 +350,122 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
         return prev.map(c => {
           if (c.id === target.id) {
             const nextHp = Math.max(0, (c.current_life ?? 0) - attackPower)
-            return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone }
+            return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone, zone_position: nextHp <= 0 ? null : c.zone_position }
           }
           return c
         })
       }
       return prev
     })
-    setMatchState(prev => prev ? {
-      ...prev,
-      current_player_id: BOT_UUID,
-      state_version: prev.state_version + 1,
-      match_version: prev.match_version + 1
-    } : null)
+
+    // Marca as cartas do jogador que atacaram
+    setBoardCards(prev => prev.map(c => attackerCardIds.includes(c.id) ? { ...c, has_attacked_this_turn: true } : c))
+
+    // Passagem de turno automática após ataque resolvido
+    setMatchState(prev => {
+      if (!prev) return null
+      // Saca 1 carta para o Bot
+      let newHandCount = prev.player2_hand_count
+      setBoardCards(cards => {
+        const botDeck = cards.filter(c => c.owner_id === BOT_UUID && c.zone === "deck")
+        if (botDeck.length > 0) {
+          const drawn = botDeck[0]
+          newHandCount += 1
+          return cards.map(c => c.id === drawn.id ? { ...c, zone: "hand" } : c)
+        }
+        return cards
+      })
+
+      return {
+        ...prev,
+        current_player_id: BOT_UUID,
+        player2_mana: Math.min(prev.player2_max_mana + 1, 10),
+        player2_max_mana: Math.min(prev.player2_max_mana + 1, 10),
+        player2_hand_count: newHandCount,
+        state_version: prev.state_version + 1,
+        match_version: prev.match_version + 1
+      }
+    })
+
+    // Reseta flags de ataque das cartas do Bot
+    setBoardCards(prev => prev.map(c => c.owner_id === BOT_UUID ? { ...c, has_attacked_this_turn: false } : c))
+
     setIsActionPending(false)
     return { success: true }
   }, [boardCards, matchState])
 
+  // Passar Turno (sacar 1 carta e alternar active_player_id)
   const endTurn = useCallback(async () => {
     setIsActionPending(true)
     await sleep(200)
-    setMatchState(prev => prev ? {
-      ...prev,
-      current_player_id: BOT_UUID,
-      state_version: prev.state_version + 1,
-      match_version: prev.match_version + 1
-    } : null)
+
+    setMatchState(prev => {
+      if (!prev) return null
+      const nextPlayer = prev.current_player_id === currentUserId ? BOT_UUID : currentUserId
+      
+      // Saca 1 carta do deck do novo jogador ativo
+      setBoardCards(cards => {
+        const deck = cards.filter(c => c.owner_id === nextPlayer && c.zone === "deck")
+        if (deck.length > 0) {
+          const drawn = deck[0]
+          return cards.map(c => c.id === drawn.id ? { ...c, zone: "hand" } : c)
+        }
+        return cards
+      })
+
+      const isBot = nextPlayer === BOT_UUID
+      return {
+        ...prev,
+        current_player_id: nextPlayer,
+        player1_mana: isBot ? prev.player1_mana : Math.min(prev.player1_max_mana + 1, 10),
+        player1_max_mana: isBot ? prev.player1_max_mana : Math.min(prev.player1_max_mana + 1, 10),
+        player2_mana: isBot ? Math.min(prev.player2_max_mana + 1, 10) : prev.player2_mana,
+        player2_max_mana: isBot ? Math.min(prev.player2_max_mana + 1, 10) : prev.player2_max_mana,
+        state_version: prev.state_version + 1,
+        match_version: prev.match_version + 1
+      }
+    })
+
+    // Reseta flags de ataque do novo jogador ativo
+    const nextPlayer = matchState?.current_player_id === currentUserId ? BOT_UUID : currentUserId
+    setBoardCards(prev => prev.map(c => c.owner_id === nextPlayer ? { ...c, has_attacked_this_turn: false } : c))
+
     setIsActionPending(false)
     return { success: true }
-  }, [])
+  }, [currentUserId, matchState])
 
-  // CORREÇÃO: runTrainingBotTurn declarada como useCallback para ser retornada e importada na UI
+  // IA do Bot local
   const runTrainingBotTurn = useCallback(async () => {
     setIsActionPending(true)
     await sleep(1500)
+
+    // Move de 1 a 3 cartas da mão do Bot para a zona attacker
+    let botHandIds: string[] = []
     setBoardCards(prev => {
       const botHand = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
       if (botHand.length === 0) return prev
       const countToPlay = Math.min(botHand.length, Math.floor(Math.random() * 3) + 1)
       const chosenToPlay = botHand.slice(0, countToPlay)
-      const chosenIds = chosenToPlay.map(c => c.id)
+      botHandIds = chosenToPlay.map(c => c.id)
+
       return prev.map(c => {
-        if (chosenIds.includes(c.id)) {
+        if (botHandIds.includes(c.id)) {
           return { ...c, zone: "attacker", zone_position: 1, slot_index: 1 }
         }
         return c
       })
     })
+
     await sleep(1000)
+
+    // Executa ataque com as cartas
     let attackPower = 0
     setBoardCards(prev => {
-      const readyAttackers = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
+      const readyAttackers = prev.filter(c => botHandIds.includes(c.id) || (c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0))
       attackPower = readyAttackers.reduce((sum, c) => sum + (c.current_power ?? 0), 0)
       return prev
     })
+
     const botField = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
     const currentMana = matchState?.player2_mana ?? 0
     const withManaEffect = botField.filter(c => (c.card_data?.mana ?? 0) <= currentMana)
@@ -416,6 +488,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       ])
       await sleep(1000)
     }
+
     if (attackPower > 0) {
       setBoardCards(prev => {
         const playerDefenses = prev.filter(c => c.owner_id === currentUserId && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
@@ -424,7 +497,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
           return prev.map(c => {
             if (c.id === target.id) {
               const nextHp = Math.max(0, (c.current_life ?? 0) - attackPower)
-              return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone }
+              return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone, zone_position: nextHp <= 0 ? null : c.zone_position }
             }
             return c
           })
@@ -432,18 +505,35 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
         return prev
       })
     }
+
     await sleep(1000)
-    setMatchState(prev => prev ? {
-      ...prev,
-      current_player_id: currentUserId,
-      player1_mana: Math.min(prev.player1_max_mana + 1, 10),
-      player1_max_mana: Math.min(prev.player1_max_mana + 1, 10),
-      player2_mana: Math.min(prev.player2_max_mana + 1, 10),
-      player2_max_mana: Math.min(prev.player2_max_mana + 1, 10),
-      current_turn: prev.current_turn + 1,
-      state_version: prev.state_version + 1,
-      match_version: prev.match_version + 1
-    } : null)
+
+    // Passa o turno para o Humano e saca 1 carta
+    setMatchState(prev => {
+      if (!prev) return null
+      setBoardCards(cards => {
+        const deck = cards.filter(c => c.owner_id === currentUserId && c.zone === "deck")
+        if (deck.length > 0) {
+          const drawn = deck[0]
+          return cards.map(c => c.id === drawn.id ? { ...c, zone: "hand" } : c)
+        }
+        return cards
+      })
+
+      return {
+        ...prev,
+        current_player_id: currentUserId,
+        player1_mana: Math.min(prev.player1_max_mana + 1, 10),
+        player1_max_mana: Math.min(prev.player1_max_mana + 1, 10),
+        current_turn: prev.current_turn + 1,
+        state_version: prev.state_version + 1,
+        match_version: prev.match_version + 1
+      }
+    })
+
+    // Reseta flags de ataque das cartas do Humano
+    setBoardCards(prev => prev.map(c => c.owner_id === currentUserId ? { ...c, has_attacked_this_turn: false } : c))
+
     setIsActionPending(false)
   }, [boardCards, matchState, matchId, currentUserId])
 
@@ -494,7 +584,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     replaceEarlyLifeCard: async () => ({ success: true }),
     declareAttack,
     endTurn,
-    passWithoutAction: async () => ({ success: true }),
+    passWithoutAction: endTurn,
     surrenderMatch: async () => ({ success: true }),
     activateMatchEffect: async () => ({ success: true }),
     declineAttackReaction: async () => ({ success: true }),
