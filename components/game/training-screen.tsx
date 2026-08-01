@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useCallback } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { BookOpen, Crown, Flag, Heart, Hourglass, Layers, Loader2, Shield, Skull, Sparkles, Sword, Swords, Wifi, WifiOff, X, Zap, Beaker } from "lucide-react"
+import { BookOpen, Crown, Flag, Hand, Heart, Hourglass, Layers, Loader2, Shield, Skull, Sparkles, Sword, Swords, Wifi, WifiOff, X, Zap, Beaker } from "lucide-react"
 import { GameCard } from "./game-card"
 import { ReactionModal } from "./reaction-modal"
 import { PreCombatModal } from "./pre-combat-modal"
@@ -63,6 +63,11 @@ function GraveyardModal({ cards, onClose, onInspect }: { cards: VisibleMatchCard
 
 function CardPileModal({ title, cards, hidden = false, onClose }: { title: string; cards: VisibleMatchCard[]; hidden?: boolean; onClose: () => void }) {
   return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 z-[160] flex items-center justify-center bg-black/90 p-5 backdrop-blur-md"><div onClick={e => e.stopPropagation()} className="relative max-h-[88vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-amber-500/50 bg-stone-950 p-6"><button onClick={onClose} className="absolute right-4 top-4 text-amber-200"><X /></button><h2 className="mb-5 font-serif text-2xl font-black text-amber-200">{title} · {cards.length}</h2><div className="grid grid-cols-3 gap-4 sm:grid-cols-5 md:grid-cols-7 xl:grid-cols-10">{cards.map(card => <CardView key={card.id} row={card} hidden={hidden && !card.is_face_up} />)}</div>{!cards.length && <p className="py-14 text-center text-stone-500">Nenhuma carta nesta pilha.</p>}</div></motion.div>
+}
+
+function ArenaPreview() {
+  const slots = (label: string, count: number) => <div className="flex justify-center gap-2">{Array.from({ length: count }, (_, index) => <EmptySlot key={index} label={label} />)}</div>
+  return <main className="relative min-h-screen w-full overflow-x-hidden overflow-y-auto pb-24 bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-center text-stone-100"><div className="absolute inset-0 bg-black/65 backdrop-blur-[2px]" /><div className="relative z-10 flex h-full flex-col p-3 pt-16"><div className="mb-2 rounded border border-blue-400/40 bg-blue-950/70 p-2 text-center text-xs text-blue-100">Prévia visual — mão inicial: 7 de no máximo 10 cartas. Nenhuma ação será enviada ao servidor.</div><div className="grid min-h-0 flex-1 grid-cols-[150px_minmax(620px,1fr)_150px] gap-3 overflow-x-auto"><aside className="flex flex-col justify-between rounded-xl border border-amber-800/30 bg-stone-950/70 p-2"><Pile label="Deck rival" count={33} /><Pile label="Cemitério rival" count={0} graveyard /><Pile label="Seu cemitério" count={0} graveyard /><Pile label="Seu deck" count={33} /></aside><section className="flex min-h-0 flex-col justify-around overflow-y-auto rounded-xl border border-amber-700/30 bg-black/30 p-2"><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Campo de Defesa do oponente</p>{slots("Carta", 4)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Cartas de Vida do oponente</p>{slots("Carta", 3)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Campo de Ataque do oponente</p>{slots("Carta", 4)}</div><div className="flex items-center justify-between border-y border-amber-700/50 bg-stone-950/95 px-4 py-2"><ManaOrb label="Rival" /><b className="font-serif text-amber-200">Turno 0</b><div className="flex gap-2"><button disabled className="rounded border border-amber-500 bg-amber-800 px-3 py-1 text-[9px] font-black opacity-60">ENCERRAR TURNO</button><button disabled className="rounded border border-blue-400 bg-blue-900 px-3 py-1 text-[9px] font-black opacity-60">PASSAR TURNO</button></div><ManaOrb label="Você" /></div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Campo de Ataque</p>{slots("Carta", 4)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Campo de Defesa</p>{slots("Carta", 4)}</div><div><p className="mb-1 text-center font-serif text-[9px] uppercase tracking-widest text-amber-300">Suas cartas de vida</p>{slots("Carta", 3)}</div></section><aside className="flex flex-col justify-between rounded-xl border border-amber-800/30 bg-stone-950/70 p-3"><EmptySlot label="Carta que você baniu" danger /><span className="rounded-full border border-blue-400/50 bg-blue-950 p-2 text-center text-[9px] text-blue-200">PRÉVIA LOCAL</span><EmptySlot label="Sua carta banida pelo rival" danger /></aside></div><div className="mx-auto mt-2 flex h-24 w-full max-w-4xl items-end justify-center -space-x-2 rounded-t-3xl border border-amber-700/30 bg-black/65 p-2">{Array.from({ length: 7 }, (_, index) => <EmptySlot key={index} label="Carta" />)}</div></div></main>
 }
 
 function ManaOrb({ label }: { label: string }) { return <div className="flex items-center gap-2 text-[10px]"><span className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-cyan-300 bg-[radial-gradient(circle_at_35%_25%,#67e8f9,#1d4ed8_55%,#172554)] font-black shadow-[0_0_18px_rgba(34,211,238,.65)]">0</span><span className="text-stone-400">{label}</span></div> }
@@ -175,7 +180,7 @@ function actionText(action: MatchAction, state: MatchState | null, cards:Visible
   return ""
 }
 
-function effectOutcome(action:MatchAction,cards:VisibleMatchCard[]){const p=action.payload_public??{};const code=String(p.effect_code??"");const result=(p.result??{})as Record<string,unknown>;const inner=(result.result??{})as Record<string,unknown>;const name=(id:unknown)=>cards.find(card=>card.id===id)?.card_data?.nome??"carta registrada";if(code==="epic_lambert_mill_random_deck")return `💥 [Lambert] triturou a carta ${String(result.destroyed_card_name??"")} direto do deck para o cemitério!`;if(code==="common_draw_three_common")return `${String(result.drawn_count??0)} carta(s) comum(ns) saíram do deck para a mão.`;if(code==="common_erinia_exchange")return `${name(result.stolen_card_id)} foi roubada e ${name(result.randomly_discarded_card_id)} foi descartada aleatoriamente.`;if(code==="common_endriuga_scaled_damage")return `${name(result.target_card_id)} recebeu ${String(result.poison_damage??0)} de veneno, calculated sobre ${String(result.enemy_reinforcement_count??0)} reforço(s).`;if(code==="common_henselt_attack_all_life")return `Henselt atacou todas as Cartas de Vida com ${String(result.power_per_target??0)} de poder em cada alvo.`;if(code==="common_night_wraith_silence_hand")return `${name(result.silenced_hand_card_id)} teve seu efeito permanentemente silenciado.`;if(code==="common_keira_replace_life")return `${name(result.replacement_card_id)} saiu do deck e ocupou o slot de Vida ${String(result.life_slot??"?")}.`;if(code==="common_ghoul_group_revive")return `${name(result.returned_card_id)} retornou do cemitério para a mão.`;if(code==="common_elemental_prevent_damage"||code==="common_gargoyle_cancel_single_attack")return `O ataque de ${String(result.cancelled_power??0)} foi integralmente reduzido a zero.`;if(code==="common_troll_discard_draw")return `A mão foi descartada e duas novas cartas foram compradas.`;if(code==="common_berserker_copy_stats")return `Berseker copiou ${String(result.copied_power??0)} de Poder e ${String(result.copied_life??0)} de Vida de ${name(result.copied_card_id)}.`;if(code==="common_puero_destroy_random_legendary")return `${name(result.random_legendary_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_necrophage_destroy_hand")return `${name(result.destroyed_enemy_hand_card_id)} foi destruída na mão por possuir poder abaixo de ${String(result.power_limit??0)}.`;if(code==="common_fairy_extra_draw")return `O saque adicional automático foi mantido enquanto Fada permanecer em campo.`;if(code==="common_shani_redeploy_life")return `Shani substituiu ${name(result.replaced_life_card_id)} no slot ${String(result.life_slot??"?")} e voltou com a Vida cheia.`;if(code==="common_barghest_overkill_to_deck")return `O golpe de ${String(result.incoming_attack_power??0)} ativou Barghest, que retornou embaralhado ao deck.`;if(code==="common_barroso_purge_enemy_hand")return `A mão adversária inteira foi enviada ao cemitério automaticamente.`;if(code==="common_atrocious_ghoul_draw_epic")return `${name(result.drawn_epic_card_id)} foi comprada após Carniçal Atroz sobreviver.`;if(code==="common_beggar_king_destroy_life")return `${name(result.random_destroyed_life_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_cleaver_discard_for_direct")return `O alvo direto foi marcado; agora escolha exatamente três descartes para pagar o ataque.`;if(code==="common_lugos_next_civil_double_power")return result.drawn?`${name(result.top_card_id)} era Cívil, foi comprada e teve o Poder dobrado permanentemente.`:`A carta do topo era ${String(result.top_card_element??"de outro tipo")}; nenhuma carta foi comprada.`;if(code==="common_halmar_coin_attack"){const targets=Object.keys(inner).map(id=>cards.find(card=>card.id===id)).filter((card):card is VisibleMatchCard=>Boolean(card));const names=targets.length?targets.map(card=>card.card_data?.nome??"Carta de Vida misteriosa").join(" e "):"Carta de Vida misteriosa";const backfire=targets.some(card=>card.owner_id===action.actor_user_id);return backfire?`O feitiço saiu pela culatra e atingiu diretamente a Carta de Vida ${names}!`:`A sorte sorriu: o ataque atingiu diretamente a Carta de Vida ${names}!`}if(code==="common_tomira_full_heal"){const target=cards.find(card=>card.id===p.target_card_id);return `A energia mágica restaurou ${target?.card_data?.nome??"a Carta de Vida"} até sua Vida máxima.`}if(result.message)return String(result.message);const target=cards.find(card=>card.id===p.target_card_id);if(target&&/destroy|purge/i.test(code))return `O feitiço despedaçou ${target.card_data?.nome??"a unidade atingida"} e a enviou ao cemitério!`;return `A magia alterou o estado da batalha conforme as condições da carta.`}
+function effectOutcome(action:MatchAction,cards:VisibleMatchCard[]){const p=action.payload_public??{};const code=String(p.effect_code??"");const result=(p.result??{})as Record<string,unknown>;const inner=(result.result??{})as Record<string,unknown>;const name=(id:unknown)=>cards.find(card=>card.id===id)?.card_data?.nome??"carta registrada";if(code==="epic_lambert_mill_random_deck")return `💥 [Lambert] triturou a carta ${String(result.destroyed_card_name??"")} direto do deck para o cemitério!`;if(code==="common_draw_three_common")return `${String(result.drawn_count??0)} carta(s) comum(ns) saíram do deck para a mão.`;if(code==="common_erinia_exchange")return `${name(result.stolen_card_id)} foi roubada e ${name(result.randomly_discarded_card_id)} foi descartada aleatoriamente.`;if(code==="common_endriuga_scaled_damage")return `${name(result.target_card_id)} recebeu ${String(result.poison_damage??0)} de veneno, calculado sobre ${String(result.enemy_reinforcement_count??0)} reforço(s).`;if(code==="common_henselt_attack_all_life")return `Henselt atacou todas as Cartas de Vida com ${String(result.power_per_target??0)} de poder em cada alvo.`;if(code==="common_night_wraith_silence_hand")return `${name(result.silenced_hand_card_id)} teve seu efeito permanentemente silenciado.`;if(code==="common_keira_replace_life")return `${name(result.replacement_card_id)} saiu do deck e ocupou o slot de Vida ${String(result.life_slot??"?")}.`;if(code==="common_ghoul_group_revive")return `${name(result.returned_card_id)} retornou do cemitério para a mão.`;if(code==="common_elemental_prevent_damage"||code==="common_gargoyle_cancel_single_attack")return `O ataque de ${String(result.cancelled_power??0)} foi integralmente reduzido a zero.`;if(code==="common_troll_discard_draw")return `A mão foi descartada e duas novas cartas foram compradas.`;if(code==="common_berserker_copy_stats")return `Berseker copiou ${String(result.copied_power??0)} de Poder e ${String(result.copied_life??0)} de Vida de ${name(result.copied_card_id)}.`;if(code==="common_puero_destroy_random_legendary")return `${name(result.random_legendary_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_necrophage_destroy_hand")return `${name(result.destroyed_enemy_hand_card_id)} foi destruída na mão por possuir poder abaixo de ${String(result.power_limit??0)}.`;if(code==="common_fairy_extra_draw")return `O saque adicional automático foi mantido enquanto Fada permanecer em campo.`;if(code==="common_shani_redeploy_life")return `Shani substituiu ${name(result.replaced_life_card_id)} no slot ${String(result.life_slot??"?")} e voltou com a Vida cheia.`;if(code==="common_barghest_overkill_to_deck")return `O golpe de ${String(result.incoming_attack_power??0)} ativou Barghest, que retornou embaralhado ao deck.`;if(code==="common_barroso_purge_enemy_hand")return `A mão adversária inteira foi enviada ao cemitério automaticamente.`;if(code==="common_atrocious_ghoul_draw_epic")return `${name(result.drawn_epic_card_id)} foi comprada após Carniçal Atroz sobreviver.`;if(code==="common_beggar_king_destroy_life")return `${name(result.random_destroyed_life_id)} foi escolhida aleatoriamente e destruída.`;if(code==="common_cleaver_discard_for_direct")return `O alvo direto foi marcado; agora escolha exatamente três descartes para pagar o ataque.`;if(code==="common_lugos_next_civil_double_power")return result.drawn?`${name(result.top_card_id)} era Cívil, foi comprada e teve o Poder dobrado permanentemente.`:`A carta do topo era ${String(result.top_card_element??"de outro tipo")}; nenhuma carta foi comprada.`;if(code==="common_halmar_coin_attack"){const targets=Object.keys(inner).map(id=>cards.find(card=>card.id===id)).filter((card):card is VisibleMatchCard=>Boolean(card));const names=targets.length?targets.map(card=>card.card_data?.nome??"Carta de Vida misteriosa").join(" e "):"Carta de Vida misteriosa";const backfire=targets.some(card=>card.owner_id===action.actor_user_id);return backfire?`O feitiço saiu pela culatra e atingiu diretamente a Carta de Vida ${names}!`:`A sorte sorriu: o ataque atingiu diretamente a Carta de Vida ${names}!`}if(code==="common_tomira_full_heal"){const target=cards.find(card=>card.id===p.target_card_id);return `A energia mágica restaurou ${target?.card_data?.nome??"a Carta de Vida"} até sua Vida máxima.`}if(result.message)return String(result.message);const target=cards.find(card=>card.id===p.target_card_id);if(target&&/destroy|purge/i.test(code))return `O feitiço despedaçou ${target.card_data?.nome??"a unidade atingida"} e a enviou ao cemitério!`;return `A magia alterou o estado da batalha conforme as condições da carta.`}
 
 const zoneNarrative:Record<string,string>={hand:"Mão",life:"Campo de Vida",reinforcement:"Campo de Reforço",attacker:"Campo de Ataque",graveyard:"Cemitério",deck:"Deck"}
 function actionChronicleLines(action:MatchAction,state:MatchState|null,cards:VisibleMatchCard[]){
@@ -196,6 +201,55 @@ function actionChronicleLines(action:MatchAction,state:MatchState|null,cards:Vis
 
 export function TrainingScreen() {
   const [matchId, setMatchId] = useState("")
+  // Lab Sandbox states
+  const testCardId = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get("test_card_id") : null;
+  const isLabSandbox = !!testCardId;
+  const [hasBeenPlayed, setHasBeenPlayed] = useState(false)
+  const [labModalOpen, setLabModalOpen] = useState(false)
+  const [labRewardCoins, setLabRewardCoins] = useState<number>(0)
+  const [labIsFirstTime, setLabIsFirstTime] = useState<boolean>(false)
+  const [labModalStatus, setLabModalStatus] = useState<string>("")
+  const [labRedirectTimer, setLabRedirectTimer] = useState<number | null>(null)
+  
+  const isBoardFrozen = labModalOpen;
+
+  const leaveLabSandbox = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("screen", "lab");
+    url.searchParams.delete("matchId");
+    url.searchParams.delete("test_card_id");
+    window.location.assign(url.toString());
+  };
+
+  const triggerLabConclusion = async () => {
+    if (labModalOpen) return;
+    setLabModalOpen(true);
+    setLabModalStatus("Processando recompensas...");
+    try {
+      const { data, error } = await supabase.rpc("claim_lab_reward", { p_card_id: testCardId });
+      if (error) throw error;
+      setLabRewardCoins(data?.reward ?? 0);
+      setLabIsFirstTime(data?.first_time ?? false);
+    } catch (err) {
+      console.error(err);
+    }
+
+    let count = 4;
+    setLabRedirectTimer(count);
+    const interval = setInterval(() => {
+      count -= 1;
+      setLabRedirectTimer(count);
+      if (count <= 0) {
+        clearInterval(interval);
+        leaveLabSandbox();
+      }
+    }, 1000);
+  };
+
+  const [preview, setPreview] = useState(false)
+  const [sandbox,setSandbox] = useState<{cardId:string;objective:string;actionType:string;setup:string[];expected:string[];visual:string[]}|null>(null)
+  const [sandboxReport,setSandboxReport] = useState<{approved:boolean;status:string;effect_code:string;before:Record<string,unknown>;after:Record<string,unknown>;effect_execution_log:unknown[];prepared_action_proof?:unknown}|null>(null)
+  const [sandboxBusy,setSandboxBusy] = useState(false)
   const [userId, setUserId] = useState("")
   const [selectedHand, setSelectedHand] = useState<string | null>(null)
   const [selectedAttackers, setSelectedAttackers] = useState<Set<string>>(new Set())
@@ -203,6 +257,7 @@ export function TrainingScreen() {
   const [pileOpen, setPileOpen] = useState<{ title: string; cards: VisibleMatchCard[]; hidden?: boolean } | null>(null)
   const [setupCards, setSetupCards] = useState<Set<string>>(new Set())
   const [setupReinforcements, setSetupReinforcements] = useState<Set<string>>(new Set())
+  const [secondsLeft, setSecondsLeft] = useState(180)
   const [banCandidates, setBanCandidates] = useState<BanCandidate[]>([])
   const [selectedBan,setSelectedBan]=useState<BanCandidate|null>(null)
   const [banBusy, setBanBusy] = useState(false)
@@ -224,28 +279,59 @@ export function TrainingScreen() {
   const [combatSequenceActive,setCombatSequenceActive]=useState(false)
   const [collisionStage,setCollisionStage]=useState<{phase:"strike"|"reveal"|"impact"|"destroy";cardId:string;name:string;damage:number;finalHp:number}|null>(null)
   const [isMobile, setIsMobile] = useState(false)
-  
   const botActionRunning = useRef(false)
   const botReactionRunning = useRef(false)
+  const isRescuing = useRef(false)
+  const rescueUnlockTimer = useRef<number | null>(null)
   const setupTimer=useRef<number|null>(null)
   const seenEffect=useRef(0)
   const seenCombat=useRef(0)
   const seenAction = useRef<number | null>(null)
   const logEnd = useRef<HTMLDivElement | null>(null)
+  const expiredVersion = useRef<number | null>(null)
   const suppressedReactionHandled=useRef<string|null>(null)
   const latestBoardCards = useRef<VisibleMatchCard[]>([])
 
   useEffect(() => {
     setIsMobile(typeof window !== 'undefined' && window.localStorage.getItem('arena_mobile') === 'true');
     const params = new URLSearchParams(window.location.search);
+    const list = (key: string) => {
+      try {
+        const parsed = JSON.parse(params.get(key) ?? "[]");
+        return Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch {
+        return [];
+      }
+    };
     setMatchId(params.get("matchId") ?? "");
+    setPreview(params.get("preview") === "1");
+
+    const currentScreen = params.get("screen");
+    const isLabRoute = currentScreen === "lab" || (typeof window !== "undefined" && window.location.pathname.startsWith("/lab"));
+
+    if (isLabRoute && params.get("sandbox") === "1") {
+      setSandbox({
+        cardId: params.get("sandboxCard") ?? "",
+        actionType: params.get("sandboxAction") ?? "",
+        objective: params.get("objective") ?? "Execute a ação indicada e confira o cálculo autoritativo.",
+        setup: list("sandboxSetup"),
+        expected: list("sandboxExpected"),
+        visual: list("sandboxVisual"),
+      });
+    } else {
+      setSandbox(null);
+      setSandboxReport(null);
+      try {
+        localStorage.removeItem("active_lab_scenario");
+        localStorage.removeItem("isLabMode");
+        sessionStorage.removeItem("active_lab_scenario");
+      } catch {
+        // Safe fallback
+      }
+    }
     void supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? ""));
   }, [])
-
-  useEffect(()=>()=>{
-    if(setupTimer.current!==null) window.clearTimeout(setupTimer.current);
-  },[])
-
+  useEffect(()=>()=>{if(setupTimer.current!==null)window.clearTimeout(setupTimer.current);if(rescueUnlockTimer.current!==null)window.clearTimeout(rescueUnlockTimer.current)},[])
   const duel = useTrainingDuel(matchId, userId)
   const { matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining, isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed,usedEffectCardIds,isActionPending } = duel
   const latestResolvedAction=matchActions.findLast(action=>action.action_type==="attack_resolved")
@@ -256,23 +342,45 @@ export function TrainingScreen() {
   useEffect(() => {
     if (matchState && !initialLogDone.current) {
       initialLogDone.current = true;
-      console.log("[TREINO-BOT] 🤖 Arena de treino iniciada. Status:", matchState?.status);
+      const match = matchState as any;
+      console.log("[TREINO-BOT] 🤖 Arena iniciada. Tipo de partida:", match?.match_type, "Status atual:", match?.status);
     }
   }, [matchState])
 
   useEffect(() => {
     if (!matchState || !isTraining) return;
-    if (matchState.status === 'in_progress' && matchState.current_player_id === opponentId) {
-      console.log("[TREINO-BOT] 🧠 Turno do Bot iniciado. O Autômato está processando suas ações...");
+    
+    console.log("[TREINO-BOT] 🤖 Partida de Treino iniciada. Verificando deck do Bot...");
+    
+    const botCardsCount = boardCards.filter(c => c.owner_id === opponentId).length;
+    console.log("[TREINO-BOT] 🃏 Deck do Bot carregado com sucesso? Total de cartas:", botCardsCount);
+    
+    const botBanned = matchBans.find(ban => ban.banned_by_user_id === userId);
+    if (botBanned) {
+      console.log("[TREINO-BOT] 🚫 Fase de Banimento: Bot teve carta banida pelo jogador. Avançando para Turno 0...");
     }
-  }, [matchState?.status, matchState?.current_player_id, isTraining, opponentId])
+    
+    const botLifeCount = boardCards.filter(c => c.owner_id === opponentId && c.zone === 'life').length;
+    if (botLifeCount === 3) {
+      console.log("[TREINO-BOT] ⚔️ Turno 0: Alocando 3 cartas de vida e 1 reforço automaticamente para o Bot via SQL...");
+    }
+    
+    if (matchState.status === 'in_progress' && matchState.current_turn === 1) {
+      const activePlayerName = matchState.current_player_id === userId ? 'Você' : 'Bot';
+      console.log("[TREINO-BOT] 🪙 Moeda de Iniciativa lançada. Quem começa o Turno 1:", activePlayerName);
+    }
+    
+    if (matchState.status === 'in_progress' && matchState.current_player_id === opponentId) {
+      console.log("[TREINO-BOT] 🧠 Turno do Bot iniciado. O Autômato está calculando sua jogada...");
+    }
+  }, [matchState?.status, matchState?.current_player_id, boardCards.length, isTraining, matchBans, opponentId, userId])
 
   useEffect(() => {
     if (!isTraining || !matchActions.length) return;
     const lastAction = matchActions[matchActions.length - 1];
     if (lastAction.actor_user_id === opponentId && lastAction.id !== lastActionRef.current) {
       lastActionRef.current = lastAction.id;
-      console.log("[TREINO-BOT] 💥 Bot agiu! Tipo:", lastAction.action_type);
+      console.log("[TREINO-BOT] 💥 O Bot executou uma jogada! Ação:", lastAction.action_type);
     }
   }, [matchActions.length, isTraining, matchActions, opponentId])
 
@@ -295,7 +403,6 @@ export function TrainingScreen() {
     seenAction.current=Math.max(seenAction.current,max)
     logEnd.current?.scrollIntoView({behavior:"smooth"})
   },[matchActions,userId])
-
   useEffect(() => {
     if(showcase||!showcaseQueue.length)return
     const action=showcaseQueue[0]; const p=action.payload_public??{}
@@ -303,7 +410,6 @@ export function TrainingScreen() {
     const card=boardCards.find(item=>item.id===raw)??null
     setShowcase({action,card}); setShowcaseQueue(previous=>previous.slice(1))
   },[boardCards,showcase,showcaseQueue])
-
   useEffect(()=>{
     if(!showcase)return
     const duration=showcase.action.action_type==="card_played"?2500:showcase.action.action_type.includes("attack")?2000:2500
@@ -311,7 +417,6 @@ export function TrainingScreen() {
     const finish=window.setTimeout(()=>{setScreenShake(false);setShowcase(null)},duration)
     return()=>{window.clearTimeout(impact);window.clearTimeout(finish)}
   },[showcase?.action.id])
-
   useEffect(() => {
     const action = latestEffectAction;
     if (!action || action.id <= seenEffect.current) return;
@@ -357,7 +462,6 @@ export function TrainingScreen() {
     }, 5000);
     return () => window.clearTimeout(timer);
   }, [latestEffectAction?.id])
-
   useEffect(()=>{
     const action=latestResolvedAction;if(!action||action.id<=seenCombat.current)return;seenCombat.current=action.id
     const payload=action.payload_public??{};const reinforcements=Array.isArray(payload.reinforcements)?payload.reinforcements as Array<Record<string,unknown>>:[];const life=payload.life&&typeof payload.life==="object"?payload.life as Record<string,unknown>:null;const steps:Array<Record<string,unknown>&{originalZone:MatchCardZone}>=[...reinforcements.map(item=>({...item,originalZone:"reinforcement" as MatchCardZone})),...(life?[{...life,originalZone:"life" as MatchCardZone}]:[])]
@@ -380,7 +484,6 @@ export function TrainingScreen() {
     void run();return()=>{cancelled=true;setScreenShake(false);setCombatSequenceActive(false);setCollisionStage(null);setVisualCards(latestBoardCards.current)}
   },[latestResolvedAction?.id])
 
-  // Bot Turn Automation (Defesa e Ofensiva)
   useEffect(() => {
     if (!isTraining || !matchState || matchState.status !== "in_progress" || matchState.engine_state !== "turn_action") return;
     if (matchState.current_player_id !== opponentId) return;
@@ -389,14 +492,14 @@ export function TrainingScreen() {
     let active = true;
     const runBot = async () => {
       botActionRunning.current = true;
-      console.log("[TREINO-BOT] 🤖 Bot pensando...");
-      await sleep(1500);
+      console.log("[TREINO-BOT] 🤖 Iniciando ação do Bot local...");
+      await sleep(1000);
       if (!active) return;
       try {
         await duel.runTrainingBotTurn();
         await duel.refresh();
       } catch (err) {
-        console.error("[TREINO-BOT] ❌ Erro ao rodar ação do Bot:", err);
+        console.error("[TREINO-BOT] ❌ Erro na ação do Bot:", err);
       } finally {
         botActionRunning.current = false;
       }
@@ -404,6 +507,36 @@ export function TrainingScreen() {
     void runBot();
     return () => { active = false; };
   }, [isTraining, matchState?.status, matchState?.engine_state, matchState?.current_player_id, opponentId, isActionPending]);
+
+  useEffect(() => {
+    if (!isTraining || !pendingAttack || pendingAttack.status !== "awaiting_reaction") return;
+    if (pendingAttack.defender_user_id !== opponentId) return;
+    if (botReactionRunning.current || isActionPending) return;
+
+    let active = true;
+    const runBotReaction = async () => {
+      botReactionRunning.current = true;
+      console.log("[TREINO-BOT] 🛡️ Iniciando reação defensiva do Bot local...");
+      await sleep(500);
+      if (!active) return;
+      try {
+        await duel.autoResolveTrainingAttack(matchState?.match_version ?? 0);
+        await duel.refresh();
+      } catch (err) {
+        console.error("[TREINO-BOT] ❌ Erro na reação do Bot:", err);
+      } finally {
+        botReactionRunning.current = false;
+      }
+    };
+    void runBotReaction();
+    return () => { active = false; };
+  }, [isTraining, pendingAttack?.status, pendingAttack?.defender_user_id, opponentId, matchState?.match_version, isActionPending]);
+
+  useEffect(()=>{const suppressed=Boolean(pendingAttack?.result?.suppress_reinforcement_reaction);if(!pendingAttack||pendingAttack.defender_user_id!==userId||pendingAttack.status!=="awaiting_reaction"||!suppressed||isActionPending||suppressedReactionHandled.current===pendingAttack.id)return;suppressedReactionHandled.current=pendingAttack.id;setEffectMessage("🐗 O ataque do Javali suprimiu a revelação e toda reação defensiva. Resolvendo impacto…");void duel.declineAttackReaction().then(()=>duel.refresh()).catch(error=>{suppressedReactionHandled.current=null;setEffectMessage(error?.message??"Falha ao resolver o ataque sem reação.")})},[isActionPending,pendingAttack?.id,pendingAttack?.status,pendingAttack?.defender_user_id,pendingAttack?.result,userId])
+
+  useEffect(() => {
+    /* [V39] REMOVIDO EXPIRE TURN AUTO. DEVE SER MANUAL PELO USUÁRIO */
+  }, [matchState?.turn_deadline, matchState?.match_version, matchState?.status])
 
   useEffect(() => {
     if (matchState?.status !== "ban_phase") { 
@@ -423,31 +556,33 @@ export function TrainingScreen() {
     fetchBans();
     return () => { isMounted = false };
   }, [matchId, matchState?.status])
-
   useEffect(() => {
-    if (!matchId) return
+    if (!matchId || preview) return
     const load = async () => { const { data } = await supabase.from("match_bans").select("id,banned_by_user_id,target_user_id,source_card_id,is_skipped,created_at,cards:source_card_id(name,image_url,rarity)").eq("match_id", matchId); setMatchBans((data ?? []) as unknown as MatchBanView[]) }
     void load()
-    const channel = supabase.channel(`training-bans:${matchId}`).on("postgres_changes", { event: "*", schema: "public", table: "match_bans", filter: `match_id=eq.${matchId}` }, () => void load()).subscribe()
+    const channel = supabase.channel(`match-bans:${matchId}`).on("postgres_changes", { event: "*", schema: "public", table: "match_bans", filter: `match_id=eq.${matchId}` }, () => void load()).subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [matchId])
+  }, [matchId, preview])
 
   const mine = (zone: MatchCardZone) => visualCards.filter(card=>card.zone===zone&&card.owner_id===userId)
   const theirs = (zone: MatchCardZone) => visualCards.filter(card=>card.zone===zone&&card.owner_id===opponentId)
   const hand = mine("hand")
   const attackers = mine("attacker")
+  const selectedPower = useMemo(() => attackers.filter(card => selectedAttackers.has(card.id)).reduce((sum, card) => sum + (card.current_power ?? 0), 0), [attackers, selectedAttackers])
   const myMana = matchState ? (isPlayer1 ? matchState.player1_mana : matchState.player2_mana) : 0
   const theirMana = matchState ? (isPlayer1 ? matchState.player2_mana : matchState.player1_mana) : 0
   const selectedCard = hand.find(card => card.id === selectedHand)
   const playSelected = (zone: "attacker" | "reinforcement", position: number) => {
+    if (isBoardFrozen) return;
     if (selectedCard) void duel.playCard(selectedCard.id, zone, position).then(() => { setSelectedHand(null); void duel.refresh() })
   }
   const dropCard = (cardId: string, zone: "attacker" | "reinforcement", position: number) => {
-    if (!isCurrentPlayer || matchState?.status !== "in_progress" || matchState.engine_state !== "turn_action" || isActionPending) return
+    if (isBoardFrozen || !isCurrentPlayer || matchState?.status !== "in_progress" || matchState.engine_state !== "turn_action" || isActionPending) return
     setEffectMessage(`Movendo carta para ${zone === "attacker" ? "o Campo de Ataque" : "o Campo de Defesa"}…`)
     void duel.playCard(cardId, zone, position).then(() => { setSelectedHand(null); setEffectMessage("Carta posicionada. A ação foi registrada no servidor."); void duel.refresh() }).catch(error => setEffectMessage(error?.message ?? "Jogada recusada pelo servidor."))
   }
   
+  // Helper premium para exibição de toasts flutuantes nativos
   const showToast = useCallback((message: string, type: "success" | "error" | "warning" = "success") => {
     if (typeof window === "undefined") return;
     const containerId = "custom-toast-container";
@@ -474,11 +609,14 @@ export function TrainingScreen() {
   }, []);
 
   const activateEffect = (card:VisibleMatchCard,afterResolve?:(version:number)=>void,expectedVersion?:number) => {
+    if (isBoardFrozen) return;
     const effect = card.card_data?.effect_definition?.find(item => item.trigger_type === "manual")
     if (!effect) return
     const order = effect.effect_order ?? 1;const code=effect.effect_code??""
+    const cardName = card.card_data?.nome ?? "Desconhecida";
+    const manaCost = card.card_data?.mana ?? 0;
     const payload = { p_match_card_id: card.id, p_order: order, p_expected_version: expectedVersion };
-    console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço do Bot em treino:", card.card_data?.nome, "Custo:", card.card_data?.mana);
+    console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço! Carta:", cardName, "Custo:", manaCost, "Payload:", JSON.stringify(payload));
     const mode=effect.target_mode??"none"; const fieldZones=["life","reinforcement","attacker","leader"]
     if (["selected", "ally", "enemy", "deck", "hand", "graveyard", "enemy_graveyard"].includes(mode)) {
       const zone = ["deck", "hand", "graveyard", "enemy_graveyard"].includes(mode) ? (mode === "enemy_graveyard" ? "graveyard" : mode) as MatchCardZone : undefined
@@ -501,9 +639,7 @@ export function TrainingScreen() {
     }
     void duel.activateMatchEffect(card.id,order,undefined,expectedVersion).then(result=>{const payload=result as {state_version?:number;choice_pending?:boolean};const version=Number(payload.state_version??expectedVersion??matchState?.match_version??0);if(payload.choice_pending){setEffectMessage("🎯 O efeito aguarda sua escolha obrigatória antes do combate.");void duel.refresh();return}setEffectMessage("✨ Efeito confirmado pelo servidor.");showToast("✨ Efeito ativado com sucesso!", "success");afterResolve?.(version);void duel.refresh()}).catch(error=>{const msg=error?.message??"Falha ao ativar efeito.";setEffectMessage(`❌ Erro: ${msg}`);showToast(`❌ Falha ao ativar efeito: ${msg}`, "error")})
   }
-
   const chooseEffectTarget=(card:VisibleMatchCard)=>{if(!effectSelection)return false;if(!effectSelection.validIds.has(card.id)){setEffectMessage("Esta ficha não é um alvo válido para o efeito.");showToast("Esta ficha não é um alvo válido.", "warning");return true}const selection=effectSelection;setEffectSelection(null);void duel.activateMatchEffect(selection.sourceId,selection.order,card.id,selection.expectedVersion).then(result=>{const payload=result as {state_version?:number;choice_pending?:boolean};const version=Number(payload.state_version??selection.expectedVersion??matchState?.match_version??0);if(payload.choice_pending){setEffectMessage("🎯 Alvo verificado. Escolha as cartas exigidas pelo efeito.");void duel.refresh();return}setEffectMessage("✨ Efeito resolvido com sucesso.");showToast("✨ Efeito resolvido com sucesso!", "success");selection.afterResolve?.(version);void duel.refresh()}).catch(error=>{const msg=error?.message??"Alvo inválido.";setEffectMessage(`❌ Erro: ${msg}`);showToast(`❌ Alvo inválido: ${msg}`, "error")});return true}
-  
   useEffect(()=>{const cancel=(event:KeyboardEvent)=>{if(event.key==="Escape"){setEffectSelection(null);setEffectMessage(null)}};window.addEventListener("keydown",cancel);return()=>window.removeEventListener("keydown",cancel)},[])
 
   const toggleAttacker = (card: VisibleMatchCard) => setSelectedAttackers(previous => { const next = new Set(previous); next.has(card.id) ? next.delete(card.id) : next.add(card.id); return next })
@@ -523,7 +659,7 @@ export function TrainingScreen() {
     }
     catch (cause: any) {
       const error = cause as { message?: string; details?: string; hint?: string; code?: string }
-      const full = [error.message, error.details, error.hint, error.code && `Código: ${error.code}`].filter(Boolean).join(" · ") || "O servidor recusou o banimento."
+      const full = [error.message, error.details, error.hint, error.code && `Código: ${error.code}`].filter(Boolean).join(" · ") || "O servidor recusou o banimento sem fornecer detalhes."
       setBanError(full); setEffectMessage(`Falha no banimento: ${full}`)
     } finally { setBanBusy(false) }
   }
@@ -535,21 +671,37 @@ export function TrainingScreen() {
     try {
       const lifeArray = Array.from(setupCards);
       const reinforcementArray = Array.from(setupReinforcements);
+      
+      console.log("[TREINO-BOT] ⚔️ Executando submissão de setup transacional:", {
+        match_id: matchId,
+        lifes: lifeArray,
+        reinforcements: reinforcementArray
+      });
+
       await duel.submitSetup(lifeArray, reinforcementArray);
+      
       setSetupCards(new Set());
       setSetupReinforcements(new Set());
+      
       await duel.refresh();
+      
+      setTimeout(() => {
+        void duel.refresh();
+      }, 500);
+
     } catch (error: any) {
-      console.error("[TREINO-BOT] Erro ao enviar setup:", error);
-      setEffectMessage(`Falha na preparação: ${error?.message || "Erro desconhecido."}`);
+      console.error("[TREINO-BOT] ❌ Erro ao enviar setup:", error);
+      const errMsg = error?.message || error?.details || "O servidor rejeitou a alocação de Cartas de Vida.";
+      setEffectMessage(`Falha na preparação: ${errMsg}`);
     } finally {
       setSetupBusy(false);
     }
   }
 
   const confirmPreparation = () => {
+    console.log("[TREINO-BOT] ⚔️ Solicitação de confirmação iniciada. Vidas selecionadas:", setupCards.size, "- Ocupado:", setupBusy);
     if (setupCards.size !== 3 || setupBusy) {
-      setEffectMessage("Você deve selecionar exatamente 3 Cartas de Vida.");
+      setEffectMessage("Você deve selecionar exatamente 3 Cartas de Vida para iniciar o combate.");
       return;
     }
     void submitPreparation();
@@ -563,9 +715,8 @@ export function TrainingScreen() {
         await duel.declareAttack(attackers.map(card=>card.id),false,expectedVersion)
       } else await duel.endTurn(expectedVersion)
       await duel.refresh()
-    } catch (error) { setEffectMessage((error as Error)?.message ?? "Recusado pelo servidor.") }
+    } catch (error) { setEffectMessage((error as Error)?.message ?? "O servidor recusou o encerramento do turno.") }
   }
-
   const attackAction=pendingAttack?matchActions.findLast(action=>action.action_type==="attack_declared"&&action.payload_public?.pending_attack_id===pendingAttack.id):undefined
   const attackerIds=Array.isArray(attackAction?.payload_public?.attacker_card_ids)?attackAction.payload_public.attacker_card_ids.filter((id):id is string=>typeof id==="string"):[]
   const reactionAttackers=boardCards.filter(card=>attackerIds.includes(card.id))
@@ -574,89 +725,110 @@ export function TrainingScreen() {
   const turnEffectCards=boardCards.filter(card=>card.owner_user_id===userId&&["hand","life","reinforcement","attacker"].includes(card.zone)&&(card.zone==="hand"||(card.current_life??0)>0)&&!usedEffectCardIds.has(card.id)&&card.card_data?.effect_definition?.some(effect=>{if(effect.trigger_type!=="manual"||effect.is_reaction)return false;const allowed=effect.parameters?.allowed_zones??effect.parameters?.allowed_source_zones;const handAuthorized=effect.effect_code==="common_beggar_king_destroy_life"||Array.isArray(allowed)&&allowed.includes("hand")||/ativad[ao] (diretamente )?da mão/i.test(`${effect.description??""} ${card.card_data?.efeito??""}`);if(card.zone==="hand"&&!handAuthorized)return false;const cost=Number(effect.parameters?.mana_cost??card.card_data?.mana??0);return cost>0?!matchState?.my_paid_effect_used:!matchState?.my_free_effect_used}))
   const executeStagedConjurations=(staged:VisibleMatchCard[],index=0,version=matchState?.match_version??0)=>{if(index>=staged.length){void submitTurn(version);return}activateEffect(staged[index],nextVersion=>executeStagedConjurations(staged,index+1,nextVersion),version)}
   const confirmConjurations=(staged:VisibleMatchCard[])=>{setPreCombatOpen(false);executeStagedConjurations(staged)}
-  const passTurnWithoutActing=()=>{if(!isCurrentPlayer||isActionPending||(matchState?.my_actions_this_turn??0)!==0||attackers.length)return;void duel.passWithoutAction().then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"Não foi possível passar."))
-  }
+  const passTurnWithoutActing=()=>{if(!isCurrentPlayer||isActionPending||(matchState?.my_actions_this_turn??0)!==0||attackers.length)return;void duel.passWithoutAction().then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"Não foi possível passar o turno sem agir."))}
   const canRecallInspected=Boolean(inspectedCard&&inspectedCard.owner_id===userId&&isCurrentPlayer&&matchState?.engine_state==="turn_action"&&["attacker","reinforcement"].includes(inspectedCard.zone)&&inspectedCard.entered_zone_turn===matchState?.current_turn&&!inspectedCard.has_attacked_this_turn)
-  const recallCard=(card:VisibleMatchCard)=>{void duel.recallMatchCard(card.id).then(()=>{setInspectedCard(null);setEffectMessage(`↩️ ${card.card_data?.nome??"Ficha"} retornou à mão.`);return duel.refresh()}).catch(error=>setEffectMessage(error?.message??"Erro ao retornar carta."))}
-  
+  const recallCard=(card:VisibleMatchCard)=>{void duel.recallMatchCard(card.id).then(()=>{setInspectedCard(null);setEffectMessage(`↩️ ${card.card_data?.nome??"Ficha"} retornou à mão. Mana reembolsada.`);return duel.refresh()}).catch(error=>setEffectMessage(error?.message??"O arrependimento foi recusado pelo servidor."))}
+  const restartSandbox=async()=>{if(!sandbox?.cardId||isActionPending)return;try{const {data,error}=await supabase.rpc("setup_sandbox_match",{p_card_id:sandbox.cardId});if(error)throw error;const result=data as {success?:boolean;match_id?:string;objective?:string;action_type?:string;reason?:string};if(!result.success||!result.match_id)throw new Error(result.reason??"Falha ao reiniciar laboratório.");const url=new URL(window.location.href);url.searchParams.set("matchId",result.match_id);url.searchParams.set("objective",result.objective??sandbox.objective);url.searchParams.set("sandboxAction",result.action_type??sandbox.actionType);window.location.assign(url.toString())}catch(error){setEffectMessage(error instanceof Error?error.message:String(error))}}
+  const leaveSandbox=()=>{const url=new URL(window.location.href);url.searchParams.set("screen","lab");["matchId","sandbox","sandboxCard","sandboxAction","objective","sandboxSetup","sandboxExpected","sandboxVisual"].forEach(key=>url.searchParams.delete(key));window.location.assign(url.toString())}
+  const beginSandboxOpponentAction=async()=>{if(!sandbox||sandboxBusy)return;setSandboxBusy(true);try{const{data,error}=await supabase.rpc("begin_sandbox_opponent_action",{p_match_id:matchId});if(error)throw error;const result=data as{success?:boolean;event?:string};if(!result.success)throw new Error("A ação preparada do Autômato foi recusada.");setEffectMessage(`⚔️ Ação laboratorial iniciada: ${result.event??"ataque do Autômato"}.`);await duel.refresh()}catch(error){setEffectMessage(error instanceof Error?error.message:String(error))}finally{setSandboxBusy(false)}}
+  const reviewSandbox=async()=>{if(!sandbox||sandboxBusy)return;setSandboxBusy(true);try{const{data,error}=await supabase.rpc("get_sandbox_test_report",{p_match_id:matchId});if(error)throw error;setSandboxReport(data as typeof sandboxReport);setEffectMessage("📋 Relatório antes/depois gerado. Inspecione a Arena e finalize somente quando estiver satisfeito.")}catch(error){setEffectMessage(error instanceof Error?error.message:String(error))}finally{setSandboxBusy(false)}}
+  const finishSandbox=async()=>{if(!sandboxReport||sandboxBusy)return;setSandboxBusy(true);try{const{error}=await supabase.rpc("finish_sandbox_test",{p_match_id:matchId});if(error)throw error;leaveSandbox()}catch(error){setEffectMessage(error instanceof Error?error.message:String(error));setSandboxBusy(false)}}
+  const pendingTriggerCard=pendingCardTrigger?boardCards.find(card=>card.id===pendingCardTrigger.source_match_card_id):undefined
   const chronicleEntries=useMemo(()=>{const visible=matchActions.filter(action=>action.sequence_number<=visibleLogSequence);const synthetic=matchBans.filter(ban=>!visible.some(action=>action.action_type==="card_banned"&&action.actor_user_id===ban.banned_by_user_id&&action.payload_public.source_card_id===ban.source_card_id)).map((ban,index):MatchAction=>({id:-(index+1),match_id:matchId,sequence_number:1,actor_user_id:ban.banned_by_user_id,action_type:"card_banned",payload_public:{source_card_id:ban.source_card_id,target_user_id:ban.target_user_id},state_version_before:0,state_version_after:0,created_at:ban.created_at??new Date(0).toISOString()}));return [...visible,...synthetic].sort((a,b)=>new Date(a.created_at).getTime()-new Date(b.created_at).getTime()).flatMap(action=>actionChronicleLines(action,matchState,boardCards).map((text,line)=>({action,text,line})))},[boardCards,matchActions,matchBans,matchId,matchState,visibleLogSequence])
-  const automaticEffectEntries=useMemo(()=>effectExecutionLogs.filter(log=>log.result?.automatic===true||log.result?.automatic_turn_draw===true).map(log=>{const source=boardCards.find(card=>card.id===log.source_match_card_id);const fake:MatchAction={id:log.id,match_id:log.match_id,sequence_number:0,actor_user_id:source?.owner_id??null,action_type:"effect_activated",payload_public:{source_card_id:log.source_match_card_id,effect_code:log.effect_code,mana_spent:0,result:log.result},state_version_before:0,state_version_after:0,created_at:log.created_at};return{log,text:`⚡ [Passiva] ${source?.card_data?.nome??log.effect_code}: ${effectOutcome(fake,boardCards)}`}}),[boardCards,effectExecutionLogs])
-  
+  const automaticEffectEntries=useMemo(()=>effectExecutionLogs.filter(log=>log.result?.automatic===true||log.result?.automatic_turn_draw===true).map(log=>{const source=boardCards.find(card=>card.id===log.source_match_card_id);const fake:MatchAction={id:log.id,match_id:log.match_id,sequence_number:0,actor_user_id:source?.owner_id??null,action_type:"effect_activated",payload_public:{source_card_id:log.source_match_card_id,effect_code:log.effect_code,mana_spent:0,result:log.result},state_version_before:0,state_version_after:0,created_at:log.created_at};return{log,text:`⚡ [Efeito automático] ${source?.card_data?.nome??log.effect_code}: ${effectOutcome(fake,boardCards)}`}}),[boardCards,effectExecutionLogs])
   useEffect(()=>{logEnd.current?.scrollIntoView({behavior:"smooth",block:"end"})},[chronicleEntries.length])
 
-  if (!matchId) return <div className="flex min-h-screen items-center justify-center bg-stone-950 text-center text-amber-200"><div><Swords className="mx-auto mb-4" size={40} /><h1 className="font-serif text-xl font-black">Modo Treino PvE</h1><p className="mt-2 text-sm text-stone-400">Nenhum duelo de treino carregado.</p></div></div>
+  if (preview) return <ArenaPreview />
+  if (!matchId) return <div className="flex min-h-screen items-center justify-center bg-stone-950 text-center text-amber-200"><div><Swords className="mx-auto mb-4" size={40} /><h1 className="font-serif text-xl font-black">Nenhuma batalha selecionada</h1><p className="mt-2 text-sm text-stone-400">Abra a Arena a partir de uma partida encontrada no Hub.</p></div></div>
 
   return <motion.main animate={screenShake?{x:[0,-8,7,-5,3,0],y:[0,4,-3,2,0]}:{x:0,y:0}} transition={{duration:.35}} className={`relative flex flex-col min-h-screen w-full mx-auto overflow-x-hidden overflow-y-auto pb-24 bg-zinc-950 text-zinc-100 ${effectSelection?"cursor-crosshair":""}`}>
-    <button onClick={()=>{if(confirm("Deseja mesmo abandonar o treino?")){void duel.surrenderMatch();const url=new URL(window.location.href);url.searchParams.set("screen","hub");url.searchParams.delete("matchId");window.location.assign(url.toString())}}} className="fixed left-3 top-3 z-[200] rounded border border-red-500/50 bg-red-950/80 px-3 py-1.5 text-[10px] font-black tracking-wider text-red-200 shadow-md hover:bg-red-900">ABANDONAR TREINO</button>
+    <button onClick={()=>{if(confirm("Atenção: Sair da arena agora resultará em DERROTA automática. Deseja continuar?")){void duel.surrenderMatch();const url=new URL(window.location.href);url.searchParams.set("screen","hub");url.searchParams.delete("matchId");window.location.assign(url.toString())}}} className="fixed left-3 top-3 z-[200] rounded border border-red-500/50 bg-red-950/80 px-3 py-1.5 text-[10px] font-black tracking-wider text-red-200 shadow-md transition-colors hover:bg-red-900">SAIR DA ARENA</button>
     <div className="absolute inset-0 bg-[url('/yang-69TcSUVhbmY-unsplash.jpg')] bg-cover bg-center bg-no-repeat opacity-40 mix-blend-overlay"/><div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/60 to-black/85 backdrop-blur-[2px]" />
-    
-    {isActionPending&&<div className="fixed inset-0 z-[185] flex items-start justify-center bg-black/20 pt-5 backdrop-blur-[1px]"><div className="rounded-full border border-cyan-300/60 bg-blue-950/95 px-5 py-2 text-xs font-black text-cyan-100"><Loader2 className="mr-2 inline animate-spin" size={14}/>Processando no Servidor...</div></div>}
-    
-    {matchState?.status==="ban_phase"&&<div className="fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border-2 px-6 py-2 font-mono text-2xl font-black shadow-2xl border-amber-300 bg-black/95 text-amber-100">MODO TREINO: BANIMENTO</div>}
-
-    <AnimatePresence>{effectBanner&&<motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[188] flex items-center justify-center bg-black/80 p-5 backdrop-blur-md"><motion.div initial={{y:-180,scale:.55,rotate:-8}} animate={{y:0,scale:1,rotate:0}} transition={{type:"spring",stiffness:170,damping:18}} className="flex w-full max-w-3xl flex-col items-center">{effectBanner.cardData?<div className="aspect-[2/3] w-56 drop-shadow-[0_0_35px_rgba(250,204,21,.8)]"><GameCard card={effectBanner.cardData} enableZoom={false}/></div>:<Sparkles className="text-yellow-200" size={100}/>}<div className="mt-5 w-full border-y-2 border-yellow-200 bg-gradient-to-r from-transparent via-purple-950 to-transparent px-8 py-5 text-center shadow-[0_0_45px_rgba(192,132,252,.55)]"><h2 className={`font-serif text-2xl font-black uppercase ${effectBanner.isMine?"text-yellow-100":"text-red-200"}`}>{effectBanner.isMine?`✨ VOCÊ CONJUROU: ${effectBanner.card}!`:`⚠️ O BOT CONJUROU: ${effectBanner.card}!`}</h2><p className="mt-3 text-sm font-black uppercase leading-relaxed text-yellow-300">{effectBanner.description}</p></div></motion.div></motion.div>}</AnimatePresence>
-    <AnimatePresence>{collisionStage&&<motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className={`pointer-events-none fixed inset-0 z-[176] flex items-center justify-center ${collisionStage.phase==="impact"?"bg-red-700/30":"bg-black/20"}`}><motion.div key={`${collisionStage.cardId}-${collisionStage.phase}`} initial={{scale:.6,x:collisionStage.phase==="strike"?-320:0}} animate={{scale:collisionStage.phase==="destroy"?.2:1,x:0,rotate:collisionStage.phase==="destroy"?35:0,filter:collisionStage.phase==="destroy"?"blur(14px)":"blur(0px)"}} className={`rounded-xl border-2 bg-black/90 px-8 py-5 text-center ${collisionStage.phase==="reveal"?"border-cyan-300 shadow-[0_0_55px_rgba(34,211,238,.8)]":"border-red-300 shadow-[0_0_55px_rgba(239,68,68,.7)]"}`}><p className={`font-serif text-2xl font-black uppercase ${collisionStage.phase==="reveal"?"text-cyan-100":"text-red-100"}`}>{collisionStage.phase==="strike"?`⚔️ Golpe contra ${collisionStage.name}`:collisionStage.phase==="reveal"?`🛡️ REFORÇO REVELADO: ${collisionStage.name}`:collisionStage.phase==="impact"?`💥 ${collisionStage.name} recebeu ${collisionStage.damage} de dano!`:`☠️ ${collisionStage.name} foi destruída`}</p>{collisionStage.phase==="reveal"&&<p className="mt-2 font-black text-cyan-200">Exposta por 2,5 segundos...</p>}{collisionStage.phase==="impact"&&<p className="mt-2 font-mono text-xl font-black text-red-300">HP RESTANTE: {collisionStage.finalHp}</p>}</motion.div></motion.div>}</AnimatePresence>
-
+    {isActionPending&&<div className="fixed inset-0 z-[185] flex items-start justify-center bg-black/20 pt-5 backdrop-blur-[1px]"><div className="rounded-full border border-cyan-300/60 bg-blue-950/95 px-5 py-2 text-xs font-black text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,.45)]"><Loader2 className="mr-2 inline animate-spin" size={14}/>Servidor resolvendo a ação · comandos bloqueados</div></div>}
+    {isLabSandbox && (
+      <div className="fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border border-emerald-500/50 bg-black/95 px-6 py-2 text-center text-xs font-black uppercase tracking-wider text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+        🧪 LABORATÓRIO OFIERI — Teste de Artefato. Conjure a carta ou ative seu efeito para ver a mecânica em ação!
+      </div>
+    )}
+    {matchState?.status==="ban_phase"&&<div className={`fixed left-1/2 top-3 z-[182] -translate-x-1/2 rounded-full border-2 px-6 py-2 font-mono text-2xl font-black shadow-2xl border-amber-300 bg-black/95 text-amber-100`}>BANIMENTO ESTRATÉGICO</div>}
+    {sandbox && (typeof window !== "undefined" && (window.location.pathname.startsWith("/lab") || new URLSearchParams(window.location.search).get("screen") === "lab")) && <div className="fixed left-2 top-16 z-[120] w-[min(390px,92vw)] rounded-xl border-2 border-emerald-300 bg-[radial-gradient(circle_at_top,#14532d,#09090b_75%)] p-4 shadow-[0_0_35px_rgba(52,211,153,.35)]"><p className="font-serif text-sm font-black uppercase text-emerald-100">🧪 Partida laboratorial · turno único</p><p className="mt-2 text-[11px] leading-relaxed text-stone-200"><b className="text-amber-200">🎯 OBJETIVO INDIVIDUAL:</b> {sandbox.objective}</p><div className="mt-3 max-h-44 space-y-2 overflow-auto rounded border border-emerald-700/50 bg-black/60 p-2 text-[9px] text-emerald-100"><p>O teste não termina automaticamente. Execute a jogada, confira campo, pilhas e Crônica; depois gere o relatório antes/depois.</p>{sandbox.setup.length>0&&<div><b className="text-cyan-200">CENÁRIO PREPARADO</b>{sandbox.setup.map((item,index)=><p key={`setup-${index}`}>• {item}</p>)}</div>}{sandbox.visual.length>0&&<div><b className="text-fuchsia-200">SEQUÊNCIA VISUAL</b>{sandbox.visual.map((item,index)=><p key={`visual-${index}`}>{index+1}. {item}</p>)}</div>}{sandbox.expected.length>0&&<div><b className="text-amber-200">PROVA EXIGIDA</b>{sandbox.expected.map((item,index)=><p key={`expected-${index}`}>✓ {item}</p>)}</div>}</div>{["scripted_opponent_attack","scripted_discard","attempt_blocked_action","advance_turn","destroy","scripted_continuation"].includes(sandbox.actionType)&&!pendingAttack&&!pendingCardTrigger&&!sandboxReport&&<button disabled={sandboxBusy} onClick={()=>void beginSandboxOpponentAction()} className="mt-3 w-full rounded border-2 border-red-300 bg-red-950 px-3 py-3 text-[10px] font-black text-red-100 disabled:opacity-40">{sandboxBusy?"PREPARANDO CENÁRIO…":sandbox.actionType==="scripted_opponent_attack"?"⚔️ RECEBER ATAQUE PREPARADO":sandbox.actionType==="scripted_discard"?"🗑️ EXECUTAR DESCARTE PREPARADO":sandbox.actionType==="attempt_blocked_action"?"🛡️ TENTAR A AÇÃO QUE DEVE SER BLOQUEADA":sandbox.actionType==="advance_turn"?"⏭️ AVANÇAR PARA O GATILHO DE TURNO":sandbox.actionType==="scripted_continuation"?"▶️ EXECUTAR CONTINUAÇÃO APÓS ATIVAR O EFEITO":"💥 EXECUTAR DESTRUIÇÃO PREPARADA"}</button>}{!sandboxReport?<button disabled={sandboxBusy||isActionPending} onClick={()=>void reviewSandbox()} className="mt-3 w-full rounded border-2 border-amber-300 bg-amber-900 px-3 py-3 text-[10px] font-black text-amber-100 disabled:opacity-40">📋 GERAR RELATÓRIO DA RESOLUÇÃO</button>:<div className={`mt-3 rounded-lg border-2 p-3 ${sandboxReport.approved?"border-emerald-300 bg-emerald-950/80":"border-red-300 bg-red-950/80"}`}><b className={sandboxReport.approved?"text-emerald-100":"text-red-100"}>{sandboxReport.approved?"MECÂNICA OBSERVADA — REVISE A PROVA":"MECÂNICA NÃO COMPROVADA"}</b><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-[8px] text-stone-200">{JSON.stringify({effect_code:sandboxReport.effect_code,before:sandboxReport.before,after:sandboxReport.after,prepared_action_proof:sandboxReport.prepared_action_proof,effect_execution_log:sandboxReport.effect_execution_log},null,2)}</pre><button disabled={sandboxBusy} onClick={()=>void finishSandbox()} className="mt-3 w-full rounded border-2 border-yellow-200 bg-yellow-700 px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40">🏁 ENCERRAR TESTE COM ESTE RELATÓRIO</button></div>}<button onClick={()=>void restartSandbox()} className="mt-2 w-full rounded border border-cyan-300 bg-blue-950 px-2 py-2 text-[9px] font-black text-cyan-100">🔄 REINICIAR ESTE TESTE</button></div>}
+    <AnimatePresence>{effectBanner&&<motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[188] flex items-center justify-center bg-black/80 p-5 backdrop-blur-md"><motion.div initial={{y:-180,scale:.55,rotate:-8}} animate={{y:0,scale:1,rotate:0}} transition={{type:"spring",stiffness:170,damping:18}} className="flex w-full max-w-3xl flex-col items-center">{effectBanner.cardData?<div className="aspect-[2/3] w-56 drop-shadow-[0_0_35px_rgba(250,204,21,.8)]"><GameCard card={effectBanner.cardData} enableZoom={false}/></div>:<Sparkles className="text-yellow-200" size={100}/>}<div className="mt-5 w-full border-y-2 border-yellow-200 bg-gradient-to-r from-transparent via-purple-950 to-transparent px-8 py-5 text-center shadow-[0_0_45px_rgba(192,132,252,.55)]"><h2 className={`font-serif text-2xl font-black uppercase ${effectBanner.isMine?"text-yellow-100":"text-red-200"}`}>{effectBanner.isMine?`✨ VOCÊ CONJUROU: ${effectBanner.card}!`:`⚠️ O RIVAL CONJUROU: ${effectBanner.card}!`}</h2><p className="mt-3 text-sm font-black uppercase leading-relaxed text-yellow-300">{effectBanner.description}</p></div></motion.div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{collisionStage&&<motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className={`pointer-events-none fixed inset-0 z-[176] flex items-center justify-center ${collisionStage.phase==="impact"?"bg-red-700/30":"bg-black/20"}`}><motion.div key={`${collisionStage.cardId}-${collisionStage.phase}`} initial={{scale:.6,x:collisionStage.phase==="strike"?-320:0}} animate={{scale:collisionStage.phase==="destroy"?.2:1,x:0,rotate:collisionStage.phase==="destroy"?35:0,filter:collisionStage.phase==="destroy"?"blur(14px)":"blur(0px)"}} className={`rounded-xl border-2 bg-black/90 px-8 py-5 text-center ${collisionStage.phase==="reveal"?"border-cyan-300 shadow-[0_0_55px_rgba(34,211,238,.8)]":"border-red-300 shadow-[0_0_55px_rgba(239,68,68,.7)]"}`}><p className={`font-serif text-2xl font-black uppercase ${collisionStage.phase==="reveal"?"text-cyan-100":"text-red-100"}`}>{collisionStage.phase==="strike"?`⚔️ Golpe disparado contra ${collisionStage.name}`:collisionStage.phase==="reveal"?`🛡️ REFORÇO REVELADO: ${collisionStage.name}`:collisionStage.phase==="impact"?`💥 ${collisionStage.name} recebeu ${collisionStage.damage} de dano!`:`☠️ ${collisionStage.name} foi destruída`}</p>{collisionStage.phase==="reveal"&&<p className="mt-2 font-black text-cyan-200">A carta permanece exposta por 2,5 segundos antes do cálculo de dano.</p>}{collisionStage.phase==="impact"&&<p className="mt-2 font-mono text-xl font-black text-red-300">HP RESULTANTE: {collisionStage.finalHp}</p>}</motion.div></motion.div>}</AnimatePresence>
     {isMobile && (
       <>
-        <button onClick={() => setPileOpen({ title: "Deck do Bot", cards: theirs("deck"), hidden: true })} className="fixed top-4 left-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-400 bg-black/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.5)] backdrop-blur-md"><Layers size={24}/></button>
-        <button onClick={() => setPileOpen({ title: "Cemitério do Bot", cards: theirs("graveyard") })} className="fixed top-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-400 bg-black/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.5)] backdrop-blur-md"><Skull size={24}/></button>
+        <button onClick={() => setPileOpen({ title: "Deck rival", cards: theirs("deck"), hidden: true })} className="fixed top-4 left-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-400 bg-black/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.5)] backdrop-blur-md"><Layers size={24}/></button>
+        <button onClick={() => setPileOpen({ title: "Cemitério rival", cards: theirs("graveyard") })} className="fixed top-4 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-400 bg-black/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.5)] backdrop-blur-md"><Skull size={24}/></button>
         <button onClick={() => setPileOpen({ title: "Seu deck", cards: mine("deck") })} className="fixed bottom-36 left-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-400 bg-black/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.5)] backdrop-blur-md"><Layers size={24}/></button>
         <button onClick={() => setGraveyardOpen(true)} className="fixed bottom-36 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border-2 border-amber-400 bg-black/80 text-amber-200 shadow-[0_0_15px_rgba(245,158,11,0.5)] backdrop-blur-md"><Skull size={24}/></button>
       </>
     )}
-
     <div className={`relative z-10 grid h-[calc(100vh-132px)] ${isMobile ? "grid-cols-1" : "grid-cols-[190px_minmax(580px,1fr)_170px]"} gap-2 overflow-x-auto p-2`}>
       {!isMobile && <aside className="flex min-h-0 flex-col gap-3 rounded-xl border border-amber-800/30 bg-stone-950/55 p-3 backdrop-blur-md">
-        <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-black/60 p-2">{(isPlayer1 ? matchState?.player2_avatar_url : matchState?.player1_avatar_url) ? <img src={secureImageUrl(isPlayer1 ? matchState?.player2_avatar_url : matchState?.player1_avatar_url)} alt="" className="h-10 w-10 rounded-full border border-red-400 object-cover" /> : <div className="h-10 w-10 rounded-full bg-red-950" />}<div><p className="text-[9px] uppercase text-red-300">Autômato PVE</p><b className="text-xs text-stone-100">{isPlayer1 ? matchState?.player2_username : matchState?.player1_username}</b></div></div>
-        <Pile label="Deck do Bot" count={isPlayer1 ? matchState?.player2_deck_count ?? 0 : matchState?.player1_deck_count ?? 0} onClick={() => setPileOpen({ title: "Deck do Bot", cards: theirs("deck"), hidden: true })} /><Pile label="Cemitério do Bot" graveyard count={theirs("graveyard").length} onClick={() => setPileOpen({ title: "Cemitério do Bot", cards: theirs("graveyard") })} />
-        <div className="h-48 w-full shrink-0 rounded border border-amber-900/40 bg-stone-950/80 p-2"><div className="mb-2 flex justify-between text-[9px] font-black uppercase text-amber-300"><span>Histórico de Ações</span><span>v{matchState?.match_version ?? 0}</span></div><div className="h-[calc(100%-20px)] space-y-1.5 overflow-y-auto pr-1 text-xs leading-relaxed text-amber-100">{chronicleEntries.map(({action,text,line}) => {const mine=action.actor_user_id===userId;return <motion.p initial={{opacity:0,x:mine?-8:8}} animate={{opacity:1,x:0}} key={`${action.id}-${line}`} className={`border-b pb-1 pl-1 ${mine?"border-cyan-950 text-cyan-100":"border-red-950 text-red-100"}`}><span className={`mr-1 font-black ${mine?"text-cyan-400":"text-red-400"}`}>{mine?"◆":"◇"} #{action.sequence_number}.{line+1}</span>{text}</motion.p>})}{automaticEffectEntries.map(({log,text})=><motion.p initial={{opacity:0}} animate={{opacity:1}} key={`effect-log-${log.id}`} className="border-b border-purple-950 pb-1 pl-1 text-purple-100"><span className="mr-1 font-black text-purple-300">✦ AUTO</span>{text}</motion.p>)}{!chronicleEntries.length&&!automaticEffectEntries.length&&<p className="text-stone-500">Aguardando ações...</p>}<div ref={logEnd}/></div></div>
+        <div className="flex items-center gap-2 rounded-lg border border-red-900/50 bg-black/60 p-2">{(isPlayer1 ? matchState?.player2_avatar_url : matchState?.player1_avatar_url) ? <img src={secureImageUrl(isPlayer1 ? matchState?.player2_avatar_url : matchState?.player1_avatar_url)} alt="" className="h-10 w-10 rounded-full border border-red-400 object-cover" /> : <div className="h-10 w-10 rounded-full bg-red-950" />}<div><p className="text-[9px] uppercase text-red-300">Oponente</p><b className="text-xs text-stone-100">{isPlayer1 ? matchState?.player2_username : matchState?.player1_username}</b></div></div>
+        <Pile label="Deck rival" count={isPlayer1 ? matchState?.player2_deck_count ?? 0 : matchState?.player1_deck_count ?? 0} onClick={() => setPileOpen({ title: "Deck rival", cards: theirs("deck"), hidden: true })} /><Pile label="Cemitério rival" graveyard count={theirs("graveyard").length} onClick={() => setPileOpen({ title: "Cemitério rival", cards: theirs("graveyard") })} />
+        <div className="h-48 w-full shrink-0 rounded border border-amber-900/40 bg-stone-950/80 p-2"><div className="mb-2 flex justify-between text-[9px] font-black uppercase text-amber-300"><span>Crônica da Batalha</span><span>v{matchState?.match_version ?? 0}</span></div><div className="h-[calc(100%-20px)] space-y-1.5 overflow-y-auto pr-1 text-xs leading-relaxed text-amber-100">{chronicleEntries.map(({action,text,line}) => {const mine=action.actor_user_id===userId;return <motion.p initial={{opacity:0,x:mine?-8:8}} animate={{opacity:1,x:0}} key={`${action.id}-${line}`} className={`border-b pb-1 pl-1 ${mine?"border-cyan-950 text-cyan-100":"border-red-950 text-red-100"}`}><span className={`mr-1 font-black ${mine?"text-cyan-400":"text-red-400"}`}>{mine?"◆":"◇"} #{action.sequence_number}.{line+1}</span>{text}<time className="ml-2 text-[8px] text-stone-600">{new Date(action.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</time></motion.p>})}{automaticEffectEntries.map(({log,text})=><motion.p initial={{opacity:0}} animate={{opacity:1}} key={`effect-log-${log.id}`} className="border-b border-purple-950 pb-1 pl-1 text-purple-100"><span className="mr-1 font-black text-purple-300">✦ AUTO</span>{text}<time className="ml-2 text-[8px] text-stone-600">{new Date(log.created_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}</time></motion.p>)}{!chronicleEntries.length&&!automaticEffectEntries.length&&<p className="text-stone-500">As Areias aguardam a primeira ação registrada…</p>}<div ref={logEnd}/></div></div>
         <Pile label="Seu cemitério" graveyard count={mine("graveyard").length} onClick={() => setGraveyardOpen(true)} /><Pile label="Seu deck" count={isPlayer1 ? matchState?.player1_deck_count ?? 0 : matchState?.player2_deck_count ?? 0} onClick={() => setPileOpen({ title: "Seu deck", cards: mine("deck") })} />
         <div className="flex items-center gap-2 rounded-lg border border-emerald-800/50 bg-black/60 p-2">{(isPlayer1 ? matchState?.player1_avatar_url : matchState?.player2_avatar_url) ? <img src={secureImageUrl(isPlayer1 ? matchState?.player1_avatar_url : matchState?.player2_avatar_url)} alt="" className="h-10 w-10 rounded-full border border-emerald-400 object-cover" /> : <div className="h-10 w-10 rounded-full bg-emerald-950" />}<div><p className="text-[9px] uppercase text-emerald-300">Você</p><b className="text-xs text-stone-100">{isPlayer1 ? matchState?.player1_username : matchState?.player2_username}</b></div></div>
       </aside>}
 
       <section className={`flex min-w-[580px] min-h-0 flex-col justify-between overflow-y-auto overflow-x-visible rounded-xl border border-amber-700/20 bg-black/20 px-2 ${isMobile ? "w-full h-full touch-pan-x" : ""}`}>
         {effectMessage && <button onClick={() => { setEffectMessage(null); setEffectSelection(null) }} className="sticky top-0 z-50 w-full rounded border border-cyan-500/50 bg-blue-950/95 p-2 text-xs text-cyan-100">{effectMessage}</button>}
-        <Zone label="Campo de Defesa do Bot" cards={theirs("reinforcement")} hidden selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} /><Zone label="Cartas de Vida do Bot" cards={theirs("life")} slots={3} danger={Boolean(pendingAttack)} selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} /><Zone label="Campo de Ataque do Bot" cards={theirs("attacker")} selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} />
-        
+        <Zone label="Campo de Defesa do oponente" cards={theirs("reinforcement")} hidden selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} /><Zone label="Cartas de Vida do oponente" cards={theirs("life")} slots={3} danger={Boolean(pendingAttack)} selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} /><Zone label="Campo de Ataque do oponente" cards={theirs("attacker")} selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} />
         <div className="z-40 my-1 flex items-center justify-between gap-3 border-y border-amber-700/50 bg-stone-950/95 px-4 py-2 shadow-2xl">
-          <div className="flex items-center gap-2 text-xs"><span className="h-7 w-7 rounded-full border border-blue-300 bg-blue-700 shadow-[0_0_14px_rgba(59,130,246,.8)]" /><b>{theirMana}</b><span className="text-stone-500">Bot</span></div>
+          <div className="flex items-center gap-2 text-xs"><span className="h-7 w-7 rounded-full border border-blue-300 bg-blue-700 shadow-[0_0_14px_rgba(59,130,246,.8)]" /><b>{theirMana}</b><span className="text-stone-500">Rival</span></div>
           <div className={`rounded px-3 py-1 text-center text-xs font-black ${isCurrentPlayer ? "bg-emerald-950 text-emerald-200 ring-1 ring-emerald-400" : "bg-red-950 text-red-200 ring-1 ring-red-500"}`}>
-            <span className="block">{matchState?.engine_state==="reaction_window"?"REAGIR AO ATAQUE":matchState?.engine_state==="resolving"?"RESOLVENDO COMBATE":isCurrentPlayer?"SUA VEZ":"BOT PENSANDO"}</span>
-            <span className="block font-serif text-[10px] text-yellow-100">[ RODADA: {Math.max(1,Math.ceil((matchState?.current_turn??1)/2))} ]</span>
+            <span className="block">{matchState?.engine_state==="reaction_window"?"JANELA DE REAÇÃO":matchState?.engine_state==="resolving"?"RESOLVENDO COMBATE":isCurrentPlayer?"SUA VEZ":`VEZ DE ${isPlayer1 ? matchState?.player2_username : matchState?.player1_username}`}</span>
+            <span className="block font-serif text-[10px] text-yellow-100">[ ⏳ TURNO GLOBAL: {matchState?.current_turn??0} | RODADA ATUAL: {Math.max(1,Math.ceil((matchState?.current_turn??1)/2))} ]</span>
           </div>
           <div className="flex items-center gap-2">
-            {isCurrentPlayer ? (
+            {isLabSandbox && matchState && matchState.current_turn > 9 ? (
+              <button 
+                onClick={() => void triggerLabConclusion()} 
+                disabled={isActionPending} 
+                className="min-h-[44px] px-5 py-2 font-serif font-black text-xs uppercase tracking-wider rounded-lg shadow-[0_0_20px_rgba(245,158,11,0.4)] border border-amber-400 bg-amber-800 text-yellow-100 animate-pulse active:scale-95 transition-transform"
+              >
+                🏆 Concluir Teste e Resgatar Moedas
+              </button>
+            ) : isCurrentPlayer ? (
               <>
                 {(matchState?.my_actions_this_turn ?? 0) === 0 && !attackers.length && (
-                  <button onClick={passTurnWithoutActing} disabled={matchState?.engine_state !== "turn_action" || isActionPending} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md border border-blue-400 bg-blue-900 text-blue-100 disabled:opacity-40">⏭️ PASSAR</button>
+                  <button onClick={passTurnWithoutActing} disabled={matchState?.engine_state !== "turn_action" || isActionPending} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-blue-400 bg-blue-900 text-blue-100 disabled:opacity-40">⏭️ PASSAR</button>
                 )}
-                <button onClick={() => setPreCombatOpen(true)} disabled={matchState?.engine_state !== "turn_action" || isActionPending || ((matchState?.my_actions_this_turn ?? 0) === 0 && !attackers.length && !turnEffectCards.length)} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md border border-amber-400 bg-amber-700 text-amber-100 disabled:opacity-35">⚔️ COMBATE{attackers.length ? ` (${attackers.length})` : ""}</button>
+                <button onClick={() => setPreCombatOpen(true)} disabled={matchState?.engine_state !== "turn_action" || isActionPending || ((matchState?.my_actions_this_turn ?? 0) === 0 && !attackers.length && !turnEffectCards.length)} className="min-h-[44px] px-4 py-2 font-bold text-sm rounded-lg shadow-md active:scale-95 transition-transform border border-amber-400 bg-amber-700 text-amber-100 disabled:opacity-35">⚔️ COMBATE{attackers.length ? ` (${attackers.length})` : ""}</button>
               </>
             ) : (
-              <span className="min-h-[44px] flex items-center px-4 py-2 text-sm rounded-lg border border-stone-700 bg-black/60 font-bold text-stone-500">TURNO BOT</span>
+              <span className="min-h-[44px] flex items-center px-4 py-2 text-sm rounded-lg border border-stone-700 bg-black/60 font-bold text-stone-500">AGUARDE</span>
             )}
-            <button disabled={!isCurrentPlayer} onClick={() => void duel.surrenderMatch()} className="min-h-[44px] px-4 py-2 rounded-lg border border-red-800 bg-red-950 text-red-300 disabled:opacity-30">
-              <Flag size={14} />
-            </button>
+            {!(isLabSandbox && matchState && matchState.current_turn > 9) && (
+              <button disabled={!isCurrentPlayer} onClick={() => void duel.surrenderMatch()} className="min-h-[44px] px-4 py-2 rounded-lg border border-red-800 bg-red-950 text-red-300 disabled:opacity-30 active:scale-95 transition-transform" title="Se render">
+                <Flag size={14} />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs"><span className="text-stone-500">Você</span><b>{myMana}</b><span className="h-7 w-7 rounded-full border border-blue-300 bg-blue-700 shadow-[0_0_14px_rgba(59,130,246,.8)]" /></div>
         </div>
-        
         <Zone label="Campo de Ataque" cards={attackers} selected={effectSelection?.validIds??selectedAttackers} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} onEmpty={position => playSelected("attacker", position)} onDropCard={(id,position) => dropCard(id,"attacker",position)} /><Zone label="Campo de Defesa" cards={mine("reinforcement")} hidden ownerPreview selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} onEmpty={position => playSelected("reinforcement", position)} onDropCard={(id,position) => dropCard(id,"reinforcement",position)} /><Zone label="Suas cartas de vida" cards={mine("life")} slots={3} danger selected={effectSelection?.validIds} onInspect={setInspectedCard} onCard={effectSelection ? chooseEffectTarget : undefined} onEmpty={selectedCard && matchState && matchState.current_turn > 0 && matchState.current_turn < 4 ? position => void duel.replaceEarlyLifeCard(selectedCard.id, position).then(() => setSelectedHand(null)) : undefined} />
       </section>
 
-      {!isMobile && <aside className="hidden lg:flex min-h-0 flex-col rounded-xl border border-amber-800/30 bg-stone-950/75 p-3 backdrop-blur-md">{matchState?.status==="ban_phase"?<><BannedCard ban={matchBans.find(ban => ban.banned_by_user_id === userId)} label="Carta que você baniu" /><div className="flex-1"/><BannedCard ban={matchBans.find(ban => ban.target_user_id === userId)} label="Sua carta banida pelo rival" /></>:<Inspector card={inspectedCard} canRecall={canRecallInspected} onRecall={recallCard}/>}<div className={`mt-2 rounded-full border px-2 py-1 text-center text-[9px] font-bold ${connectionStatus === "connected" ? "border-emerald-400/50 bg-emerald-950/70 text-emerald-300" : "border-red-500/50 bg-red-950/70 text-red-300"}`}>{connectionStatus === "connected" ? <Wifi className="mr-1 inline" size={11} /> : connectionStatus === "syncing" ? <Loader2 className="mr-1 inline animate-spin" size={11} /> : <WifiOff className="mr-1 inline" size={11} />}{connectionStatus === "connected" ? "Realtime conectado" : "Desconectado"}</div></aside>}
+      {!isMobile && <aside className="hidden lg:flex min-h-0 flex-col rounded-xl border border-amber-800/30 bg-stone-950/75 p-3 backdrop-blur-md">{matchState?.status==="ban_phase"?<><BannedCard ban={matchBans.find(ban => ban.banned_by_user_id === userId)} label="Carta que você baniu" /><div className="flex-1"/><BannedCard ban={matchBans.find(ban => ban.target_user_id === userId)} label="Sua carta banida pelo rival" /></>:<Inspector card={inspectedCard} canRecall={canRecallInspected} onRecall={recallCard}/>}<div className={`mt-2 rounded-full border px-2 py-1 text-center text-[9px] font-bold ${connectionStatus === "connected" ? "border-emerald-400/50 bg-emerald-950/70 text-emerald-300" : "border-red-500/50 bg-red-950/70 text-red-300"}`}>{connectionStatus === "connected" ? <Wifi className="mr-1 inline" size={11} /> : connectionStatus === "syncing" ? <Loader2 className="mr-1 inline animate-spin" size={11} /> : <WifiOff className="mr-1 inline" size={11} />}{connectionStatus === "connected" ? "Realtime conectado" : connectionStatus === "syncing" ? "Sincronizando" : "Desconectado"}</div></aside>}
     </div>
 
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-black/90 border-t border-amber-500/30 p-2 flex items-center gap-2 overflow-x-auto touch-pan-x pb-safe"><div className="flex justify-center -space-x-7 transition-all duration-300 hover:space-x-1">{hand.map(card => <div draggable={isCurrentPlayer} onDragStart={event => { event.dataTransfer.effectAllowed="move"; event.dataTransfer.setData("text/card-id",card.id) }} key={card.id} className={`relative flex-shrink-0 w-20 h-28 shrink-0 origin-bottom transition-transform duration-200 ${isCurrentPlayer ? "cursor-grab active:cursor-grabbing hover:z-50 hover:-translate-y-6 hover:scale-125" : "opacity-70"} ${selectedHand === card.id ? "z-40 -translate-y-4 rounded-xl ring-2 ring-amber-300" : ""}`}><button disabled={!isCurrentPlayer} onClick={() => {setInspectedCard(card);if (!chooseEffectTarget(card)) setSelectedHand(card.id)}} className="h-full w-full"><MiniCard row={card}/></button></div>)}</div></div>
 
     {effectSelection&&<><div className="pointer-events-none fixed inset-0 z-[5] bg-black/40"/><div className="pointer-events-none fixed inset-x-0 top-4 z-[120] mx-auto w-fit animate-pulse rounded-xl border-2 border-blue-300 bg-blue-950/95 px-8 py-4 text-center font-serif text-lg font-black text-blue-50 shadow-[0_0_30px_rgba(96,165,250,.8)]">🎯 CLIQUE NA CARTA ALVO PARA APLICAR O EFEITO<br/><small className="text-xs text-blue-200">Pressione ESC para cancelar</small></div></>}
 
-    <AnimatePresence>{showcase && <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="pointer-events-none fixed inset-0 z-[155] flex items-center justify-center bg-black/55 backdrop-blur-[2px]"><motion.div initial={{scale:.6,x:280,rotate:8}} animate={{scale:1,x:0,rotate:0}} transition={{type:"spring",stiffness:180,damping:18}} className="relative flex items-center gap-8"><div className="absolute -inset-20 bg-[radial-gradient(circle,rgba(245,158,11,.35),transparent_65%)]" />{showcase.card?.card_data?<div className="relative aspect-[2/3] w-44 drop-shadow-[0_0_28px_rgba(245,158,11,.8)]"><GameCard card={showcase.card.card_data} enableZoom={false}/></div>:<Sparkles className="relative text-amber-300" size={90}/>}<div className="relative max-w-lg border-y-2 border-amber-300 bg-gradient-to-r from-transparent via-black/90 to-transparent px-10 py-6"><p className="text-xs font-black uppercase tracking-[.35em] text-red-300">Ação do Bot</p><h2 className="mt-2 font-serif text-3xl font-black uppercase text-amber-100">{showcase.action.action_type==="card_played"?`O BOT INVOCA${showcase.card?.card_data?`: ${showcase.card.card_data.nome}`:""}`:showcase.action.action_type==="effect_activated"?`O BOT ATIVA EFEITO${showcase.card?.card_data?`: ${showcase.card.card_data.nome}`:""}`:showcase.action.action_type.includes("attack")?"O BOT DESFERE UM ATAQUE":actionText(showcase.action,matchState)}</h2></div></motion.div></motion.div>}</AnimatePresence>
 
+    <AnimatePresence>{showcase && <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="pointer-events-none fixed inset-0 z-[155] flex items-center justify-center bg-black/55 backdrop-blur-[2px]"><motion.div initial={{scale:.6,x:280,rotate:8}} animate={{scale:1,x:0,rotate:0}} transition={{type:"spring",stiffness:180,damping:18}} className="relative flex items-center gap-8"><div className="absolute -inset-20 bg-[radial-gradient(circle,rgba(245,158,11,.35),transparent_65%)]" />{showcase.card?.card_data?<div className="relative aspect-[2/3] w-44 drop-shadow-[0_0_28px_rgba(245,158,11,.8)]"><GameCard card={showcase.card.card_data} enableZoom={false}/></div>:<Sparkles className="relative text-amber-300" size={90}/>}<div className="relative max-w-lg border-y-2 border-amber-300 bg-gradient-to-r from-transparent via-black/90 to-transparent px-10 py-6"><p className="text-xs font-black uppercase tracking-[.35em] text-red-300">Ação do rival</p><h2 className="mt-2 font-serif text-3xl font-black uppercase text-amber-100">{showcase.action.action_type==="card_played"?`O RIVAL INVOCA${showcase.card?.card_data?`: ${showcase.card.card_data.nome}`:""}`:showcase.action.action_type==="effect_activated"?`O RIVAL ATIVA EFEITO${showcase.card?.card_data?`: ${showcase.card.card_data.nome}`:""}`:showcase.action.action_type.includes("attack")?"O RIVAL DESFERE UM ATAQUE":actionText(showcase.action,matchState)}</h2></div><motion.div initial={{x:-120,opacity:0,scaleX:.2}} animate={{x:260,opacity:[0,1,1,0],scaleX:1}} transition={{delay:.8,duration:.55}} className="absolute left-1/3 top-1/2 h-2 w-72 origin-left bg-gradient-to-r from-amber-100 via-yellow-400 to-red-500 shadow-[0_0_24px_#f59e0b]" /></motion.div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{graveyardOpen && <GraveyardModal cards={mine("graveyard")} onInspect={setInspectedCard} onClose={() => setGraveyardOpen(false)} />}</AnimatePresence>
+    <AnimatePresence>{pileOpen && <CardPileModal title={pileOpen.title} cards={pileOpen.cards} hidden={pileOpen.hidden} onClose={() => setPileOpen(null)} />}</AnimatePresence>
+    <AnimatePresence>{effectSelection?.zone && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[165] flex items-center justify-center bg-black/85 p-6"><div className="max-h-[80vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-cyan-500/50 bg-stone-950 p-6"><button onClick={() => setEffectSelection(null)} className="float-right text-cyan-200"><X /></button><h2 className="mb-5 font-serif text-xl font-black text-cyan-100">🎯 Escolha uma carta — {effectSelection.zone}</h2><div className="grid grid-cols-3 gap-4 sm:grid-cols-5 lg:grid-cols-8">{mine(effectSelection.zone).filter(card=>effectSelection.validIds.has(card.id)).map(card => <CardView key={card.id} row={card} selected onClick={() => chooseEffectTarget(card)} />)}</div></div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{pendingEffectChoice && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[168] flex items-center justify-center bg-black/85 p-6"><div className="max-h-[88vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-purple-400/60 bg-stone-950 p-6"><h2 className="font-serif text-xl font-black text-purple-100">Escolha autoritativa exigida pelo efeito</h2><p className="mt-2 text-sm text-stone-300">{pendingEffectChoice.public_prompt}</p><p className="mb-5 mt-1 text-xs font-black text-cyan-200">Selecione {pendingEffectChoice.min_choices===pendingEffectChoice.max_choices?`exatamente ${pendingEffectChoice.min_choices}`:`entre ${pendingEffectChoice.min_choices} e ${pendingEffectChoice.max_choices}`} carta(s) · {pendingChoiceSelection.size}/{pendingEffectChoice.max_choices}</p><div className="grid grid-cols-3 gap-4 sm:grid-cols-5 lg:grid-cols-8">{boardCards.filter(card => pendingEffectChoice.candidate_ids.includes(card.id)).map(card => <CardView key={card.id} row={card} selected={pendingChoiceSelection.has(card.id)} onClick={() => setPendingChoiceSelection(previous=>{const next=new Set(previous);if(next.has(card.id))next.delete(card.id);else if(next.size<pendingEffectChoice.max_choices)next.add(card.id);return next})} />)}</div><button disabled={pendingChoiceSelection.size<pendingEffectChoice.min_choices||pendingChoiceSelection.size>pendingEffectChoice.max_choices||isActionPending} onClick={()=>void duel.submitEffectChoice(pendingEffectChoice.id,[...pendingChoiceSelection]).then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"Escolha inválida."))} className="mt-6 w-full rounded-xl border-2 border-yellow-200 bg-gradient-to-r from-amber-900 via-yellow-600 to-amber-900 px-5 py-4 font-black text-yellow-50 disabled:opacity-35">CONFIRMAR {pendingChoiceSelection.size} CARTA(S)</button></div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{pendingCardTrigger&&<TriggerPromptModal trigger={pendingCardTrigger} card={pendingTriggerCard} mana={myMana} busy={isActionPending} onAccept={()=>void duel.resolvePendingCardTrigger(pendingCardTrigger.id,true).then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"O gatilho não pôde ser ativado."))} onDecline={()=>void duel.declinePendingCardTrigger(pendingCardTrigger.id).then(()=>duel.refresh()).catch(error=>setEffectMessage(error?.message??"Não foi possível recusar o gatilho."))}/>}</AnimatePresence>
+    <AnimatePresence>{preCombatOpen&&<PreCombatModal cards={turnEffectCards} mana={myMana} busy={isActionPending} freeUsed={Boolean(matchState?.my_free_effect_used)} paidUsed={Boolean(matchState?.my_paid_effect_used)} onClose={()=>setPreCombatOpen(false)} onConfirm={confirmConjurations}/>}</AnimatePresence>
+    <AnimatePresence>{pendingAttack && pendingAttack.defender_user_id === userId && !pendingAttack.result?.suppress_reinforcement_reaction && <ReactionModal attack={pendingAttack} attackerCards={reactionAttackers} defenses={orderedDefenses} reactionCards={validReactions} mana={myMana} reactionUsed={reactionUsed} onActivate={async(cardId: string,effectOrder:number) => { const result=await duel.activateMatchEffect(cardId,effectOrder) as { state_version?: number }; if(result.state_version!=null) await duel.finalizePendingAttack(pendingAttack.id,result.state_version); await duel.refresh() }} onDecline={async() => { await duel.declineAttackReaction(); await duel.refresh() }} />}</AnimatePresence>
+    <AnimatePresence>{matchState?.status==="ban_phase"&& !forceHideBanModal &&<BanPhaseModal candidates={banCandidates} selected={selectedBan} busy={banBusy} error={banError} onSelect={setSelectedBan} onBan={id=>void submitBan(id, selectedBan?.rarity?.toLowerCase() ?? "rare")} onRefetch={()=>void duel.getBanCandidates().then(c=>{setBanCandidates(c);setSelectedBan(c[0]??null)})} onSkip={()=>void submitBan(null, "rare")}/>}</AnimatePresence>
     <AnimatePresence>{matchState?.status === "setup" && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[172] flex items-center justify-center bg-black/95 p-5"><div className="relative max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl border border-emerald-500/60 bg-stone-950 p-6">{mine("life").length === 3 ? <div className="flex flex-col items-center justify-center py-20 text-center text-emerald-200"><Loader2 className="animate-spin mb-4 text-emerald-400" size={48} /><h2 className="font-serif text-3xl font-black mb-3">Sua formação foi enviada!</h2><p className="text-stone-400 text-sm max-w-md">Aguardando o oponente concluir a alocação de suas Cartas de Vida...</p></div> : <><h2 className="text-center font-serif text-3xl font-black text-emerald-200">Turno 0 · Preparação</h2><p className="mt-2 text-center text-stone-300">Escolha exatamente 3 Cartas de Vida e, opcionalmente, até 4 Reforços. Os reforços entram virados para baixo.</p><div className="my-5 grid gap-4 lg:grid-cols-2"><SetupSelection title="Cartas de Vida · 3 obrigatórias" cards={hand.filter(card=>setupCards.has(card.id))} slots={3} tone="life" onRemove={toggleSetup}/><SetupSelection title="Reforços · até 4" cards={hand.filter(card=>setupReinforcements.has(card.id))} slots={4} tone="reinforcement" onRemove={toggleSetupReinforcement}/></div><div className="grid grid-cols-3 gap-5 sm:grid-cols-4 md:grid-cols-7">{hand.map(card => <div key={card.id} className={`rounded-xl p-1 transition ${setupCards.has(card.id)||setupReinforcements.has(card.id)?"opacity-50 ring-2 ring-amber-300":"bg-stone-900"}`}><GameCard card={card.card_data ?? undefined} interactive/><div className="mt-1 grid grid-cols-2 gap-1"><button disabled={setupCards.has(card.id)||setupReinforcements.has(card.id)||setupCards.size>=3} onClick={()=>toggleSetup(card.id)} className="rounded bg-red-900 px-1 py-1 text-[8px] font-black disabled:opacity-30">VIDA</button><button disabled={setupCards.has(card.id)||setupReinforcements.has(card.id)||setupReinforcements.size>=4} onClick={()=>toggleSetupReinforcement(card.id)} className="rounded bg-blue-900 px-1 py-1 text-[8px] font-black disabled:opacity-30">REFORÇO</button></div></div>)}</div><button disabled={setupCards.size!==3||isActionPending||setupBusy} onClick={confirmPreparation} className="mx-auto mt-7 block rounded-lg border border-emerald-300 bg-emerald-800 px-8 py-3 font-black text-white disabled:opacity-40">{(isActionPending||setupBusy)?"VALIDANDO NO SERVIDOR…":`CONFIRMAR PREPARAÇÃO · 3 VIDAS + ${setupReinforcements.size} REFORÇO(S)`}</button></>}</div></motion.div>}</AnimatePresence>
-    <AnimatePresence>{matchState?.status === "finished" && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[190] flex items-center justify-center bg-black/90"><div className="rounded-xl border border-amber-400 bg-stone-950 p-10 text-center"><Crown className="mx-auto mb-4 text-amber-300" size={48} /><h2 className="font-serif text-3xl font-black text-amber-200">{matchState.winner_id === userId ? "Vitória" : "Derrota"}</h2><button onClick={()=>{const url=new URL(window.location.href);url.searchParams.set("screen","hub");url.searchParams.delete("matchId");window.location.assign(url.toString())}} className="mt-6 rounded border border-amber-500 bg-amber-900 px-6 py-2 text-sm font-black text-amber-100">VOLTAR AO HUB</button></div></motion.div>}</AnimatePresence>
+    <AnimatePresence>{matchState?.status === "finished" && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[190] flex items-center justify-center bg-black/90"><div className="rounded-xl border border-amber-400 bg-stone-950 p-10 text-center"><Crown className="mx-auto mb-4 text-amber-300" size={48} /><h2 className="font-serif text-3xl font-black text-amber-200">{matchState.winner_id === userId ? "Vitória" : "Derrota"}</h2></div></motion.div>}</AnimatePresence>
     
     <AnimatePresence>
       {matchState?.status === "initiative" && matchId && matchState.initiative_result?.winner_user_id && (
@@ -667,82 +839,40 @@ export function TrainingScreen() {
         />
       )}
     </AnimatePresence>
-
     <AnimatePresence>
-      {matchState?.status==="ban_phase" && !forceHideBanModal && (
-        <BanPhaseModal 
-          candidates={banCandidates} 
-          selected={selectedBan} 
-          busy={banBusy} 
-          error={banError} 
-          onSelect={setSelectedBan} 
-          onBan={id=>void submitBan(id, selectedBan?.rarity?.toLowerCase() ?? "rare")} 
-          onRefetch={() => void duel.getBanCandidates().then(c=>{setBanCandidates(c);setSelectedBan(c[0]??null)})} 
-          onSkip={() => void submitBan(null, "rare")} 
-        />
-      )}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {pendingAttack && pendingAttack.status === "awaiting_reaction" && pendingAttack.defender_user_id === userId && (
-        <ReactionModal
-          isOpen={true}
-          onDecline={() => duel.declineAttackReaction().then(() => duel.refresh())}
-          onSelectReaction={card => activateEffect(card, () => duel.refresh())}
-          reactionCards={validReactions}
-          attackPower={pendingAttack.declared_power}
-          attackerCards={reactionAttackers}
-          defendingCards={orderedDefenses}
-          mana={myMana}
-          expectedVersion={matchState?.match_version ?? 0}
-        />
-      )}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {pendingEffectChoice && (
-        <PreCombatModal
-          isOpen={true}
-          title={pendingEffectChoice.public_prompt || "Escolha Obrigatória"}
-          cards={boardCards.filter(card => pendingEffectChoice.candidate_ids.includes(card.id))}
-          minChoices={pendingEffectChoice.min_choices}
-          maxChoices={pendingEffectChoice.max_choices}
-          onSubmit={selectedIds => void duel.submitEffectChoice(pendingEffectChoice.id, selectedIds).then(() => duel.refresh())}
-          onClose={() => setPendingChoiceSelection(new Set())}
-        />
-      )}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {pendingCardTrigger && pendingTriggerCard && (
-        <TriggerPromptModal
-          isOpen={true}
-          card={pendingTriggerCard}
-          trigger={pendingCardTrigger}
-          onConfirm={() => void duel.resolvePendingCardTrigger(pendingCardTrigger.id, true).then(() => duel.refresh())}
-          onDecline={() => void duel.resolvePendingCardTrigger(pendingCardTrigger.id, false).then(() => duel.refresh())}
-        />
-      )}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {graveyardOpen && (
-        <GraveyardModal
-          cards={mine("graveyard")}
-          onClose={() => setGraveyardOpen(false)}
-          onInspect={setInspectedCard}
-        />
-      )}
-    </AnimatePresence>
-
-    <AnimatePresence>
-      {pileOpen && (
-        <CardPileModal
-          title={pileOpen.title}
-          cards={pileOpen.cards}
-          hidden={pileOpen.hidden}
-          onClose={() => setPileOpen(null)}
-        />
+      {labModalOpen && (
+        <motion.div 
+          initial={{ opacity: 0 }} 
+          animate={{ opacity: 1 }} 
+          exit={{ opacity: 0 }} 
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/95 backdrop-blur-md"
+        >
+          <div className="rounded-xl border border-emerald-500/40 bg-stone-950 p-10 text-center max-w-md shadow-[0_0_50px_rgba(16,185,129,0.2)]">
+            <Beaker className="mx-auto mb-4 text-emerald-400 animate-pulse" size={56} />
+            <h2 className="font-serif text-2xl font-black text-emerald-200 uppercase tracking-widest mb-4">
+              {labRewardCoins > 0 ? "Análise Concluída!" : "Simulação Finalizada!"}
+            </h2>
+            <p className="text-sm text-stone-300 leading-relaxed mb-6">
+              {labRewardCoins > 0 
+                ? "Você dominou os segredos desta arte e recebeu 🪙 +25 Moedas Ofieri!"
+                : "Dados do artefato coletados com sucesso."}
+            </p>
+            
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={leaveLabSandbox}
+                className="w-full py-3 rounded-lg border border-emerald-500 bg-emerald-950/80 hover:bg-emerald-900 font-serif font-black text-xs uppercase tracking-widest text-emerald-100 transition-all"
+              >
+                Voltar ao Laboratório
+              </button>
+              {labRedirectTimer !== null && (
+                <span className="text-[10px] text-stone-500">
+                  Redirecionando automaticamente em {labRedirectTimer}s...
+                </span>
+              )}
+            </div>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   </motion.main>

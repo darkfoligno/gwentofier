@@ -13,7 +13,6 @@ import type {
   PendingCardTrigger,
   VisibleMatchCard,
   VisibleMatchCardRow,
-  MatchCardZone,
 } from "@/lib/types"
 
 type ConnectionStatus = "connected" | "syncing" | "disconnected"
@@ -46,7 +45,7 @@ function readableRpcError(error: PostgrestError) {
 
 async function reportDuelError(matchId: string, operation: string, error: PostgrestError | Error) {
   const issue = error as PostgrestError
-  await supabase.rpc("report_client_error", { p_area: "training_arena", p_operation: operation, p_error_code: issue.code ?? null, p_error_message: error.message, p_error_details: issue.details ?? null, p_match_id: UUID.test(matchId) ? matchId : null, p_client_context: { online: typeof navigator !== "undefined" ? navigator.onLine : null } })
+  await supabase.rpc("report_client_error", { p_area: "arena", p_operation: operation, p_error_code: issue.code ?? null, p_error_message: error.message, p_error_details: issue.details ?? null, p_match_id: UUID.test(matchId) ? matchId : null, p_client_context: { online: typeof navigator !== "undefined" ? navigator.onLine : null } })
 }
 
 export function useTrainingDuel(matchId: string, currentUserId: string) {
@@ -58,7 +57,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
   const [pendingEffectChoice, setPendingEffectChoice] = useState<{ id: string; effect_code: string; choice_type: string; min_choices: number; max_choices: number; candidate_ids: string[]; public_prompt: string; expected_state_version: number } | null>(null)
   const [effectExecutionLogs,setEffectExecutionLogs]=useState<Array<{id:number;match_id:string;source_match_card_id:string|null;effect_code:string;result:Record<string,unknown>;created_at:string}>>([])
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
-  const [isTraining, setIsTraining] = useState(true)
+  const [isTraining, setIsTraining] = useState(false)
   const [usedEffectCardIds,setUsedEffectCardIds]=useState<Set<string>>(new Set())
   const [isActionPending,setIsActionPending]=useState(false)
   const actionPending = useRef(false)
@@ -166,7 +165,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack(), fetchPendingEffectChoice(),fetchPendingCardTrigger(),fetchEffectUses(),fetchEffectExecutionLogs()])
       if (mounted.current) setConnectionStatus("connected")
     } catch (error) {
-      console.error("Falha ao sincronizar a partida de treino", error)
+      console.error("Falha ao sincronizar a partida autoritativa", error)
       void reportDuelError(matchId, "realtime_refresh", error as PostgrestError | Error)
       if (mounted.current) setConnectionStatus("disconnected")
     }
@@ -182,22 +181,48 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
     for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id","p_trigger_id"])
       if (key in clean && clean[key] !== null) clean[key] = requiredUuid(clean[key], key)
-    
+    if (name === "activate_card_effect_v2") {
+      const cardId = clean.p_source_card_id;
+      const card = boardCards.find(c => c.id === cardId);
+      console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço da carta:", card?.card_data?.nome || cardId, "Custo de Mana:", card?.card_data?.mana || 0);
+      console.log("[ENGINE-EFEITO] 📦 Payload enviado para o backend:", JSON.stringify(clean));
+    }
+    if (process.env.NODE_ENV === "development") console.debug(`[Duel RPC] ${name}`, { payload: clean, matchVersion: matchState?.match_version, at: new Date().toISOString() })
     const { data, error } = await supabase.rpc(name, clean)
     if (error) {
+      if (name === "activate_card_effect_v2") {
+        console.error("[ENGINE-EFEITO] ❌ ERRO AO ATIVAR EFEITO:", error.message, error.details);
+      }
       if (isStaleVersion(error)) {
-        await refresh()
-        return { success: false, stale: true } as any
+        console.warn("[Duel RPC] Concorrência detectada. Sincronizando estado...", error);
+        if (typeof window !== "undefined") {
+          const toast = document.createElement("div");
+          toast.className = "fixed bottom-5 right-5 z-[9999] rounded-lg border border-amber-600 bg-amber-950 px-4 py-3 text-xs text-amber-200 shadow-lg animate-pulse";
+          toast.innerText = "🔄 Sincronizando estado do combate...";
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 2500);
+        }
+        await refresh();
+        return { success: false, stale: true } as any;
       }
       void reportDuelError(matchId, name, error)
       throw readableRpcError(error)
+    }
+    if (name === "activate_card_effect_v2") {
+      const cardId = clean.p_source_card_id;
+      const card = boardCards.find(c => c.id === cardId);
+      const nameOrId = card?.card_data?.nome || cardId;
+      const order = clean.p_effect_order || 1;
+      const targetId = clean.p_target_card_id || "Nenhum";
+      const stateVersion = (data as any)?.state_version || (data as any)?.stateVersion || "Desconhecido";
+      console.log(`[EFEITO ATIVADO] ✨ Carta: ${nameOrId} | Ordem: ${order} | Alvo: ${targetId} | Status: SUCESSO | Versão do Estado: ${stateVersion}`);
     }
     return data as T
     } finally {
       actionPending.current = false
       if (mounted.current) setIsActionPending(false)
     }
-  }, [matchId, refresh])
+  }, [matchId, refresh, boardCards])
 
   const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
     p_match_id: requiredUuid(matchId,"p_match_id"),
@@ -209,8 +234,10 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     mounted.current = true
     if (!validMatch) return
     void refresh()
-
-    const channel = supabase.channel(`training-match:${matchId}`)
+    if (isTraining) {
+      return
+    }
+    const channel = supabase.channel(`match:${matchId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, payload => {
         const next = payload.new as MatchRow
         setMatchState(previous => previous ? { ...previous, ...next, current_player_id: next.active_player_id, match_version: next.state_version } : previous)
@@ -233,21 +260,37 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
         void fetchBoardCards()
       })
       .subscribe(status => setConnectionStatus(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "CLOSED" ? "disconnected" : "syncing"))
-    
-    const actionChannel = supabase.channel(`training-actions:${matchId}`)
+    const actionChannel=supabase.channel(`match-actions:${matchId}`)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_action_feed", filter: `match_id=eq.${matchId}` }, payload => {
         const row = payload.new as Omit<MatchAction,"id"> & { action_id: number }
         setMatchActions(previous => previous.some(item => item.id === row.action_id) ? previous : [...previous,{ ...row,id:row.action_id }].slice(-100))
         void Promise.all([fetchMatchState(),fetchBoardCards()])
       })
       .subscribe()
-
     return () => {
       mounted.current = false
       void supabase.removeChannel(channel)
       void supabase.removeChannel(actionChannel)
     }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs, matchId, refresh, validMatch])
+  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs, matchId, refresh, validMatch, isTraining])
+
+  useEffect(() => {
+    if (!validMatch || isTraining) return
+    const interval = setInterval(async () => {
+      if (pendingAttack && pendingAttack.status === "awaiting_reaction") {
+        const deadline = new Date(pendingAttack.reaction_deadline).getTime()
+        if (Date.now() > deadline) {
+          console.log("[CRON-FALLBACK] Pendendo ataque expirado. Forçando resolução de tempo...")
+          try {
+            await supabase.rpc("resolve_expired_pending_attacks")
+          } catch (e) {
+            console.error("[CRON-FALLBACK] Erro ao tentar expirar ataque:", e)
+          }
+        }
+      }
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [pendingAttack, validMatch, isTraining])
 
   const isPlayer1 = matchState?.player1_id === currentUserId
   const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
@@ -266,6 +309,7 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
       return res
     },
     submitSetup: async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
+      // Modo Treino / Teste usa exclusivamente a função de match setup universal unificada sem sobrecarga
       const res = await rpc("submit_match_setup", {
         p_match_id: matchId,
         p_life_card_ids: lifeCardIds,
@@ -291,10 +335,10 @@ export function useTrainingDuel(matchId: string, currentUserId: string) {
     declinePendingCardTrigger:(triggerId:string)=>rpc<{success:boolean;error?:string;error_message?:string}>("resolve_pending_card_trigger",{p_trigger_id:triggerId,p_action:"decline"}).then(result=>{if(!result.success)throw new Error(result.error_message??result.error??"PENDING_TRIGGER_DECLINE_FAILED");return result}),
     recallMatchCard:(cardId:string)=>rpc("recall_match_card",versioned({p_match_card_id:cardId})),
     resolveTrainingBotTrigger:()=>rpc("resolve_training_bot_trigger",versioned()),
-    runTrainingBotTurn: () => rpc("game_ai.execute_bot_actions", { p_match_id: matchId }),
+    runTrainingBotTurn: () => rpc("run_training_bot_turn", versioned()),
     expireTurn: () => rpc("expire_match_turn", versioned()),
     autoResolveTrainingAttack: (expectedVersion: number) => rpc("auto_resolve_training_attack", { p_match_id: matchId, p_expected_version: expectedVersion }),
     finalizePendingAttack: (attackId: string, expectedVersion: number) => rpc("finalize_pending_attack_turn", { p_pending_attack_id: attackId, p_expected_version: expectedVersion }),
-    rescueTrainingBotTurn: () => rpc("game_ai.execute_bot_actions", { p_match_id: matchId }),
+    rescueTrainingBotTurn: () => rpc("rescue_training_bot_turn", versioned()),
   }
 }
