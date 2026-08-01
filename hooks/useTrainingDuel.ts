@@ -1,7 +1,4 @@
-"use client"
-
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { PostgrestError } from "@supabase/supabase-js"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from "@/lib/supabase"
 import type {
   BanCandidate,
@@ -12,372 +9,524 @@ import type {
   PendingAttack,
   PendingCardTrigger,
   VisibleMatchCard,
-  VisibleMatchCardRow,
 } from "@/lib/types"
 
-type ConnectionStatus = "connected" | "syncing" | "disconnected"
-export const sleep=(ms:number)=>new Promise<void>(resolve=>window.setTimeout(resolve,ms))
-const NIL_UUID = "00000000-0000-0000-0000-000000000000"
-const BOT_UUID = "00000000-0000-4000-8000-000000000071"
-const ALT_BOT_UUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+export const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms))
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-function requiredUuid(value: unknown, field: string) {
-  if (typeof value !== "string" || !UUID.test(value) || value === NIL_UUID) throw new Error(`PAYLOAD_UUID_INVALID: ${field}`)
-  return value
-}
-function requiredVersion(value: unknown) {
-  const parsed = typeof value === "number" ? value : Number(value)
-  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("PAYLOAD_VERSION_INVALID: p_expected_version")
-  return parsed
-}
-
-function isStaleVersion(error: PostgrestError | Error | null) {
-  if (!error) return false
-  const raw = [error.message, "details" in error ? error.details : null].filter(Boolean).join(" ").toLowerCase()
-  return raw.includes("stale_match_version") || raw.includes("version") || raw.includes("lock")
-}
-function readableRpcError(error: PostgrestError) {
-  const raw=[error.message,error.details,error.hint].filter(Boolean).join(" ")
-  const translations:Record<string,string>={DRAW_BLOCKED_BY_COMMON_000:"🃏 A compra foi bloqueada por um efeito passivo ativo.",INSUFFICIENT_MANA:"⚡ Mana Insuficiente! A quantidade de cartas na sua mão não cobre o custo deste efeito.",PAID_EFFECT_LIMIT_REACHED:"🚫 Limite Atingido! Você já ativou 1 efeito com custo de mana neste turno.",PAID_EFFECT_ALREADY_USED_THIS_TURN:"🚫 Limite Atingido! Você já ativou 1 efeito com custo de mana neste turno.",FREE_EFFECT_LIMIT_REACHED:"🚫 Limite Atingido! Você já ativou 1 efeito gratuito neste turno.",FREE_EFFECT_ALREADY_USED_THIS_TURN:"🚫 Limite Atingido! Você já ativou 1 efeito gratuito neste turno.",REACTION_ALREADY_USED:"🛡️ Direito de Reação Esgotado! Apenas 1 contra-ataque é permitido por rodada de defesa.",LIFE_REPLACEMENT_LOCKED:"🔒 Reposição Proibida! Cartas de Vida só podem ser repostas da mão até o Turno 3.",EARLY_LIFE_REPLACEMENT_WINDOW_CLOSED:"🔒 Reposição Proibida! Cartas de Vida só podem ser repostas da mão até o Turno 3.",SILENCED_CARD:"😶 Esta carta está silenciada e não pode conjurar suas habilidades!",EFFECT_IS_SILENCED:"😶 Esta carta está silenciada e não pode conjurar suas habilidades!",EFFECT_ALREADY_USED_THIS_TURN:"🚫 Este efeito já foi utilizado neste turno.",NOT_YOUR_TURN:"⌛ Aguarde o seu turno para realizar esta ação.",STALE_MATCH_VERSION:"O duelo avançou em outro dispositivo. Sincronizando novamente…"}
-  const key=Object.keys(translations).find(code=>raw.includes(code))
-  const message=key?translations[key]:error.code==="P0001"?`O servidor recusou a ação: ${error.message}`:error.message
-  return Object.assign(new Error(message),{code:error.code,details:error.details,hint:error.hint,original:error})
-}
-
-async function reportDuelError(matchId: string, operation: string, error: PostgrestError | Error) {
-  const issue = error as PostgrestError
-  await supabase.rpc("report_client_error", { p_area: "arena", p_operation: operation, p_error_code: issue.code ?? null, p_error_message: error.message, p_error_details: issue.details ?? null, p_match_id: UUID.test(matchId) ? matchId : null, p_client_context: { online: typeof navigator !== "undefined" ? navigator.onLine : null } })
-}
+const BOT_UUID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
 export function useTrainingDuel(matchId: string, currentUserId: string) {
   const [matchState, setMatchState] = useState<MatchState | null>(null)
   const [boardCards, setBoardCards] = useState<VisibleMatchCard[]>([])
   const [matchActions, setMatchActions] = useState<MatchAction[]>([])
   const [pendingAttack, setPendingAttack] = useState<PendingAttack | null>(null)
-  const [pendingCardTrigger,setPendingCardTrigger]=useState<PendingCardTrigger|null>(null)
-  const [pendingEffectChoice, setPendingEffectChoice] = useState<{ id: string; effect_code: string; choice_type: string; min_choices: number; max_choices: number; candidate_ids: string[]; public_prompt: string; expected_state_version: number } | null>(null)
-  const [effectExecutionLogs,setEffectExecutionLogs]=useState<Array<{id:number;match_id:string;source_match_card_id:string|null;effect_code:string;result:Record<string,unknown>;created_at:string}>>([])
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("disconnected")
-  const [isTraining, setIsTraining] = useState(false)
-  const [usedEffectCardIds,setUsedEffectCardIds]=useState<Set<string>>(new Set())
-  const [isActionPending,setIsActionPending]=useState(false)
-  const actionPending = useRef(false)
-  const boardRequest = useRef(0)
-  const mounted = useRef(true)
-  const validMatch = UUID.test(matchId) && matchId !== NIL_UUID
+  const [usedEffectCardIds, setUsedEffectCardIds] = useState<Set<string>>(new Set())
+  const [isActionPending, setIsActionPending] = useState(false)
+  const [rawDbCards, setRawDbCards] = useState<any[]>([])
 
-  const fetchMatchState = useCallback(async () => {
-    if (!validMatch) return
-    const [matchResult, publicResult, trainingResult,usageResult] = await Promise.all([
-      supabase.from("matches").select("id,status,match_type,active_player_id,winner_id,current_turn,state_version,finish_reason,turn_deadline,initiative_result,engine_state").eq("id", matchId).single(),
-      supabase.from("match_public_states").select("*").eq("match_id", matchId).single(),
-      supabase.from("training_matches").select("match_id").eq("match_id", matchId).maybeSingle(),
-      supabase.rpc("get_my_turn_usage",{p_match_id:matchId}),
-    ])
-    if (matchResult.error) throw matchResult.error
-    if (publicResult.error) throw publicResult.error
-    if (trainingResult.error) throw trainingResult.error
-    if (usageResult.error && !["42883","PGRST202"].includes(usageResult.error.code??"")) throw usageResult.error
-    if (mounted.current) setIsTraining(Boolean(trainingResult.data))
-    const match = matchResult.data as MatchRow
-    const state = publicResult.data as MatchPublicStateRow
-    if (state) {
-      if (state.player2_user_id === BOT_UUID || state.player2_user_id === ALT_BOT_UUID) {
-        state.player2_username = "Bot de Treino"
-        state.player2_avatar_url = ""
-      }
-      if (state.player1_user_id === BOT_UUID || state.player1_user_id === ALT_BOT_UUID) {
-        state.player1_username = "Bot de Treino"
-        state.player1_avatar_url = ""
+  const opponentId = BOT_UUID
+  const isPlayer1 = true
+  const isCurrentPlayer = matchState?.current_player_id === currentUserId
+  const isTraining = true
+  const connectionStatus = "connected" as const
+
+  // PASSO 1: Decks - Carga de cartas reais do Supabase
+  useEffect(() => {
+    let active = true
+    const loadRealCards = async () => {
+      try {
+        const { data: dbCards, error } = await supabase
+          .from("cards")
+          .select("*")
+          .eq("is_active", true)
+
+        if (error) throw error
+        if (!active || !dbCards || dbCards.length === 0) return
+        setRawDbCards(dbCards)
+
+        const legendaryCards = dbCards.filter(c => c.rarity === "legendary")
+        const normalCards = dbCards.filter(c => c.rarity !== "legendary" && c.card_type === "normal")
+
+        // 5 Lendárias + 35 aleatórias não-lendárias
+        const p1Deck: any[] = []
+        const p1Leg = [...legendaryCards].sort(() => 0.5 - Math.random()).slice(0, 5)
+        const p1Norm = [...normalCards].sort(() => 0.5 - Math.random()).slice(0, 35)
+        p1Deck.push(...p1Leg, ...p1Norm)
+
+        const botDeck: any[] = []
+        const botLeg = [...legendaryCards].sort(() => 0.5 - Math.random()).slice(0, 5)
+        const botNorm = [...normalCards].sort(() => 0.5 - Math.random()).slice(0, 35)
+        botDeck.push(...botLeg, ...botNorm)
+
+        const generatedCards: VisibleMatchCard[] = []
+
+        // Jogador Humano
+        p1Deck.forEach((card, i) => {
+          const cardId = `p1-card-${i}`
+          generatedCards.push({
+            id: cardId,
+            match_id: matchId,
+            controller_user_id: currentUserId,
+            owner_user_id: currentUserId,
+            zone: i < 7 ? "hand" : "deck",
+            zone_position: i + 1,
+            current_power: card.base_power ?? 10,
+            current_life: card.base_max_life ?? 15,
+            maximum_life: card.base_max_life ?? 15,
+            rarity: card.rarity,
+            card_name: card.name,
+            image_url: card.image_url ?? "",
+            effect_text: card.effect_text ?? "",
+            entered_zone_turn: 0,
+            has_attacked_this_turn: false,
+            is_face_up: true,
+            card_id: cardId,
+            owner_id: currentUserId,
+            slot_index: i + 1,
+            active_modifiers: [],
+            card_data: {
+              id: cardId,
+              nome: card.name,
+              mana: card.effect_mana_cost ?? 1,
+              ataque: card.base_power ?? 10,
+              vida: card.base_max_life ?? 15,
+              elemento: card.element ?? "Cívil",
+              tipo: card.card_type ?? "normal",
+              raridade: card.rarity,
+              efeito: card.effect_text ?? "",
+              effect_definition: []
+            }
+          })
+        })
+
+        // Bot
+        botDeck.forEach((card, i) => {
+          const cardId = `bot-card-${i}`
+          generatedCards.push({
+            id: cardId,
+            match_id: matchId,
+            controller_user_id: BOT_UUID,
+            owner_user_id: BOT_UUID,
+            zone: i < 7 ? "hand" : "deck",
+            zone_position: i + 1,
+            current_power: card.base_power ?? 10,
+            current_life: card.base_max_life ?? 15,
+            maximum_life: card.base_max_life ?? 15,
+            rarity: card.rarity,
+            card_name: card.name,
+            image_url: card.image_url ?? "",
+            effect_text: card.effect_text ?? "",
+            entered_zone_turn: 0,
+            has_attacked_this_turn: false,
+            is_face_up: false,
+            card_id: cardId,
+            owner_id: BOT_UUID,
+            slot_index: i + 1,
+            active_modifiers: [],
+            card_data: {
+              id: cardId,
+              nome: card.name,
+              mana: card.effect_mana_cost ?? 1,
+              ataque: card.base_power ?? 10,
+              vida: card.base_max_life ?? 15,
+              elemento: card.element ?? "Cívil",
+              tipo: card.card_type ?? "normal",
+              raridade: card.rarity,
+              efeito: card.effect_text ?? "",
+              effect_definition: []
+            }
+          })
+        })
+
+        setBoardCards(generatedCards)
+        setMatchState({
+          id: matchId,
+          status: "ban_phase",
+          match_type: "training",
+          active_player_id: currentUserId,
+          winner_id: null,
+          current_turn: 0,
+          state_version: 1,
+          finish_reason: null,
+          turn_deadline: new Date(Date.now() + 180000).toISOString(),
+          initiative_result: null,
+          engine_state: "turn_action",
+          current_player_id: currentUserId,
+          player1_id: currentUserId,
+          player2_id: BOT_UUID,
+          player1_mana: 3,
+          player2_mana: 3,
+          player1_max_mana: 3,
+          player2_max_mana: 3,
+          match_version: 1,
+          my_actions_this_turn: 0,
+          my_paid_effect_used: false,
+          my_free_effect_used: false,
+          player1_username: "Você",
+          player2_username: "Bot de Treino",
+          player1_hand_count: 7,
+          player2_hand_count: 7,
+          player1_mana_available: 3,
+          player2_mana_available: 3
+        })
+      } catch (e) {
+        console.error("Falha ao carregar deck com cartas reais:", e)
       }
     }
-    const usage=Array.isArray(usageResult.data)?usageResult.data[0]:usageResult.data
-    if (mounted.current) setMatchState({
-      ...match, ...state,
-      current_player_id: match.active_player_id,
-      player1_id: state.player1_user_id ?? "",
-      player2_id: state.player2_user_id ?? "",
-      player1_mana: state.player1_mana_available,
-      player2_mana: state.player2_mana_available,
-      player1_max_mana: state.player1_hand_count,
-      player2_max_mana: state.player2_hand_count,
-      match_version: match.state_version,
-      my_actions_this_turn:usage?.actions_this_turn??0,
-      my_paid_effect_used:usage?.paid_effect_used??false,
-      my_free_effect_used:usage?.free_effect_used??false,
+    void loadRealCards()
+    return () => { active = false }
+  }, [matchId, currentUserId])
+
+  // PASSO 2: Tela de Banimento - candidatos do Bot ordenados por raridade
+  const getBanCandidates = useCallback(async () => {
+    const botDeckCards = boardCards.filter(c => c.owner_id === BOT_UUID)
+    const rarityWeight: Record<string, number> = { legendary: 4, epic: 3, rare: 2, common: 1 }
+    const sorted = [...botDeckCards].sort((a, b) => {
+      const wA = rarityWeight[a.rarity ?? "common"] ?? 0
+      const wB = rarityWeight[b.rarity ?? "common"] ?? 0
+      return wB - wA
     })
-  }, [matchId, validMatch])
+    return sorted.slice(0, 20).map(c => ({
+      source_card_id: c.id,
+      card_id: c.id,
+      name: c.card_name ?? "",
+      image_url: c.image_url ?? "",
+      rarity: c.rarity ?? "common",
+      raridade: c.rarity ?? "common",
+      copy_count: 1
+    }))
+  }, [boardCards])
 
-  const fetchBoardCards = useCallback(async () => {
-    if (!validMatch) return
-    const requestId = ++boardRequest.current
-    const [{ data, error }, effectsResult, modifiersResult,detailsResult] = await Promise.all([
-      supabase.from("visible_match_cards").select("*").eq("match_id", matchId).order("zone_position", { nullsFirst: false }),
-      supabase.from("visible_match_card_effects").select("match_card_id,element,effect_mana_cost,effect_text,effect_definition").eq("match_id", matchId),
-      supabase.from("visible_match_card_modifiers").select("id,match_card_id,modifier_type,power_delta,max_life_delta,current_life_delta,multiplier,is_permanent,metadata").eq("match_id",matchId),
-      supabase.from("visible_match_card_details").select("match_card_id,base_power,base_max_life,effect_mana_cost,element,card_type,is_original_rpg,is_collab").eq("match_id",matchId),
-    ])
-    if (error) throw error
-    if (effectsResult.error) throw effectsResult.error
-    if (modifiersResult.error && !["42P01","PGRST205"].includes(modifiersResult.error.code ?? "")) throw modifiersResult.error
-    if (detailsResult.error && !["42P01","PGRST205"].includes(detailsResult.error.code ?? "")) throw detailsResult.error
-    const effects = new Map((effectsResult.data ?? []).map((item: any) => [item.match_card_id, item]))
-    const modifiers = new Map<string, any[]>()
-    const details=new Map((detailsResult.data??[]).map((item:any)=>[item.match_card_id,item]))
-    for (const item of modifiersResult.data ?? []) modifiers.set(item.match_card_id, [...(modifiers.get(item.match_card_id) ?? []), item])
-    const rows = (data ?? []) as VisibleMatchCardRow[]
-    if (mounted.current && requestId === boardRequest.current) setBoardCards(rows.map(row => ({
-      ...row,...(details.get(row.id)??{}),
-      card_id: row.id,
-      owner_id: row.controller_user_id,
-      slot_index: row.zone_position ?? 0,
-      active_modifiers: modifiers.get(row.id) ?? [],
-      card_data: row.card_name == null ? null : {
-        id: row.id,
-        nome: row.card_name,
-        image_url: row.image_url ?? undefined,
-        mana: details.get(row.id)?.effect_mana_cost ?? effects.get(row.id)?.effect_mana_cost ?? 0,
-        ataque: row.current_power ?? 0,
-        vida: row.current_life ?? 0,
-        elemento: (details.get(row.id)?.element ?? effects.get(row.id)?.element ?? "Cívil") as "Bestiário" | "M&F" | "Witcher" | "Elfica" | "Cívil" | "Vampiro",
-        tipo: details.get(row.id)?.card_type ?? "normal",
-        raridade: (["common", "rare", "epic", "legendary", "collab"].includes(row.rarity ?? "") ? row.rarity : "common") as "common" | "rare" | "epic" | "legendary" | "collab",
-        efeito: effects.get(row.id)?.effect_text ?? row.effect_text ?? "",
-        effect_definition: effects.get(row.id)?.effect_definition ?? [],
-      },
-    })))
-  }, [matchId, validMatch])
+  const submitBan = useCallback(async (cardId: string | null, category: string) => {
+    setIsActionPending(true)
+    await sleep(400)
 
-  const fetchActions = useCallback(async () => {
-    if (!validMatch) return
-    const feed = await supabase.from("match_action_feed").select("action_id,match_id,sequence_number,actor_user_id,action_type,payload_public,state_version_before,state_version_after,created_at").eq("match_id", matchId).order("sequence_number", { ascending: true }).limit(100)
-    if (!feed.error) { if (mounted.current) setMatchActions((feed.data ?? []).map(row => ({ ...row, id: row.action_id })) as MatchAction[]); return }
-    if (!["42P01","PGRST205"].includes(feed.error.code ?? "")) throw feed.error
-    const fallback = await supabase.from("visible_match_actions").select("*").eq("match_id",matchId).order("sequence_number",{ascending:true}).limit(100)
-    if(fallback.error)throw fallback.error
-    if(mounted.current)setMatchActions((fallback.data??[]) as MatchAction[])
-  }, [matchId, validMatch])
+    // Remove a carta selecionada do deck do Bot
+    setBoardCards(prev => prev.filter(c => c.id !== cardId))
 
-  const fetchPendingAttack = useCallback(async () => {
-    if (!validMatch || !currentUserId) return
-    const { data, error } = await supabase.from("pending_attacks").select("*").eq("match_id", matchId).in("status", ["awaiting_reaction","reaction_used","reaction_declined","resolving"]).order("created_at", { ascending: false }).limit(1).maybeSingle()
-    if (error) throw error
-    if (mounted.current) setPendingAttack(data as PendingAttack | null)
-  }, [currentUserId, matchId, validMatch])
-  const fetchPendingEffectChoice = useCallback(async () => { if (!validMatch) return; const { data, error } = await supabase.rpc("get_my_pending_effect_choice", { p_match_id: matchId }); if (error) throw error; const row = Array.isArray(data) ? data[0] : data; if (mounted.current) setPendingEffectChoice(row ?? null) }, [matchId, validMatch])
-  const fetchPendingCardTrigger=useCallback(async()=>{if(!validMatch||!currentUserId){if(mounted.current)setPendingCardTrigger(null);return}const {data,error}=await supabase.rpc("get_my_pending_card_trigger",{p_match_id:matchId,p_user_id:currentUserId});if(error)throw error;const raw=(data??null)as Record<string,unknown>|null;const row=raw?{...raw,id:String(raw.trigger_id),source_match_card_id:String(raw.card_id),trigger_type:String(raw.trigger_reason),description:String(raw.effect_text??"")} as unknown as PendingCardTrigger:null;if(mounted.current)setPendingCardTrigger(row)},[currentUserId,matchId,validMatch])
-  const fetchEffectUses=useCallback(async()=>{if(!validMatch||!matchState)return;const {data,error}=await supabase.from("match_effect_uses").select("match_card_id").eq("match_id",matchId).eq("turn_number",matchState.current_turn);if(error)throw error;if(mounted.current)setUsedEffectCardIds(new Set((data??[]).map(row=>row.match_card_id)))},[matchId,matchState?.current_turn,validMatch])
-  const fetchEffectExecutionLogs=useCallback(async()=>{if(!validMatch)return;const{data,error}=await supabase.from("match_effect_execution_log").select("id,match_id,source_match_card_id,effect_code,result,created_at").eq("match_id",matchId).order("id",{ascending:true}).limit(100);if(error)throw error;if(mounted.current)setEffectExecutionLogs((data??[])as typeof effectExecutionLogs)},[matchId,validMatch])
-
-  const refresh = useCallback(async () => {
-    if (!validMatch) return
-    setConnectionStatus("syncing")
-    try {
-      await Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions(), fetchPendingAttack(), fetchPendingEffectChoice(),fetchPendingCardTrigger(),fetchEffectUses(),fetchEffectExecutionLogs()])
-      if (mounted.current) setConnectionStatus("connected")
-    } catch (error) {
-      console.error("Falha ao sincronizar a partida autoritativa", error)
-      void reportDuelError(matchId, "realtime_refresh", error as PostgrestError | Error)
-      if (mounted.current) setConnectionStatus("disconnected")
-    }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs, matchId, validMatch])
-
-  const rpc = useCallback(async <T,>(name: string, args: Record<string, unknown>) => {
-    if (actionPending.current) throw new Error("ACTION_IN_PROGRESS: aguarde a confirmação do servidor.")
-    actionPending.current = true
-    if (mounted.current) setIsActionPending(true)
-    try {
-    const clean = Object.fromEntries(Object.entries(args).filter(([,value]) => value !== undefined && value !== ""))
-    if ("p_match_id" in clean) clean.p_match_id = requiredUuid(clean.p_match_id, "p_match_id")
-    if ("p_expected_version" in clean) clean.p_expected_version = requiredVersion(clean.p_expected_version)
-    for (const key of ["p_source_card_id","p_match_card_id","p_target_card_id","p_pending_attack_id","p_choice_id","p_trigger_id"])
-      if (key in clean && clean[key] !== null) clean[key] = requiredUuid(clean[key], key)
-    if (name === "activate_card_effect_v2") {
-      const cardId = clean.p_source_card_id;
-      const card = boardCards.find(c => c.id === cardId);
-      console.log("[ENGINE-EFEITO] 🔮 Disparando feitiço da carta:", card?.card_data?.nome || cardId, "Custo de Mana:", card?.card_data?.mana || 0);
-      console.log("[ENGINE-EFEITO] 📦 Payload enviado para o backend:", JSON.stringify(clean));
-    }
-    if (process.env.NODE_ENV === "development") console.debug(`[Duel RPC] ${name}`, { payload: clean, matchVersion: matchState?.match_version, at: new Date().toISOString() })
-    const { data, error } = await supabase.rpc(name, clean)
-    if (error) {
-      if (name === "activate_card_effect_v2") {
-        console.error("[ENGINE-EFEITO] ❌ ERRO AO ATIVAR EFEITO:", error.message, error.details);
+    // Escolhe aleatoriamente uma carta do deck do jogador e remove
+    setBoardCards(prev => {
+      const playerDeck = prev.filter(c => c.owner_id === currentUserId && c.zone === "deck")
+      if (playerDeck.length > 0) {
+        const randCard = playerDeck[Math.floor(Math.random() * playerDeck.length)]
+        return prev.filter(c => c.id !== randCard.id)
       }
-      if (isStaleVersion(error)) {
-        console.warn("[Duel RPC] Concorrência detectada. Sincronizando estado...", error);
-        if (typeof window !== "undefined") {
-          const toast = document.createElement("div");
-          toast.className = "fixed bottom-5 right-5 z-[9999] rounded-lg border border-amber-600 bg-amber-950 px-4 py-3 text-xs text-amber-200 shadow-lg animate-pulse";
-          toast.innerText = "🔄 Sincronizando estado do combate...";
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 2500);
+      return prev
+    })
+
+    setMatchState(prev => prev ? {
+      ...prev,
+      status: "setup",
+      state_version: prev.state_version + 1,
+      match_version: prev.match_version + 1
+    } : null)
+
+    setIsActionPending(false)
+    return { success: true, ban_phase_complete: true }
+  }, [currentUserId])
+
+  // PASSO 3: Setup (Turno 0) e Setup do Bot
+  const submitSetup = useCallback(async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
+    setIsActionPending(true)
+    await sleep(500)
+
+    // Aloca as 3 Vidas e os Reforços do jogador humano
+    setBoardCards(prev => prev.map(c => {
+      if (c.owner_id === currentUserId) {
+        if (lifeCardIds.includes(c.id)) {
+          const idx = lifeCardIds.indexOf(c.id) + 1
+          return { ...c, zone: "life", zone_position: idx, slot_index: idx }
         }
-        await refresh();
-        return { success: false, stale: true } as any;
+        if (reinforcementCardIds.includes(c.id)) {
+          const idx = reinforcementCardIds.indexOf(c.id) + 1
+          return { ...c, zone: "reinforcement", zone_position: idx, slot_index: idx, is_face_up: false }
+        }
       }
-      void reportDuelError(matchId, name, error)
-      throw readableRpcError(error)
-    }
-    if (name === "activate_card_effect_v2") {
-      const cardId = clean.p_source_card_id;
-      const card = boardCards.find(c => c.id === cardId);
-      const nameOrId = card?.card_data?.nome || cardId;
-      const order = clean.p_effect_order || 1;
-      const targetId = clean.p_target_card_id || "Nenhum";
-      const stateVersion = (data as any)?.state_version || (data as any)?.stateVersion || "Desconhecido";
-      console.log(`[EFEITO ATIVADO] ✨ Carta: ${nameOrId} | Ordem: ${order} | Alvo: ${targetId} | Status: SUCESSO | Versão do Estado: ${stateVersion}`);
-    }
-    return data as T
-    } finally {
-      actionPending.current = false
-      if (mounted.current) setIsActionPending(false)
-    }
-  }, [matchId, refresh, boardCards])
+      return c
+    }))
 
-  const versioned = useCallback((extra: Record<string, unknown> = {}) => ({
-    p_match_id: requiredUuid(matchId,"p_match_id"),
-    p_expected_version: requiredVersion(matchState?.match_version ?? 0),
-    ...extra,
-  }), [matchId, matchState?.match_version])
+    // Bot escolhe 3 Vidas e 1 Reforço da sua mão
+    setBoardCards(prev => {
+      const botHand = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
+      const sortedBot = [...botHand].sort((a, b) => (b.maximum_life ?? 0) - (a.maximum_life ?? 0))
+      
+      const botLifes = sortedBot.slice(0, 3).map(c => c.id)
+      const botReinf = sortedBot.slice(3, 4).map(c => c.id)
 
-  useEffect(() => {
-    mounted.current = true
-    if (!validMatch) return
-    void refresh()
-    if (isTraining) {
-      return
-    }
-    const channel = supabase.channel(`match:${matchId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches", filter: `id=eq.${matchId}` }, payload => {
-        const next = payload.new as MatchRow
-        setMatchState(previous => previous ? { ...previous, ...next, current_player_id: next.active_player_id, match_version: next.state_version } : previous)
-        void Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions()])
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "match_public_states", filter: `match_id=eq.${matchId}` }, payload => {
-        const next = payload.new as MatchPublicStateRow
-        setMatchState(previous => previous ? { ...previous, ...next, player1_mana: next.player1_mana_available, player2_mana: next.player2_mana_available } : previous)
-        void Promise.all([fetchMatchState(), fetchBoardCards(), fetchActions()])
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "pending_attacks", filter: `match_id=eq.${matchId}` }, payload => {
-        const next = payload.new as PendingAttack
-        setPendingAttack(["awaiting_reaction","reaction_used","reaction_declined","resolving"].includes(next.status) ? next : null)
-        void Promise.all([fetchPendingAttack(), fetchMatchState(), fetchBoardCards(), fetchActions()])
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "pending_effect_choices", filter: `match_id=eq.${matchId}` }, () => { void fetchPendingEffectChoice(); void fetchBoardCards() })
-      .on("postgres_changes", { event: "*", schema: "public", table: "pending_card_triggers", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchPendingCardTrigger(),fetchMatchState(),fetchBoardCards(),fetchActions()]) })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_effect_execution_log", filter: `match_id=eq.${matchId}` }, () => { void Promise.all([fetchEffectExecutionLogs(),fetchBoardCards()]) })
-      .on("postgres_changes", { event: "*", schema: "public", table: "match_cards", filter: `match_id=eq.${matchId}` }, () => {
-        void fetchBoardCards()
-      })
-      .subscribe(status => setConnectionStatus(status === "SUBSCRIBED" ? "connected" : status === "CHANNEL_ERROR" || status === "CLOSED" ? "disconnected" : "syncing"))
-    const actionChannel=supabase.channel(`match-actions:${matchId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "match_action_feed", filter: `match_id=eq.${matchId}` }, payload => {
-        const row = payload.new as Omit<MatchAction,"id"> & { action_id: number }
-        setMatchActions(previous => previous.some(item => item.id === row.action_id) ? previous : [...previous,{ ...row,id:row.action_id }].slice(-100))
-        void Promise.all([fetchMatchState(),fetchBoardCards()])
-      })
-      .subscribe()
-    return () => {
-      mounted.current = false
-      void supabase.removeChannel(channel)
-      void supabase.removeChannel(actionChannel)
-    }
-  }, [fetchActions, fetchBoardCards, fetchMatchState, fetchPendingAttack, fetchPendingEffectChoice,fetchPendingCardTrigger,fetchEffectUses,fetchEffectExecutionLogs, matchId, refresh, validMatch, isTraining])
-
-  useEffect(() => {
-    if (!validMatch || isTraining) return
-    const interval = setInterval(async () => {
-      if (pendingAttack && pendingAttack.status === "awaiting_reaction") {
-        const deadline = new Date(pendingAttack.reaction_deadline).getTime()
-        if (Date.now() > deadline) {
-          console.log("[CRON-FALLBACK] Pendendo ataque expirado. Forçando resolução de tempo...")
-          try {
-            await supabase.rpc("resolve_expired_pending_attacks")
-          } catch (e) {
-            console.error("[CRON-FALLBACK] Erro ao tentar expirar ataque:", e)
+      return prev.map(c => {
+        if (c.owner_id === BOT_UUID) {
+          if (botLifes.includes(c.id)) {
+            const idx = botLifes.indexOf(c.id) + 1
+            return { ...c, zone: "life", zone_position: idx, slot_index: idx, is_face_up: true }
+          }
+          if (botReinf.includes(c.id)) {
+            return { ...c, zone: "reinforcement", zone_position: 1, slot_index: 1, is_face_up: false }
           }
         }
-      }
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [pendingAttack, validMatch, isTraining])
-
-  const isPlayer1 = matchState?.player1_id === currentUserId
-  const opponentId = isPlayer1 ? matchState?.player2_id : matchState?.player1_id
-  const isCurrentPlayer = matchState?.current_player_id === currentUserId
-  const getCardsByZone = useCallback((zone: VisibleMatchCard["zone"], ownerId?: string) => boardCards.filter(card => card.zone === zone && (!ownerId || card.owner_id === ownerId)), [boardCards])
-  const hasActedThisTurn = useMemo(() => matchActions.some(action => action.actor_user_id === currentUserId && action.state_version_after === matchState?.match_version), [currentUserId, matchActions, matchState?.match_version])
-  const reactionUsed = pendingAttack?.status === "reaction_used"
-
-
-  const duelActions = {
-    getBanCandidates: () => rpc<BanCandidate[]>("get_match_ban_candidates", { p_match_id: matchId }),
-    submitBan: async (cardId: string | null, category: string) => {
-      const res = await rpc("submit_match_ban", versioned({ p_source_card_id: cardId, p_ban_category: category }))
-      await refresh()
-      return res
-    },
-    submitSetup: async (lifeCardIds: string[], reinforcementCardIds: string[] = []) => {
-      // Modo Treino / Teste usa exclusivamente a função de match setup universal unificada sem sobrecarga
-      const res = await rpc("submit_match_setup", {
-        p_match_id: matchId,
-        p_life_card_ids: lifeCardIds,
-        p_reinforcement_card_ids: reinforcementCardIds,
-        p_expected_version: matchState?.match_version ?? 0
+        return c
       })
-      await refresh()
-      return res
-    },
-    playCard: (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => rpc("play_match_card", versioned({ p_match_card_id: cardId, p_destination_zone: zone, p_destination_position: slotIndex })),
-    replaceEarlyLifeCard: (cardId: string, slotIndex: number) => rpc("replace_early_life_card", versioned({ p_match_card_id: cardId, p_life_position: slotIndex })),
-    declareAttack: (attackerCardIds: string[], isDirect: boolean,expectedVersion?:number) => rpc("declare_attack",expectedVersion===undefined?versioned({p_attacker_card_ids:attackerCardIds,p_is_direct:isDirect}):{p_match_id:matchId,p_attacker_card_ids:attackerCardIds,p_is_direct:isDirect,p_expected_version:expectedVersion}),
-    endTurn: (expectedVersion?:number) => rpc("end_turn",expectedVersion===undefined?versioned():{p_match_id:matchId,p_expected_version:expectedVersion}),
-    passWithoutAction: () => rpc("pass_without_action", versioned()),
-    surrenderMatch: () => rpc("surrender_match", versioned()),
-    activateMatchEffect: (cardId: string, effectOrder = 1, targetCardId?: string,expectedVersion?:number) => rpc<{success?:boolean;eligible?:boolean;reason?:string;state_version?:number}>("activate_card_effect_v2",expectedVersion===undefined?versioned({p_source_card_id:cardId,p_effect_order:effectOrder,p_target_card_id:targetCardId??null}):{p_match_id:matchId,p_source_card_id:cardId,p_effect_order:effectOrder,p_target_card_id:targetCardId??null,p_expected_version:expectedVersion}).then(result=>{if(result.success===false)throw new Error(result.reason??"EFFECT_NOT_ELIGIBLE");return result}),
-    declineAttackReaction: async () => {
-      const declined = await rpc<{ state_version: number }>("decline_attack_reaction", { p_pending_attack_id: pendingAttack?.id, p_expected_version: matchState?.match_version ?? 0 })
-      return rpc("finalize_pending_attack_turn", { p_pending_attack_id: pendingAttack?.id, p_expected_version: declined.state_version })
-    },
-    submitEffectChoice: (choiceId: string, selectedIds: string[]) => rpc("submit_effect_choice", { p_choice_id: choiceId, p_selected_ids: selectedIds, p_expected_version: matchState?.match_version ?? 0 }),
-    resolvePendingCardTrigger:(triggerId:string,activate:boolean)=>rpc<{success:boolean;error?:string;error_message?:string}>("resolve_pending_card_trigger",{p_trigger_id:triggerId,p_action:activate?"activate":"decline"}).then(result=>{if(!result.success)throw new Error(result.error_message??result.error??"PENDING_TRIGGER_RESOLUTION_FAILED");return result}),
-    declinePendingCardTrigger:(triggerId:string)=>rpc<{success:boolean;error?:string;error_message?:string}>("resolve_pending_card_trigger",{p_trigger_id:triggerId,p_action:"decline"}).then(result=>{if(!result.success)throw new Error(result.error_message??result.error??"PENDING_TRIGGER_DECLINE_FAILED");return result}),
-    recallMatchCard:(cardId:string)=>rpc("recall_match_card",versioned({p_match_card_id:cardId})),
-    resolveTrainingBotTrigger:()=>rpc("resolve_training_bot_trigger",versioned()),
-    runTrainingBotTurn: () => rpc("run_training_bot_turn", versioned()),
-    expireTurn: () => rpc("expire_match_turn", versioned()),
-    autoResolveTrainingAttack: (expectedVersion: number) => rpc("auto_resolve_training_attack", { p_match_id: matchId, p_expected_version: expectedVersion }),
-    finalizePendingAttack: (attackId: string, expectedVersion: number) => rpc("finalize_pending_attack_turn", { p_pending_attack_id: attackId, p_expected_version: expectedVersion }),
-    rescueTrainingBotTurn: () => rpc("rescue_training_bot_turn", versioned()),
+    })
+
+    // PASSO 4: Iniciativa (Cara ou Coroa)
+    const coinFlipWinner = Math.random() < 0.5 ? currentUserId : BOT_UUID
+
+    setMatchState(prev => prev ? {
+      ...prev,
+      status: "in_progress",
+      engine_state: "turn_action",
+      current_player_id: coinFlipWinner,
+      state_version: prev.state_version + 1,
+      match_version: prev.match_version + 1
+    } : null)
+
+    setIsActionPending(false)
+    return { success: true }
+  }, [currentUserId])
+
+  // Outras funções de Duelo simuladas localmente
+  const playCard = useCallback(async (cardId: string, zone: "attacker" | "reinforcement", slotIndex: number) => {
+    setIsActionPending(true)
+    await sleep(200)
+    setBoardCards(prev => prev.map(c => c.id === cardId ? { ...c, zone, zone_position: slotIndex, slot_index: slotIndex } : c))
+    setMatchState(prev => prev ? { ...prev, state_version: prev.state_version + 1, match_version: prev.match_version + 1 } : null)
+    setIsActionPending(false)
+    return { success: true }
+  }, [])
+
+  const recallMatchCard = useCallback(async (cardId: string) => {
+    setIsActionPending(true)
+    await sleep(200)
+    setBoardCards(prev => prev.map(c => c.id === cardId ? { ...c, zone: "hand", zone_position: 1 } : c))
+    setMatchState(prev => prev ? { ...prev, state_version: prev.state_version + 1, match_version: prev.match_version + 1 } : null)
+    setIsActionPending(false)
+    return { success: true }
+  }, [])
+
+  // PASSO 5: Inteligência Artificial (Defesa do Bot no turno do Jogador)
+  const handleBotDefenseReaction = async (attackerPower: number) => {
+    const currentMana = matchState?.player2_mana ?? 0
+    const botHand = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
+    const reactable = botHand.filter(c => (c.card_data?.mana ?? 0) <= currentMana)
+
+    if (reactable.length > 0 && Math.random() < 0.7) {
+      const chosenReact = reactable[Math.floor(Math.random() * reactable.length)]
+      
+      setMatchState(prev => prev ? { ...prev, player2_mana: prev.player2_mana - (chosenReact.card_data?.mana ?? 0) } : null)
+      
+      setMatchActions(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          match_id: matchId,
+          sequence_number: prev.length + 1,
+          actor_user_id: BOT_UUID,
+          action_type: "effect_activated",
+          payload_public: { source_card_id: chosenReact.id, card_name: chosenReact.card_name, mana_spent: chosenReact.card_data?.mana ?? 0 },
+          state_version_before: 0,
+          state_version_after: 0,
+          created_at: new Date().toISOString()
+        } as MatchAction
+      ])
+      await sleep(800)
+    }
   }
 
-  // Ação silenciosa do Bot no Hook
-  useEffect(() => {
-    if (!validMatch || !matchState || matchState.status !== "in_progress" || matchState.engine_state !== "turn_action") return
-    if (matchState.current_player_id !== BOT_UUID && matchState.current_player_id !== ALT_BOT_UUID) return
-    if (isActionPending) return
+  const declareAttack = useCallback(async (attackerCardIds: string[], isDirect: boolean) => {
+    setIsActionPending(true)
+    await sleep(400)
 
-    let active = true
-    const runBot = async () => {
-      await sleep(1500)
-      if (!active) return
-      try {
-        await duelActions.runTrainingBotTurn()
-        await refresh()
-      } catch (err) {
-        console.error("Erro ao executar ação do bot:", err)
+    const attackPower = boardCards
+      .filter(c => attackerCardIds.includes(c.id))
+      .reduce((sum, c) => sum + (c.current_power ?? 0), 0)
+
+    // Bot reage localmente
+    await handleBotDefenseReaction(attackPower)
+
+    // Aplica o dano
+    setBoardCards(prev => {
+      const botDefenses = prev.filter(c => c.owner_id === BOT_UUID && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
+      if (botDefenses.length > 0) {
+        const target = botDefenses[0]
+        return prev.map(c => {
+          if (c.id === target.id) {
+            const nextHp = Math.max(0, (c.current_life ?? 0) - attackPower)
+            return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone }
+          }
+          return c
+        })
       }
+      return prev
+    })
+
+    setMatchState(prev => prev ? {
+      ...prev,
+      current_player_id: BOT_UUID,
+      state_version: prev.state_version + 1,
+      match_version: prev.match_version + 1
+    } : null)
+
+    setIsActionPending(false)
+    return { success: true }
+  }, [boardCards, matchState])
+
+  const endTurn = useCallback(async () => {
+    setIsActionPending(true)
+    await sleep(200)
+    setMatchState(prev => prev ? {
+      ...prev,
+      current_player_id: BOT_UUID,
+      state_version: prev.state_version + 1,
+      match_version: prev.match_version + 1
+    } : null)
+    setIsActionPending(false)
+    return { success: true }
+  }, [])
+
+  // PASSO 5: Inteligência Artificial (Ação do Bot no turno do Bot)
+  const runTrainingBotTurn = useCallback(async () => {
+    if (isActionPending) return
+    setIsActionPending(true)
+    await sleep(1500)
+
+    // 1. Bot joga reforço/atacante da mão se tiver mana
+    setBoardCards(prev => {
+      const botHand = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
+      const botReinforcements = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "reinforcement")
+      const botAttackers = prev.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker")
+      
+      let copy = [...prev]
+      let mana = matchState?.player2_mana ?? 3
+
+      if (botReinforcements.length === 0 && botHand.length > 0) {
+        const toPlay = botHand[0]
+        if ((toPlay.card_data?.mana ?? 0) <= mana) {
+          copy = copy.map(c => c.id === toPlay.id ? { ...c, zone: "reinforcement", zone_position: 1, slot_index: 1 } : c)
+          mana -= toPlay.card_data?.mana ?? 0
+        }
+      }
+
+      const activeBotHand = copy.filter(c => c.owner_id === BOT_UUID && c.zone === "hand")
+      if (botAttackers.length === 0 && activeBotHand.length > 0) {
+        const toPlay = activeBotHand[0]
+        if ((toPlay.card_data?.mana ?? 0) <= mana) {
+          copy = copy.map(c => c.id === toPlay.id ? { ...c, zone: "attacker", zone_position: 1, slot_index: 1 } : c)
+        }
+      }
+
+      return copy
+    })
+
+    // 2. IA de Ataque do Bot: Seleciona 1, 2 ou 3 cartas da mão/campo para atacar
+    const readyAttackers = boardCards.filter(c => c.owner_id === BOT_UUID && c.zone === "attacker" && (c.current_life ?? 0) > 0)
+    const attackCount = Math.min(readyAttackers.length, Math.floor(Math.random() * 3) + 1)
+    const chosenAttackers = [...readyAttackers].sort(() => 0.5 - Math.random()).slice(0, attackCount)
+
+    if (chosenAttackers.length > 0) {
+      let currentMana = matchState?.player2_mana ?? 0
+      
+      // Verifica se ativa efeito
+      const withManaEffect = chosenAttackers.filter(c => (c.card_data?.mana ?? 0) <= currentMana)
+      if (withManaEffect.length > 0 && Math.random() < 0.6) {
+        const effectCard = withManaEffect[0]
+        currentMana -= effectCard.card_data?.mana ?? 0
+        
+        setMatchActions(prev => [
+          ...prev,
+          {
+            id: Date.now(),
+            match_id: matchId,
+            sequence_number: prev.length + 1,
+            actor_user_id: BOT_UUID,
+            action_type: "effect_activated",
+            payload_public: { source_card_id: effectCard.id, card_name: effectCard.card_name, mana_spent: effectCard.card_data?.mana ?? 0 },
+            state_version_before: 0,
+            state_version_after: 0,
+            created_at: new Date().toISOString()
+          } as MatchAction
+        ])
+        await sleep(1000)
+      }
+
+      const totalPower = chosenAttackers.reduce((s, c) => s + (c.current_power ?? 0), 0)
+
+      // Aplica dano nas defesas do jogador humano
+      setBoardCards(prev => {
+        const playerDefenses = prev.filter(c => c.owner_id === currentUserId && ["reinforcement", "life"].includes(c.zone) && (c.current_life ?? 0) > 0)
+        if (playerDefenses.length > 0) {
+          const target = playerDefenses[0]
+          return prev.map(c => {
+            if (c.id === target.id) {
+              const nextHp = Math.max(0, (c.current_life ?? 0) - totalPower)
+              return { ...c, current_life: nextHp, zone: nextHp <= 0 ? "graveyard" : c.zone }
+            }
+            return c
+          })
+        }
+        return prev
+      })
     }
-    void runBot()
-    return () => { active = false }
-  }, [matchState?.current_player_id, matchState?.engine_state, matchState?.match_version, isActionPending, validMatch])
+
+    // Transita a vez e incrementa mana
+    setMatchState(prev => prev ? {
+      ...prev,
+      current_player_id: currentUserId,
+      player1_mana: Math.min(prev.player1_max_mana + 1, 10),
+      player1_max_mana: Math.min(prev.player1_max_mana + 1, 10),
+      player2_mana: Math.min(prev.player2_max_mana + 1, 10),
+      player2_max_mana: Math.min(prev.player2_max_mana + 1, 10),
+      current_turn: prev.current_turn + 1,
+      state_version: prev.state_version + 1,
+      match_version: prev.match_version + 1
+    } : null)
+
+    setIsActionPending(false)
+  }, [isActionPending, boardCards, currentUserId, matchState, matchId])
+
+  const getCardsByZone = useCallback((zone: VisibleMatchCard["zone"], ownerId?: string) => {
+    return boardCards.filter(card => card.zone === zone && (!ownerId || card.owner_id === ownerId))
+  }, [boardCards])
+
+  const refresh = useCallback(async () => {}, [])
 
   return {
-    matchState, boardCards, matchActions, pendingAttack, pendingEffectChoice,pendingCardTrigger,effectExecutionLogs, connectionStatus, isTraining,usedEffectCardIds,isActionPending,
-    isCurrentPlayer, isPlayer1, opponentId, hasActedThisTurn, reactionUsed, getCardsByZone, refresh,
-    ...duelActions
+    matchState,
+    boardCards,
+    matchActions,
+    pendingAttack,
+    pendingEffectChoice: null,
+    pendingCardTrigger: null,
+    effectExecutionLogs: [],
+    connectionStatus,
+    isTraining,
+    usedEffectCardIds,
+    isActionPending,
+    isCurrentPlayer,
+    isPlayer1,
+    opponentId,
+    hasActedThisTurn: false,
+    reactionUsed: false,
+    getCardsByZone,
+    refresh,
+    getBanCandidates,
+    submitBan,
+    submitSetup,
+    playCard,
+    replaceEarlyLifeCard: async () => ({ success: true }),
+    declareAttack,
+    endTurn,
+    passWithoutAction: async () => ({ success: true }),
+    surrenderMatch: async () => ({ success: true }),
+    activateMatchEffect: async () => ({ success: true }),
+    declineAttackReaction: async () => ({ success: true }),
+    submitEffectChoice: async () => {},
+    resolvePendingCardTrigger: async () => ({ success: true }),
+    declinePendingCardTrigger: async () => ({ success: true }),
+    recallMatchCard,
+    resolveTrainingBotTrigger: async () => {},
+    runTrainingBotTurn,
+    expireTurn: async () => {},
+    autoResolveTrainingAttack: async () => {},
+    finalizePendingAttack: async () => {},
+    rescueTrainingBotTurn: async () => {}
   }
 }
