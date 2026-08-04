@@ -62,7 +62,7 @@ export function PreMatchModal({
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="w-full max-w-xl overflow-hidden rounded-2xl border border-amber-600/40 bg-stone-950 shadow-[0_0_40px_rgba(217,119,6,0.15)]"
+        className={`w-full overflow-hidden rounded-2xl border border-amber-600/40 bg-stone-950 shadow-[0_0_40px_rgba(217,119,6,0.15)] transition-all duration-300 ${step === "version" ? "max-w-4xl" : "max-w-xl"}`}
       >
         <header className="border-b border-amber-800/40 bg-black/50 p-5 text-center">
           <h2 className="font-serif text-2xl font-black uppercase text-amber-200">
@@ -124,7 +124,7 @@ export function PreMatchModal({
           )}
 
           {step === "version" && (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
               <button
                 onClick={() => handleConfirmVersion(false)}
                 className="group relative flex flex-col items-center gap-4 overflow-hidden rounded-xl border-2 border-stone-700 bg-stone-900 p-6 text-center transition-all hover:border-blue-400 hover:bg-blue-950 hover:shadow-[0_0_30px_rgba(96,165,250,0.15)]"
@@ -146,6 +146,19 @@ export function PreMatchModal({
                   <span className="mt-2 block text-xs text-amber-500/70 group-hover:text-amber-200/80">Gavetas laterais, zoom otimizado e área de cartas expandida.</span>
                 </div>
               </button>
+
+              <a
+                href="https://mega.nz/file/odRETa7T#EHorcb217wpRSyoPLkA-TSE_aEDvCbhIHJnM333hWJw"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group relative flex flex-col items-center gap-4 overflow-hidden rounded-xl border-2 border-emerald-600 bg-stone-900 p-6 text-center transition-all hover:border-emerald-400 hover:bg-emerald-950 hover:shadow-[0_0_30px_rgba(16,185,129,0.25)]"
+              >
+                <Smartphone size={48} className="text-emerald-500 group-hover:text-emerald-300" />
+                <div>
+                  <b className="block font-serif text-lg text-emerald-500 group-hover:text-emerald-300">Versão Android (APK)</b>
+                  <span className="mt-2 block text-xs text-emerald-500/70 group-hover:text-emerald-200/80">Baixe o instalador APK oficial diretamente para jogar em seu smartphone.</span>
+                </div>
+              </a>
             </div>
           )}
         </div>
