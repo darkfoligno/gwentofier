@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft, Gamepad2, Copy, Check, X } from "lucide-react"
+import { Coins, Gem, Library, ScrollText, Search, Shield, Swords, Trophy, Users, Layers, Lock, Wallet, ChevronRight, ArrowRightLeft, Gamepad2, Copy, Check, X, Smartphone } from "lucide-react"
 import { useWallet } from "@/components/wallet-provider"
 import { supabase } from "@/lib/supabase"
 import { filtrosElemento, filtrosRaridade, type GameCard as GameCardType, type OfficialCardType, type Rarity } from "@/lib/game-data"
@@ -222,6 +222,7 @@ export function HubScreen({ onEnter }: { onEnter: (screen: Screen) => void }) {
         <TopAction icon={Layers} label="MINHAS CARTAS" onClick={() => onEnter("decks")} />
         <TopAction icon={Users} label="DUELISTAS" onClick={() => onEnter("friends")} />
         <TopAction icon={ScrollText} label="ATUALIZAÇÕES" onClick={() => onEnter("patch-notes")} />
+        <TopAction icon={Smartphone} label="VERSÃO ANDROID" onClick={() => window.open("https://mega.nz/file/odRETa7T#EHorcb217wpRSyoPLkA-TSE_aEDvCbhIHJnM333hWJw", "_blank")} featured />
       </nav>
     </header>
     {error && <div className="mb-4 rounded border border-red-500/50 bg-red-950/60 p-3 text-red-200"><strong className="block text-xs uppercase tracking-wider">Aviso do lobby</strong>{error}</div>}
